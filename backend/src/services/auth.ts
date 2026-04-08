@@ -4,10 +4,17 @@ import { prisma } from "../lib/prisma.js";
 
 const SALT_ROUNDS = 12;
 
+export class AuthError extends Error {
+  constructor(message: string, public readonly code: string) {
+    super(message);
+  }
+}
+
 export async function registerUser(email: string, password: string, name?: string) {
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {
-    throw new Error("Email already registered");
+    // Generic message to prevent account enumeration
+    throw new AuthError("Registration failed. Please try again or sign in.", "registration_failed");
   }
 
   const passwordHash = await hash(password, SALT_ROUNDS);

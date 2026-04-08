@@ -6,6 +6,7 @@ import { registerUser, loginUser, generateSessionToken, hashToken } from "../ser
 import { prisma } from "../lib/prisma.js";
 import { config } from "../config/index.js";
 import { requireAuth } from "../middleware/auth.js";
+import { rateLimit } from "../middleware/rate-limit.js";
 import type { AppEnv } from "../types/hono.js";
 
 const auth = new Hono<AppEnv>();
@@ -14,13 +15,13 @@ const SESSION_MAX_AGE = 30 * 24 * 60 * 60; // 30 days in seconds
 
 const registerSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(8),
+  password: z.string().min(8).max(128),
   name: z.string().optional(),
 });
 
 const loginSchema = z.object({
   email: z.string().email(),
-  password: z.string(),
+  password: z.string().min(1).max(128),
 });
 
 function setSessionCookie(c: Parameters<typeof setCookie>[0], token: string) {
@@ -45,8 +46,8 @@ async function createSession(userId: string): Promise<string> {
   return token;
 }
 
-// POST /auth/register
-auth.post("/register", zValidator("json", registerSchema), async (c) => {
+// POST /auth/register — 5 attempts per minute
+auth.post("/register", rateLimit({ max: 5, windowMs: 60_000 }), zValidator("json", registerSchema), async (c) => {
   const { email, password, name } = c.req.valid("json");
 
   try {
@@ -54,14 +55,13 @@ auth.post("/register", zValidator("json", registerSchema), async (c) => {
     const token = await createSession(user.id);
     setSessionCookie(c, token);
     return c.json({ user }, 201);
-  } catch (e) {
-    const message = e instanceof Error ? e.message : "Registration failed";
-    return c.json({ error: "registration_failed", message }, 400);
+  } catch {
+    return c.json({ error: "registration_failed", message: "Registration failed. Please try again or sign in." }, 400);
   }
 });
 
-// POST /auth/login
-auth.post("/login", zValidator("json", loginSchema), async (c) => {
+// POST /auth/login — 10 attempts per minute
+auth.post("/login", rateLimit({ max: 10, windowMs: 60_000 }), zValidator("json", loginSchema), async (c) => {
   const { email, password } = c.req.valid("json");
 
   try {
@@ -81,7 +81,7 @@ auth.post("/logout", async (c) => {
     const tokenHash = hashToken(sessionToken);
     await prisma.session.deleteMany({ where: { tokenHash } });
   }
-  deleteCookie(c, "session");
+  deleteCookie(c, "session", { path: "/" });
   return c.json({ ok: true });
 });
 

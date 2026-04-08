@@ -1,5 +1,5 @@
 import type { MiddlewareHandler } from "hono";
-import { getCookie } from "hono/cookie";
+import { getCookie, deleteCookie } from "hono/cookie";
 import { prisma } from "../lib/prisma.js";
 import { hashToken } from "../services/auth.js";
 import type { AppEnv } from "../types/hono.js";
@@ -21,6 +21,7 @@ export const requireAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
     if (session) {
       await prisma.session.delete({ where: { id: session.id } });
     }
+    deleteCookie(c, "session", { path: "/" });
     return c.json({ error: "unauthorized", message: "Session expired" }, 401);
   }
 
