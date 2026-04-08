@@ -1,6 +1,8 @@
 services:
   db:
     image: postgres:16-alpine
+    container_name: project-pilot-db
+    restart: unless-stopped
     environment:
       POSTGRES_USER: project_pilot
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -19,6 +21,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    container_name: project-pilot-backend
     restart: unless-stopped
     depends_on:
       db:
@@ -44,6 +47,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+    container_name: project-pilot-frontend
     restart: unless-stopped
     depends_on:
       - backend
