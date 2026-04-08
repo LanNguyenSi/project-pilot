@@ -59,7 +59,9 @@ export default function DeploysPage() {
   }, [router]);
 
   async function handleDeploy(serverName: string, appName: string) {
+    if (!confirm(`Deploy ${appName} on ${serverName}?`)) return;
     setDeploying(`${serverName}/${appName}`);
+    setError("");
     try {
       await apiFetch("/api/deploy/trigger", {
         method: "POST",

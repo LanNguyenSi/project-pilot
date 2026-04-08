@@ -46,6 +46,7 @@ export default function TasksPage() {
 
   useEffect(() => {
     if (!selectedProject) return;
+    setError("");
     setLoading(true);
     apiFetch<{ tasks: Task[] }>(`/api/tasks/projects/${selectedProject}/tasks`)
       .then((data) => setTasks(data.tasks))

@@ -64,6 +64,14 @@ tasks.get("/claimable", async (c) => {
   return c.json(result.data);
 });
 
+// GET /tasks/signals — agent signals (must be before /:taskId to avoid shadowing)
+tasks.get("/signals/inbox", async (c) => {
+  const userId = c.get("userId")!;
+  const result = await tasksRequest<unknown>(userId, "/api/agent/signals");
+  if (!result.ok) return c.json({ error: result.error }, result.status as any);
+  return c.json(result.data);
+});
+
 // GET /tasks/:taskId — task details
 tasks.get("/:taskId", async (c) => {
   const userId = c.get("userId")!;
@@ -104,14 +112,6 @@ tasks.post("/:taskId/comments", async (c) => {
     method: "POST",
     body: JSON.stringify(body),
   });
-  if (!result.ok) return c.json({ error: result.error }, result.status as any);
-  return c.json(result.data);
-});
-
-// GET /tasks/signals — agent signals
-tasks.get("/signals/inbox", async (c) => {
-  const userId = c.get("userId")!;
-  const result = await tasksRequest<unknown>(userId, "/api/agent/signals");
   if (!result.ok) return c.json({ error: result.error }, result.status as any);
   return c.json(result.data);
 });

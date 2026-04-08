@@ -85,11 +85,11 @@ deploy.get("/history", async (c) => {
   const serverId = c.req.query("server_id");
   const appId = c.req.query("app_id");
   const status = c.req.query("status");
-  const limit = c.req.query("limit");
+  const limit = Math.min(parseInt(c.req.query("limit") || "50", 10) || 50, 200).toString();
   if (serverId) params.set("server_id", serverId);
   if (appId) params.set("app_id", appId);
   if (status) params.set("status", status);
-  if (limit) params.set("limit", limit);
+  params.set("limit", limit);
   const qs = params.toString() ? `?${params}` : "";
   const result = await deployRequest<unknown>(userId, `/api/v1/deploys${qs}`);
   if (!result.ok) return c.json({ error: result.error }, result.status as any);
