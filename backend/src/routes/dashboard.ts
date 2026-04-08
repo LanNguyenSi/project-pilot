@@ -15,7 +15,8 @@ dashboard.use("*", requireAuth);
 
 // GET /dashboard/summary — aggregated data from all services
 dashboard.get("/summary", async (c) => {
-  const userId = c.get("userId")!;
+  const userId = c.get("userId");
+  if (!userId) return c.json({ error: "unauthorized" }, 401);
 
   const creds = await listCredentials(userId);
   const configured = creds.map((cr) => cr.service);

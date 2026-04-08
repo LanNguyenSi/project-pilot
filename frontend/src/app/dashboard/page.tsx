@@ -76,7 +76,12 @@ export default function DashboardPage() {
         setUser(userData.user);
         setData(dashData);
       })
-      .catch(() => router.push("/login"))
+      .catch((err: Error) => {
+        if (err.message.includes("401") || err.message.includes("Not authenticated")) {
+          router.push("/login");
+        }
+        // Non-auth errors: stay on page with partial data
+      })
       .finally(() => setLoading(false));
   }, [router]);
 
@@ -160,8 +165,8 @@ export default function DashboardPage() {
           />
           <StatCard
             title="Project Forge"
-            value={forge?.configured ? "Ready" : null}
-            subtitle="project scaffolding"
+            value={forge?.configured ? "Token saved" : null}
+            subtitle="project scaffolding — no live check"
             configured={forge?.configured ?? false}
           />
         </div>
