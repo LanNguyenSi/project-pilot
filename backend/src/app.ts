@@ -8,6 +8,8 @@ import { auth } from "./routes/auth.js";
 import { credentials } from "./routes/credentials.js";
 import { dashboard } from "./routes/dashboard.js";
 import { forge } from "./routes/forge.js";
+import { tasks } from "./routes/tasks.js";
+import { deploy } from "./routes/deploy.js";
 
 const app = new Hono<AppEnv>();
 
@@ -17,11 +19,15 @@ app.use("/api/auth/*", csrfProtection);
 app.use("/api/credentials/*", csrfProtection);
 app.use("/api/dashboard/*", csrfProtection);
 app.use("/api/forge/*", csrfProtection);
+app.use("/api/tasks/*", csrfProtection);
+app.use("/api/deploy/*", csrfProtection);
 
 app.route("/api", health);
 app.route("/api/auth", auth);
 app.route("/api/credentials", credentials);
 app.route("/api/dashboard", dashboard);
 app.route("/api/forge", forge);
+app.route("/api/tasks", tasks);
+app.route("/api/deploy", deploy);
 
 export { app };
