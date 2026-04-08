@@ -2,6 +2,7 @@
   "name": "@project-pilot/mcp",
   "version": "0.0.1",
   "private": true,
+  "type": "module",
   "bin": {
     "project-pilot-mcp": "./dist/index.js"
   },
@@ -11,7 +12,8 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.12.1"
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "zod": "^3.25.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
