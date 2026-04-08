@@ -1,4 +1,20 @@
 #!/usr/bin/env node
-// MCP server entry point — implementation in a later task
-console.log("project-pilot MCP server — not yet implemented");
-process.exit(0);
+
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { loadConfig } from "./config.js";
+import { PilotClient } from "./client.js";
+import { registerTools } from "./tools.js";
+
+const config = loadConfig();
+const client = new PilotClient(config);
+
+const server = new McpServer({
+  name: "project-pilot",
+  version: "0.0.1",
+});
+
+registerTools(server, client);
+
+const transport = new StdioServerTransport();
+await server.connect(transport);
