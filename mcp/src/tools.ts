@@ -115,7 +115,7 @@ export function registerTools(server: McpServer, client: PilotClient) {
     "Transition a task to a new status (open, in_progress, review, done)",
     {
       taskId: z.string().describe("Task ID"),
-      status: z.string().describe("Target status: open, review, done"),
+      status: z.enum(["open", "in_progress", "review", "done"]).describe("Target status"),
     },
     async ({ taskId, status }) => {
       try { return text(await client.transitionTask(taskId, status)); }
