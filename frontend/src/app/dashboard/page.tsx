@@ -176,6 +176,18 @@ export default function DashboardPage() {
           <h2 className="text-lg font-semibold mb-4">Quick Actions</h2>
           <div className="flex flex-wrap gap-3">
             <a
+              href="/forge/create"
+              className="rounded-lg bg-gray-800 border border-gray-700 px-4 py-2.5 text-sm hover:bg-gray-700"
+            >
+              New Project
+            </a>
+            <a
+              href="/forge"
+              className="rounded-lg bg-gray-800 border border-gray-700 px-4 py-2.5 text-sm hover:bg-gray-700"
+            >
+              All Projects
+            </a>
+            <a
               href="/settings"
               className="rounded-lg bg-gray-800 border border-gray-700 px-4 py-2.5 text-sm hover:bg-gray-700"
             >
