@@ -14,7 +14,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm install --workspace=backend
+      - run: npm ci
       - run: cd backend && npx prisma generate
       - run: npm run lint --workspace=backend
       - run: npm run build --workspace=backend
@@ -26,5 +26,5 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm install --workspace=frontend
+      - run: npm ci
       - run: npm run build --workspace=frontend

@@ -19,6 +19,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    restart: unless-stopped
     depends_on:
       db:
         condition: service_healthy
@@ -29,13 +30,21 @@ services:
       CORS_ORIGINS: https://project-pilot.opentriologue.ai
       FRONTEND_URL: https://project-pilot.opentriologue.ai
       NODE_ENV: production
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.project-pilot-api.rule=Host(`project-pilot.opentriologue.ai`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.project-pilot-api.entrypoints=websecure"
+      - "traefik.http.routers.project-pilot-api.tls.certresolver=letsencrypt"
+      - "traefik.http.services.project-pilot-api.loadbalancer.server.port=3001"
     networks:
       - internal
+      - traefik
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+    restart: unless-stopped
     depends_on:
       - backend
     environment:
