@@ -53,6 +53,17 @@ forge.get("/projects", async (c) => {
   return c.json(result.data);
 });
 
+// DELETE /forge/projects/:id — soft-delete a project
+forge.delete("/projects/:id", async (c) => {
+  const userId = c.get("userId")!;
+  const id = c.req.param("id");
+  const result = await forgeRequest<{ ok: boolean }>(userId, `/api/v1/projects?id=${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+  if (!result.ok) return c.json({ error: result.error }, result.status as any);
+  return c.json(result.data);
+});
+
 const generateSchema = z.object({
   projectName: z.string().min(1).max(100).regex(/^[a-zA-Z0-9._-]+$/),
   summary: z.string().min(1).max(2000),

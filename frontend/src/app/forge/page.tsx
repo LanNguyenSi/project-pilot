@@ -17,6 +17,16 @@ export default function ForgePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  async function handleDelete(id: string, name: string) {
+    if (!confirm(`Remove "${name}" from list?`)) return;
+    try {
+      await apiFetch(`/api/forge/projects/${id}`, { method: "DELETE" });
+      setProjects((prev) => prev.filter((p) => p.id !== id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete");
+    }
+  }
+
   useEffect(() => {
     apiFetch<{ projects: Project[] }>("/api/forge/projects")
       .then((data) => setProjects(data.projects))
@@ -76,14 +86,22 @@ export default function ForgePage() {
                     {new Date(p.createdAt).toLocaleDateString()}
                   </p>
                 </div>
-                <a
-                  href={p.repoUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="rounded-lg bg-gray-800 px-3 py-1.5 text-sm hover:bg-gray-700"
-                >
-                  GitHub
-                </a>
+                <div className="flex gap-2">
+                  <a
+                    href={p.repoUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-lg bg-gray-800 px-3 py-1.5 text-sm hover:bg-gray-700"
+                  >
+                    GitHub
+                  </a>
+                  <button
+                    onClick={() => handleDelete(p.id, p.projectName)}
+                    className="rounded-lg bg-gray-800 px-3 py-1.5 text-sm text-red-400 hover:bg-gray-700"
+                  >
+                    Remove
+                  </button>
+                </div>
               </div>
             ))}
           </div>
