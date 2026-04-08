@@ -1,0 +1,94 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { apiFetch } from "@/lib/api";
+
+interface Project {
+  id: string;
+  repoUrl: string;
+  projectName: string;
+  createdAt: string;
+}
+
+export default function ForgePage() {
+  const router = useRouter();
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    apiFetch<{ projects: Project[] }>("/api/forge/projects")
+      .then((data) => setProjects(data.projects))
+      .catch((err: Error) => {
+        if (err.message.includes("401")) return router.push("/login");
+        setError(err.message);
+      })
+      .finally(() => setLoading(false));
+  }, [router]);
+
+  if (loading) {
+    return (
+      <main className="flex min-h-screen items-center justify-center">
+        <p className="text-gray-400">Loading...</p>
+      </main>
+    );
+  }
+
+  return (
+    <main className="min-h-screen p-8">
+      <div className="max-w-4xl mx-auto">
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-2xl font-bold">Projects</h1>
+            <p className="text-gray-400 text-sm mt-1">Created via Project Forge</p>
+          </div>
+          <div className="flex gap-3">
+            <a href="/dashboard" className="rounded-lg bg-gray-800 px-4 py-2 text-sm hover:bg-gray-700">
+              Dashboard
+            </a>
+            <a href="/forge/create" className="rounded-lg bg-white text-black px-4 py-2 text-sm font-medium hover:bg-gray-200">
+              New Project
+            </a>
+          </div>
+        </div>
+
+        {error && (
+          <div className="rounded-lg bg-gray-900 border border-red-800/50 p-4 mb-6">
+            <p className="text-sm text-red-400">{error}</p>
+          </div>
+        )}
+
+        {projects.length === 0 && !error ? (
+          <div className="rounded-lg bg-gray-900 border border-gray-800 p-8 text-center">
+            <p className="text-gray-400 mb-4">No projects yet</p>
+            <a href="/forge/create" className="rounded-lg bg-white text-black px-4 py-2 text-sm font-medium hover:bg-gray-200">
+              Create your first project
+            </a>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {projects.map((p) => (
+              <div key={p.id} className="rounded-lg bg-gray-900 border border-gray-800 p-4 flex items-center justify-between">
+                <div>
+                  <h3 className="font-medium">{p.projectName}</h3>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {new Date(p.createdAt).toLocaleDateString()}
+                  </p>
+                </div>
+                <a
+                  href={p.repoUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-lg bg-gray-800 px-3 py-1.5 text-sm hover:bg-gray-700"
+                >
+                  GitHub
+                </a>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </main>
+  );
+}

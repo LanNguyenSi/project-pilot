@@ -7,6 +7,7 @@ import { health } from "./routes/health.js";
 import { auth } from "./routes/auth.js";
 import { credentials } from "./routes/credentials.js";
 import { dashboard } from "./routes/dashboard.js";
+import { forge } from "./routes/forge.js";
 
 const app = new Hono<AppEnv>();
 
@@ -15,10 +16,12 @@ app.use("*", securityHeaders);
 app.use("/api/auth/*", csrfProtection);
 app.use("/api/credentials/*", csrfProtection);
 app.use("/api/dashboard/*", csrfProtection);
+app.use("/api/forge/*", csrfProtection);
 
 app.route("/api", health);
 app.route("/api/auth", auth);
 app.route("/api/credentials", credentials);
 app.route("/api/dashboard", dashboard);
+app.route("/api/forge", forge);
 
 export { app };
