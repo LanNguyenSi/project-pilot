@@ -15,8 +15,21 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  apiKeys          ApiKey[]
+  apiKeys            ApiKey[]
   serviceCredentials ServiceCredential[]
+  sessions           Session[]
+}
+
+model Session {
+  id        String   @id @default(uuid())
+  tokenHash String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 model ApiKey {
