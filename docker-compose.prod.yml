@@ -36,6 +36,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.project-pilot-api.rule=Host(`project-pilot.opentriologue.ai`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.project-pilot-api.priority=20"
       - "traefik.http.routers.project-pilot-api.entrypoints=websecure"
       - "traefik.http.routers.project-pilot-api.tls.certresolver=letsencrypt"
       - "traefik.http.services.project-pilot-api.loadbalancer.server.port=3001"
@@ -56,6 +57,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.project-pilot.rule=Host(`project-pilot.opentriologue.ai`)"
+      - "traefik.http.routers.project-pilot.priority=10"
       - "traefik.http.routers.project-pilot.entrypoints=websecure"
       - "traefik.http.routers.project-pilot.tls.certresolver=letsencrypt"
       - "traefik.http.services.project-pilot.loadbalancer.server.port=3000"
