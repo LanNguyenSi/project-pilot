@@ -53,6 +53,7 @@ services:
     depends_on:
       - backend
     environment:
+      HOSTNAME: "0.0.0.0"
       NEXT_PUBLIC_API_URL: https://project-pilot.opentriologue.ai
     labels:
       - "traefik.enable=true"
