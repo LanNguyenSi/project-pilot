@@ -48,6 +48,8 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: https://project-pilot.opentriologue.ai
     container_name: project-pilot-frontend
     restart: unless-stopped
     depends_on:
