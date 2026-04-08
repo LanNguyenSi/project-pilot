@@ -1,0 +1,48 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  name         String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  apiKeys          ApiKey[]
+  serviceCredentials ServiceCredential[]
+}
+
+model ApiKey {
+  id        String    @id @default(uuid())
+  name      String
+  keyHash   String    @unique
+  keyPrefix String
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+}
+
+model ServiceCredential {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  service   String   // "project-forge" | "agent-tasks" | "deploy-panel"
+  token     String   // encrypted
+  label     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, service])
+  @@index([userId])
+}

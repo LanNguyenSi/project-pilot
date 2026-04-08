@@ -1,0 +1,68 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: project_pilot
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: project_pilot
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U project_pilot"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - internal
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://project_pilot:${POSTGRES_PASSWORD}@db:5432/project_pilot
+      SESSION_SECRET: ${SESSION_SECRET}
+      PORT: "3001"
+      CORS_ORIGINS: https://project-pilot.opentriologue.ai
+      FRONTEND_URL: https://project-pilot.opentriologue.ai
+      NODE_ENV: production
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.project-pilot-api.rule=Host(`project-pilot.opentriologue.ai`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.project-pilot-api.entrypoints=websecure"
+      - "traefik.http.routers.project-pilot-api.tls.certresolver=letsencrypt"
+      - "traefik.http.services.project-pilot-api.loadbalancer.server.port=3001"
+    networks:
+      - internal
+      - traefik
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      NEXT_PUBLIC_API_URL: https://project-pilot.opentriologue.ai
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.project-pilot.rule=Host(`project-pilot.opentriologue.ai`)"
+      - "traefik.http.routers.project-pilot.entrypoints=websecure"
+      - "traefik.http.routers.project-pilot.tls.certresolver=letsencrypt"
+      - "traefik.http.services.project-pilot.loadbalancer.server.port=3000"
+    networks:
+      - internal
+      - traefik
+
+volumes:
+  pgdata:
+
+networks:
+  internal:
+  traefik:
+    external: true
