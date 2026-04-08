@@ -1,4 +1,4 @@
-.PHONY: install setup dev dev-backend dev-frontend build clean docker-up docker-down db-generate db-push
+.PHONY: install setup dev dev-full dev-backend dev-frontend build clean docker-up docker-down db-generate db-push
 
 install:
 	npm install
@@ -7,6 +7,14 @@ setup: install db-generate
 	@echo "Setup complete. Run 'make docker-up' for PostgreSQL, then 'make db-push'."
 
 dev:
+	npm run dev
+
+dev-full: install db-generate docker-up
+	@echo "Waiting for PostgreSQL..."
+	@until docker compose exec db pg_isready -U project_pilot -q 2>/dev/null; do sleep 1; done
+	@test -f backend/.env || cp backend/.env.example backend/.env
+	@test -f frontend/.env || cp frontend/.env.example frontend/.env
+	cd backend && npx prisma db push --skip-generate
 	npm run dev
 
 dev-backend:
