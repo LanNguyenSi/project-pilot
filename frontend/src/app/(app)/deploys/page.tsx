@@ -193,7 +193,7 @@ export default function DeploysPage() {
 
       {/* History tab */}
       {tab === "history" && (<div role="tabpanel" aria-label="History">
-        deploys.length === 0 ? (
+        {deploys.length === 0 ? (
           <p className="text-content-secondary text-sm">No deploys yet</p>
         ) : (
           <div className="space-y-0">
@@ -225,7 +225,7 @@ export default function DeploysPage() {
               );
             })}
           </div>
-        )
+        )}
       </div>)}
 
       <ConfirmModal
