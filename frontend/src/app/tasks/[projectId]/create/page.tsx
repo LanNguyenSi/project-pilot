@@ -30,6 +30,7 @@ export default function CreateTaskPage() {
       .then((data) => {
         const found = data.projects.find((p) => p.id === projectId);
         if (found) setProject(found);
+        else setError("Project not found");
       })
       .catch((err: Error) => {
         if (err.message.includes("401")) return router.push("/login");
@@ -49,7 +50,7 @@ export default function CreateTaskPage() {
     if (constraints) template.constraints = constraints.split("\n").filter(Boolean);
 
     try {
-      await apiFetch(`/api/tasks/projects/${projectId}/tasks`, {
+      await apiFetch(`/api/tasks/projects/${encodeURIComponent(projectId)}/tasks`, {
         method: "POST",
         body: JSON.stringify({
           title,
@@ -172,7 +173,7 @@ export default function CreateTaskPage() {
 
           <button
             type="submit"
-            disabled={submitting}
+            disabled={submitting || !project}
             className="w-full rounded-lg bg-white text-black py-2.5 text-sm font-medium hover:bg-gray-200 disabled:opacity-50"
           >
             {submitting ? "Creating..." : "Create Task"}

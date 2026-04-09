@@ -48,12 +48,16 @@ export default function ProjectTasksPage() {
 
     Promise.all([
       apiFetch<{ projects: Project[] }>("/api/tasks/projects"),
-      apiFetch<{ tasks: Task[] }>(`/api/tasks/projects/${projectId}/tasks`),
+      apiFetch<{ tasks: Task[] }>(`/api/tasks/projects/${encodeURIComponent(projectId)}/tasks`),
     ])
       .then(([projectsData, tasksData]) => {
         const found = projectsData.projects.find((p) => p.id === projectId);
-        if (found) setProject(found);
-        setTasks(tasksData.tasks);
+        if (found) {
+          setProject(found);
+          setTasks(tasksData.tasks);
+        } else {
+          setError("Project not found");
+        }
       })
       .catch((err: Error) => {
         if (err.message.includes("401")) return router.push("/login");
