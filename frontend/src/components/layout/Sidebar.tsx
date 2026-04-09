@@ -103,7 +103,7 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
         href={item.href}
         className={`flex items-center gap-3 px-3 py-2 rounded-button text-sm transition-colors duration-fast ${
           active
-            ? "text-accent-blue bg-accent-blue/10 font-medium border-l-2 border-accent-blue -ml-[2px]"
+            ? "text-accent-blue bg-accent-blue/10 font-medium"
             : "text-content-secondary hover:text-content-primary hover:bg-surface-tertiary"
         } ${collapsed && !mobileOpen ? "justify-center" : ""}`}
       >
