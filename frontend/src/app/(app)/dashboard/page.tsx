@@ -86,7 +86,21 @@ export default function DashboardPage() {
   }, [router]);
 
   if (loading) {
-    return <p className="text-content-secondary">Loading...</p>;
+    return (
+      <div>
+        <div className="bg-surface-tertiary rounded-md animate-pulse h-7 w-40 mb-2" />
+        <div className="bg-surface-tertiary rounded-md animate-pulse h-4 w-48 mb-8" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+          {Array.from({ length: 3 }, (_, i) => (
+            <div key={i} className="bg-surface-secondary border border-stroke-default rounded-card p-6 space-y-3">
+              <div className="bg-surface-tertiary rounded-md animate-pulse h-3 w-24" />
+              <div className="bg-surface-tertiary rounded-md animate-pulse h-8 w-16" />
+              <div className="bg-surface-tertiary rounded-md animate-pulse h-3 w-32" />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   }
 
   const forge = data?.services["project-forge"];

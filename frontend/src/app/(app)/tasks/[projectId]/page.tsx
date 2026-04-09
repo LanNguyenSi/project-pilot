@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
-import { Badge, Button, Card } from "@/components/ui";
+import { Badge, Button, Card, EmptyState, SkeletonRow } from "@/components/ui";
 import type { BadgeVariant } from "@/components/ui";
 
 interface Task {
@@ -87,11 +87,17 @@ export default function ProjectTasksPage() {
       )}
 
       {loading ? (
-        <p className="text-content-secondary">Loading...</p>
+        <div className="space-y-2">
+          {Array.from({ length: 5 }, (_, i) => <SkeletonRow key={i} />)}
+        </div>
       ) : tasks.length === 0 ? (
-        <Card className="p-8 text-center">
-          <p className="text-content-secondary">No tasks in this project</p>
-        </Card>
+        <EmptyState
+          icon={<svg className="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+          title="No tasks yet"
+          description="Create your first task to start tracking work for this project."
+          actionLabel="Create Task"
+          actionHref={`/tasks/${projectId}/create`}
+        />
       ) : (
         <div className="space-y-2">
           {tasks.map((t) => {

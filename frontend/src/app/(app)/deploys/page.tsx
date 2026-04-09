@@ -91,7 +91,20 @@ export default function DeploysPage() {
   };
 
   if (loading) {
-    return <p className="text-content-secondary">Loading...</p>;
+    return (
+      <div>
+        <div className="bg-surface-tertiary rounded-md animate-pulse h-7 w-36 mb-6" />
+        <div className="space-y-2">
+          {Array.from({ length: 5 }, (_, i) => (
+            <div key={i} className="bg-surface-secondary border border-stroke-default rounded-card p-4 flex items-center gap-4">
+              <div className="bg-surface-tertiary rounded-md animate-pulse h-4 w-16" />
+              <div className="bg-surface-tertiary rounded-md animate-pulse h-4 flex-1 max-w-xs" />
+              <div className="bg-surface-tertiary rounded-md animate-pulse h-4 w-20" />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   }
 
   return (

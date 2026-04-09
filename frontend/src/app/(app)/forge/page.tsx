@@ -38,7 +38,17 @@ export default function ForgePage() {
   }, [router]);
 
   if (loading) {
-    return <p className="text-content-secondary">Loading...</p>;
+    return (
+      <div className="space-y-3">
+        <div className="bg-surface-tertiary rounded-md animate-pulse h-7 w-24 mb-8" />
+        {Array.from({ length: 4 }, (_, i) => (
+          <div key={i} className="bg-surface-secondary border border-stroke-default rounded-card p-4">
+            <div className="bg-surface-tertiary rounded-md animate-pulse h-4 w-32 mb-2" />
+            <div className="bg-surface-tertiary rounded-md animate-pulse h-3 w-20" />
+          </div>
+        ))}
+      </div>
+    );
   }
 
   return (
