@@ -109,12 +109,11 @@ export default function ProjectTasksPage() {
 
       {/* Filter bar */}
       {!loading && tasks.length > 0 && (
-        <div className="flex gap-1 mb-4" role="tablist" aria-label="Filter by status">
+        <div className="flex gap-1 mb-4" role="toolbar" aria-label="Filter by status">
           {filters.map((f) => (
             <button
               key={f.key}
-              role="tab"
-              aria-selected={filter === f.key}
+              aria-pressed={filter === f.key}
               onClick={() => setFilter(f.key)}
               className={`px-3 py-1.5 text-xs font-medium rounded-button transition-colors duration-fast ${
                 filter === f.key
@@ -151,7 +150,7 @@ export default function ProjectTasksPage() {
         />
       ) : filtered.length === 0 ? (
         <Card className="p-8 text-center">
-          <p className="text-content-secondary text-sm">No {filter.replace("_", " ")} tasks</p>
+          <p className="text-content-secondary text-sm">No {filter.replaceAll("_", " ")} tasks</p>
         </Card>
       ) : (
         <div className="space-y-2">
