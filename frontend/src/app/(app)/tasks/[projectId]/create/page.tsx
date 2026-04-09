@@ -67,19 +67,13 @@ export default function CreateTaskPage() {
   }
 
   return (
-    <main className="min-h-screen p-8">
-      <div className="max-w-3xl mx-auto">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-2xl font-bold">Create Task</h1>
-            {project && (
-              <p className="text-sm text-gray-500 mt-1">{project.name}</p>
-            )}
-          </div>
-          <a href={`/tasks/${projectId}`} className="rounded-lg bg-gray-800 px-4 py-2 text-sm hover:bg-gray-700">
-            Back
-          </a>
-        </div>
+    <>
+      <div className="mb-8">
+        <h1 className="text-page-title text-content-primary">Create Task</h1>
+        {project && (
+          <p className="text-sm text-content-secondary mt-1">{project.name}</p>
+        )}
+      </div>
 
         {error && (
           <div className="rounded-lg bg-gray-900 border border-red-800/50 p-4 mb-6">
@@ -179,7 +173,6 @@ export default function CreateTaskPage() {
             {submitting ? "Creating..." : "Create Task"}
           </button>
         </form>
-      </div>
-    </main>
+    </>
   );
 }

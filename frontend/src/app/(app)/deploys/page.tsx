@@ -91,22 +91,12 @@ export default function DeploysPage() {
   };
 
   if (loading) {
-    return (
-      <main className="flex min-h-screen items-center justify-center">
-        <p className="text-gray-400">Loading...</p>
-      </main>
-    );
+    return <p className="text-content-secondary">Loading...</p>;
   }
 
   return (
-    <main className="min-h-screen p-8">
-      <div className="max-w-5xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold">Deployments</h1>
-          <a href="/dashboard" className="rounded-lg bg-gray-800 px-4 py-2 text-sm hover:bg-gray-700">
-            Dashboard
-          </a>
-        </div>
+    <>
+      <h1 className="text-page-title text-content-primary mb-6">Deployments</h1>
 
         {error && (
           <div className="rounded-lg bg-gray-900 border border-red-800/50 p-4 mb-6">
@@ -180,7 +170,6 @@ export default function DeploysPage() {
             </div>
           )}
         </section>
-      </div>
-    </main>
+    </>
   );
 }
