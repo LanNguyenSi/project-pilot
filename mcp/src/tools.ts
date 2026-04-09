@@ -131,9 +131,15 @@ export function registerTools(server: McpServer, client: PilotClient) {
       title: z.string().describe("Task title"),
       priority: z.enum(["CRITICAL", "HIGH", "MEDIUM", "LOW"]).optional().describe("Task priority (default MEDIUM)"),
       description: z.string().optional().describe("Task description"),
+      template: z.object({
+        goal: z.string().optional(),
+        acceptanceCriteria: z.array(z.string()).optional(),
+        context: z.string().optional(),
+        constraints: z.array(z.string()).optional(),
+      }).optional().describe("Task template with goal, acceptance criteria, context, constraints"),
     },
-    async ({ projectId, title, priority, description }) => {
-      try { return text(await client.createTask(projectId, { title, priority, description })); }
+    async ({ projectId, title, priority, description, template }) => {
+      try { return text(await client.createTask(projectId, { title, priority, description, template })); }
       catch (e) { return error(e); }
     },
   );

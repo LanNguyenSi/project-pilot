@@ -182,7 +182,7 @@ export default function CreateTaskPage() {
 
           <button
             type="submit"
-            disabled={submitting}
+            disabled={submitting || !selectedProject}
             className="w-full rounded-lg bg-white text-black py-2.5 text-sm font-medium hover:bg-gray-200 disabled:opacity-50"
           >
             {submitting ? "Creating..." : "Create Task"}
