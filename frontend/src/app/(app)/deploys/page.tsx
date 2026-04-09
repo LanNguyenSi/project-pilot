@@ -84,7 +84,7 @@ export default function DeploysPage() {
     try {
       await apiFetch("/api/deploy/trigger", {
         method: "POST",
-        body: JSON.stringify({ server: deployTarget.server, app: deployTarget.app }),
+        body: JSON.stringify({ server: deployTarget.server, app: deployTarget.app, force: true }),
       });
       toast({ title: `Deploy started for ${deployTarget.app}`, variant: "success" });
       const data = await apiFetch<{ deploys: Deploy[] }>("/api/deploy/history?limit=20");
