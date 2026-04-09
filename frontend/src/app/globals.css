@@ -3,15 +3,22 @@
 @tailwind utilities;
 
 :root {
-  --bg-primary: #0a0a0a;
-  --bg-secondary: #111827;
-  --bg-tertiary: #1f2937;
-  --bg-elevated: #374151;
-  --border-default: #1f2937;
-  --border-strong: #374151;
-  --text-primary: #ededed;
-  --text-secondary: #9ca3af;
-  --text-tertiary: #6b7280;
+  /* Surface */
+  --surface-primary: #0a0a0a;
+  --surface-secondary: #111827;
+  --surface-tertiary: #1f2937;
+  --surface-elevated: #374151;
+
+  /* Stroke */
+  --stroke-default: #1f2937;
+  --stroke-strong: #374151;
+
+  /* Content */
+  --content-primary: #ededed;
+  --content-secondary: #9ca3af;
+  --content-tertiary: #6b7280;
+
+  /* Accent */
   --accent-blue: #3b82f6;
   --accent-green: #22c55e;
   --accent-amber: #f59e0b;
@@ -20,7 +27,7 @@
 }
 
 body {
-  background: var(--bg-primary);
-  color: var(--text-primary);
+  background: var(--surface-primary);
+  color: var(--content-primary);
   font-family: system-ui, -apple-system, sans-serif;
 }

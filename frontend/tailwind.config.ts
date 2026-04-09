@@ -7,12 +7,12 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        bg: colors.bg,
-        border: colors.border,
-        text: colors.text,
+        surface: colors.surface,
+        stroke: colors.stroke,
+        content: colors.content,
         accent: colors.accent,
       },
-      fontSize: fontSize as unknown as Record<string, [string, Record<string, string>]>,
+      fontSize,
       spacing,
       borderRadius,
       transitionDuration,
