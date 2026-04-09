@@ -123,6 +123,21 @@ export function registerTools(server: McpServer, client: PilotClient) {
     },
   );
 
+  server.tool(
+    "tasks_create",
+    "Create a new task in a project",
+    {
+      projectId: z.string().describe("Project ID"),
+      title: z.string().describe("Task title"),
+      priority: z.enum(["CRITICAL", "HIGH", "MEDIUM", "LOW"]).optional().describe("Task priority (default MEDIUM)"),
+      description: z.string().optional().describe("Task description"),
+    },
+    async ({ projectId, title, priority, description }) => {
+      try { return text(await client.createTask(projectId, { title, priority, description })); }
+      catch (e) { return error(e); }
+    },
+  );
+
   // ── Deploy Tools ─────────────────────────────────────────────────────────
 
   server.tool(
