@@ -1,0 +1,39 @@
+"use client";
+
+import { forwardRef, type TextareaHTMLAttributes } from "react";
+
+interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
+  label?: string;
+  hint?: string;
+  error?: string;
+}
+
+const textareaBase =
+  "w-full bg-surface-primary border rounded-input px-3 py-2 text-sm text-content-primary placeholder:text-content-tertiary focus:outline-none focus:ring-2 resize-none transition-colors duration-fast";
+
+export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
+  function Textarea({ label, hint, error, className = "", id, ...rest }, ref) {
+    const textareaId = id || label?.toLowerCase().replace(/\s+/g, "-");
+    const borderCls = error
+      ? "border-accent-red focus:ring-accent-red/50 focus:border-accent-red"
+      : "border-stroke-strong focus:ring-accent-blue/50 focus:border-accent-blue";
+
+    return (
+      <div>
+        {label && (
+          <label htmlFor={textareaId} className="block text-label text-content-tertiary mb-1">
+            {label}
+          </label>
+        )}
+        <textarea
+          ref={ref}
+          id={textareaId}
+          className={`${textareaBase} ${borderCls} ${className}`}
+          {...rest}
+        />
+        {error && <p className="text-accent-red text-xs mt-1">{error}</p>}
+        {!error && hint && <p className="text-content-tertiary text-xs mt-1">{hint}</p>}
+      </div>
+    );
+  },
+);
