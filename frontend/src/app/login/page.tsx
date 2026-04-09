@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
+import { Button, Card, Input } from "@/components/ui";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -40,65 +41,74 @@ export default function LoginPage() {
 
   return (
     <main className="flex min-h-screen items-center justify-center">
-      <div className="w-full max-w-sm space-y-6">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold">project-pilot</h1>
-          <p className="text-gray-400 mt-1">
+      <Card className="w-full max-w-sm p-6">
+        <div className="text-center mb-6">
+          <h1 className="text-section-title text-content-primary">project-pilot</h1>
+          <p className="text-content-secondary text-sm mt-1">
             {isRegister ? "Create your account" : "Sign in to continue"}
           </p>
         </div>
 
+        {/* Segmented control */}
+        <div className="flex bg-surface-tertiary rounded-button p-0.5 mb-6">
+          <button
+            type="button"
+            aria-pressed={!isRegister}
+            onClick={() => { setIsRegister(false); setError(""); }}
+            className={`flex-1 py-1.5 text-xs font-medium rounded-button transition-colors duration-fast ${
+              !isRegister ? "bg-surface-secondary text-content-primary shadow-sm" : "text-content-tertiary"
+            }`}
+          >
+            Sign in
+          </button>
+          <button
+            type="button"
+            aria-pressed={isRegister}
+            onClick={() => { setIsRegister(true); setError(""); }}
+            className={`flex-1 py-1.5 text-xs font-medium rounded-button transition-colors duration-fast ${
+              isRegister ? "bg-surface-secondary text-content-primary shadow-sm" : "text-content-tertiary"
+            }`}
+          >
+            Register
+          </button>
+        </div>
+
         <form onSubmit={handleSubmit} className="space-y-4">
           {isRegister && (
-            <input
-              type="text"
+            <Input
+              label="Name"
               placeholder="Name (optional)"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full rounded-lg bg-gray-900 border border-gray-700 px-4 py-2.5 text-sm focus:outline-none focus:border-gray-500"
             />
           )}
-          <input
+          <Input
+            label="Email"
             type="email"
-            placeholder="Email"
+            placeholder="you@example.com"
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full rounded-lg bg-gray-900 border border-gray-700 px-4 py-2.5 text-sm focus:outline-none focus:border-gray-500"
           />
-          <input
+          <Input
+            label="Password"
             type="password"
-            placeholder="Password"
+            placeholder="Minimum 8 characters"
             required
             minLength={8}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full rounded-lg bg-gray-900 border border-gray-700 px-4 py-2.5 text-sm focus:outline-none focus:border-gray-500"
           />
 
           {error && (
-            <p className="text-red-400 text-sm">{error}</p>
+            <p className="text-accent-red text-sm">{error}</p>
           )}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-lg bg-white text-black py-2.5 text-sm font-medium hover:bg-gray-200 disabled:opacity-50"
-          >
-            {loading ? "..." : isRegister ? "Register" : "Sign in"}
-          </button>
+          <Button type="submit" loading={loading} className="w-full" size="lg">
+            {isRegister ? "Register" : "Sign in"}
+          </Button>
         </form>
-
-        <p className="text-center text-sm text-gray-500">
-          {isRegister ? "Already have an account?" : "No account yet?"}{" "}
-          <button
-            onClick={() => { setIsRegister(!isRegister); setError(""); }}
-            className="text-white underline"
-          >
-            {isRegister ? "Sign in" : "Register"}
-          </button>
-        </p>
-      </div>
+      </Card>
     </main>
   );
 }

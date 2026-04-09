@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
+import { Badge, Button, Card, ConfirmModal, Input, useToast } from "@/components/ui";
 
 interface Credential {
   id: string;
@@ -19,11 +20,12 @@ const SERVICES = [
 
 export default function SettingsPage() {
   const router = useRouter();
+  const { toast } = useToast();
   const [credentials, setCredentials] = useState<Credential[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
   const [tokens, setTokens] = useState<Record<string, string>>({});
-  const [message, setMessage] = useState("");
+  const [removeTarget, setRemoveTarget] = useState<{ key: string; label: string } | null>(null);
 
   useEffect(() => {
     loadCredentials();
@@ -45,8 +47,6 @@ export default function SettingsPage() {
     if (!token) return;
 
     setSaving(service);
-    setMessage("");
-
     try {
       await apiFetch("/api/credentials", {
         method: "PUT",
@@ -54,103 +54,107 @@ export default function SettingsPage() {
       });
       setTokens((prev) => ({ ...prev, [service]: "" }));
       await loadCredentials();
-      setMessage(`${service} token saved`);
+      toast({ title: `${service} token saved`, variant: "success" });
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Failed to save");
+      toast({ title: err instanceof Error ? err.message : "Failed to save", variant: "error" });
     } finally {
       setSaving(null);
     }
   }
 
-  async function removeToken(service: string) {
+  async function removeToken() {
+    if (!removeTarget) return;
     try {
-      await apiFetch(`/api/credentials/${service}`, { method: "DELETE" });
+      await apiFetch(`/api/credentials/${removeTarget.key}`, { method: "DELETE" });
       await loadCredentials();
-      setMessage(`${service} token removed`);
+      toast({ title: `${removeTarget.label} token removed`, variant: "success" });
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Failed to remove");
+      toast({ title: err instanceof Error ? err.message : "Failed to remove", variant: "error" });
+    } finally {
+      setRemoveTarget(null);
     }
   }
 
   if (loading) {
     return (
-      <div>
+      <div role="status" aria-label="Loading">
         <div className="bg-surface-tertiary rounded-md animate-pulse h-7 w-32 mb-8" />
         <div className="space-y-4">
           {Array.from({ length: 3 }, (_, i) => (
-            <div key={i} className="bg-surface-secondary border border-stroke-default rounded-card p-4 space-y-3">
+            <Card key={i} className="space-y-3">
               <div className="bg-surface-tertiary rounded-md animate-pulse h-4 w-28" />
               <div className="bg-surface-tertiary rounded-md animate-pulse h-9 w-full" />
-            </div>
+            </Card>
           ))}
         </div>
+        <span className="sr-only">Loading</span>
       </div>
     );
   }
 
   return (
     <>
-      <h1 className="text-page-title text-content-primary mb-8">Settings</h1>
+      <h1 className="text-page-title text-content-primary mb-2">Settings</h1>
+      <p className="text-sm text-content-secondary mb-8">
+        Connect your downstream services by providing their API tokens. Tokens are stored encrypted.
+      </p>
 
-        <section>
-          <h2 className="text-lg font-semibold mb-4">Service Credentials</h2>
-          <p className="text-sm text-gray-400 mb-6">
-            Connect your downstream services by providing their API tokens.
-            Tokens are stored encrypted.
-          </p>
-
-          {message && (
-            <p className="text-sm text-green-400 mb-4">{message}</p>
-          )}
-
-          <div className="space-y-4">
-            {SERVICES.map(({ key, label, hint }) => {
-              const existing = credentials.find((c) => c.service === key);
-              return (
-                <div
-                  key={key}
-                  className="rounded-lg bg-gray-900 border border-gray-800 p-4"
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <div>
-                      <h3 className="font-medium">{label}</h3>
-                      <p className="text-xs text-gray-500">{hint}</p>
-                    </div>
-                    {existing && (
-                      <div className="flex items-center gap-3">
-                        <span className="text-xs text-green-400">Connected</span>
-                        <button
-                          onClick={() => removeToken(key)}
-                          className="text-xs text-red-400 hover:text-red-300"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex gap-2">
-                    <input
-                      type="password"
-                      placeholder={existing ? "Replace token..." : "Paste token..."}
-                      value={tokens[key] || ""}
-                      onChange={(e) =>
-                        setTokens((prev) => ({ ...prev, [key]: e.target.value }))
-                      }
-                      className="flex-1 rounded-lg bg-gray-800 border border-gray-700 px-3 py-2 text-sm focus:outline-none focus:border-gray-500"
-                    />
-                    <button
-                      onClick={() => saveToken(key)}
-                      disabled={!tokens[key] || saving === key}
-                      className="rounded-lg bg-white text-black px-4 py-2 text-sm font-medium hover:bg-gray-200 disabled:opacity-50"
-                    >
-                      {saving === key ? "..." : "Save"}
-                    </button>
-                  </div>
+      <div className="space-y-4 max-w-2xl">
+        {SERVICES.map(({ key, label, hint }) => {
+          const existing = credentials.find((c) => c.service === key);
+          return (
+            <Card key={key}>
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h3 className="font-medium text-sm text-content-primary">{label}</h3>
+                  <p className="text-xs text-content-tertiary">{hint}</p>
                 </div>
-              );
-            })}
-          </div>
-        </section>
+                {existing && (
+                  <div className="flex items-center gap-3">
+                    <Badge variant="success" dot>Connected</Badge>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-accent-red hover:text-accent-red/80"
+                      onClick={() => setRemoveTarget({ key, label })}
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <Input
+                  type="password"
+                  placeholder={existing ? "Replace token..." : "Paste token..."}
+                  value={tokens[key] || ""}
+                  onChange={(e) => setTokens((prev) => ({ ...prev, [key]: e.target.value }))}
+                  className="flex-1"
+                />
+                <Button
+                  variant="primary"
+                  size="md"
+                  disabled={!tokens[key] || saving === key}
+                  loading={saving === key}
+                  onClick={() => saveToken(key)}
+                >
+                  Save
+                </Button>
+              </div>
+            </Card>
+          );
+        })}
+      </div>
+
+      <ConfirmModal
+        open={!!removeTarget}
+        onClose={() => setRemoveTarget(null)}
+        onConfirm={removeToken}
+        title="Remove token"
+        description={removeTarget ? `Remove the ${removeTarget.label} token? You will need to re-enter it to reconnect.` : ""}
+        confirmLabel="Remove"
+        variant="danger"
+      />
     </>
   );
 }
