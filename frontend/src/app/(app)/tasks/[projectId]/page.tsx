@@ -23,19 +23,28 @@ interface Project {
   description: string;
 }
 
-const statusBadge: Record<string, { label: string; variant: BadgeVariant }> = {
+const statusMap: Record<string, { label: string; variant: BadgeVariant }> = {
   open: { label: "Open", variant: "info" },
   in_progress: { label: "In Progress", variant: "warning" },
   review: { label: "Review", variant: "purple" },
   done: { label: "Done", variant: "success" },
 };
 
-const priorityBadge: Record<string, { label: string; variant: BadgeVariant }> = {
-  CRITICAL: { label: "Critical", variant: "error" },
-  HIGH: { label: "High", variant: "warning" },
-  MEDIUM: { label: "Medium", variant: "neutral" },
-  LOW: { label: "Low", variant: "neutral" },
+const priorityBar: Record<string, string> = {
+  CRITICAL: "bg-accent-red",
+  HIGH: "bg-accent-amber",
+  MEDIUM: "bg-accent-blue",
+  LOW: "bg-surface-tertiary",
 };
+
+const priorityLabel: Record<string, string> = {
+  CRITICAL: "Critical",
+  HIGH: "High",
+  MEDIUM: "Medium",
+  LOW: "Low",
+};
+
+type StatusFilter = "all" | "open" | "in_progress" | "review" | "done";
 
 export default function ProjectTasksPage() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -44,6 +53,7 @@ export default function ProjectTasksPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [filter, setFilter] = useState<StatusFilter>("all");
 
   useEffect(() => {
     if (!projectId) return;
@@ -68,8 +78,19 @@ export default function ProjectTasksPage() {
       .finally(() => setLoading(false));
   }, [projectId, router]);
 
+  const filtered = filter === "all" ? tasks : tasks.filter((t) => t.status === filter);
+
+  const filters: { key: StatusFilter; label: string }[] = [
+    { key: "all", label: "All" },
+    { key: "open", label: "Open" },
+    { key: "in_progress", label: "In Progress" },
+    { key: "review", label: "Review" },
+    { key: "done", label: "Done" },
+  ];
+
   return (
     <>
+      {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-page-title text-content-primary">{project?.name || "Project"}</h1>
@@ -86,36 +107,89 @@ export default function ProjectTasksPage() {
         </Card>
       )}
 
+      {/* Filter bar */}
+      {!loading && tasks.length > 0 && (
+        <div className="flex gap-1 mb-4" role="toolbar" aria-label="Filter by status">
+          {filters.map((f) => (
+            <button
+              key={f.key}
+              aria-pressed={filter === f.key}
+              onClick={() => setFilter(f.key)}
+              className={`px-3 py-1.5 text-xs font-medium rounded-button transition-colors duration-fast ${
+                filter === f.key
+                  ? "bg-accent-blue/10 text-accent-blue"
+                  : "text-content-tertiary hover:text-content-primary hover:bg-surface-tertiary"
+              }`}
+            >
+              {f.label}
+              {f.key !== "all" && (
+                <span className="ml-1 text-content-tertiary">
+                  {tasks.filter((t) => t.status === f.key).length}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Content */}
       {loading ? (
-        <div className="space-y-2">
-          {Array.from({ length: 5 }, (_, i) => <SkeletonRow key={i} />)}
+        <div role="status" aria-label="Loading">
+          <div className="space-y-2">
+            {Array.from({ length: 5 }, (_, i) => <SkeletonRow key={i} />)}
+          </div>
+          <span className="sr-only">Loading</span>
         </div>
       ) : tasks.length === 0 ? (
         <EmptyState
-          icon={<svg className="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+          icon={<CheckCircleIcon />}
           title="No tasks yet"
           description="Create your first task to start tracking work for this project."
           actionLabel="Create Task"
           actionHref={`/tasks/${projectId}/create`}
         />
+      ) : filtered.length === 0 ? (
+        <Card className="p-8 text-center">
+          <p className="text-content-secondary text-sm">No {filter.replaceAll("_", " ")} tasks</p>
+        </Card>
       ) : (
         <div className="space-y-2">
-          {tasks.map((t) => {
-            const status = statusBadge[t.status] || { label: t.status, variant: "neutral" as const };
-            const priority = priorityBadge[t.priority] || { label: t.priority, variant: "neutral" as const };
+          {filtered.map((t) => {
+            const status = statusMap[t.status] || { label: t.status, variant: "neutral" as const };
+            const barColor = priorityBar[t.priority] || "bg-surface-tertiary";
             return (
-              <Card key={t.id} className="flex items-center gap-4">
-                <Badge variant={status.variant} dot>{status.label}</Badge>
-                <Badge variant={priority.variant}>{priority.label}</Badge>
-                <span className="flex-1 text-sm text-content-primary">{t.title}</span>
-                <span className="text-xs text-content-tertiary">
-                  {t.claimedByAgent?.name || t.claimedByUser?.email || "unassigned"}
-                </span>
+              <Card key={t.id} noPadding className="overflow-hidden">
+                <div className="flex">
+                  {/* Priority bar */}
+                  <div className={`w-1 shrink-0 ${barColor}`} />
+                  <div className="flex-1 p-4 flex items-center gap-4 min-w-0">
+                    {/* Top: title + status */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-sm font-medium text-content-primary truncate">{t.title}</span>
+                      </div>
+                      <div className="flex items-center gap-3 text-xs text-content-tertiary">
+                        <span>{priorityLabel[t.priority] || t.priority}</span>
+                        <span>{t.claimedByAgent?.name || t.claimedByUser?.email || "Unassigned"}</span>
+                        <span>{new Date(t.createdAt).toLocaleDateString()}</span>
+                      </div>
+                    </div>
+                    <Badge variant={status.variant} dot>{status.label}</Badge>
+                  </div>
+                </div>
               </Card>
             );
           })}
         </div>
       )}
     </>
+  );
+}
+
+function CheckCircleIcon() {
+  return (
+    <svg className="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
   );
 }
