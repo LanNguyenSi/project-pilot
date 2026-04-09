@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useCallback, useRef } from "react";
+import { apiFetch } from "@/lib/api";
 
 const navItems = [
   {
@@ -67,6 +68,7 @@ interface SidebarProps {
 
 export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: SidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const overlayRef = useRef<HTMLDivElement>(null);
 
   // Close mobile sidebar on route change
@@ -130,6 +132,20 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
       {/* Bottom section */}
       <div className="border-t border-stroke-default py-3 px-2 space-y-1 shrink-0">
         {navLink(settingsItem)}
+
+        {/* Logout */}
+        <button
+          onClick={async () => {
+            await apiFetch("/api/auth/logout", { method: "POST" });
+            router.push("/login");
+          }}
+          className={`w-full flex items-center gap-3 px-3 py-2 rounded-button text-sm text-content-tertiary hover:text-content-primary hover:bg-surface-tertiary transition-colors duration-fast ${collapsed && !mobileOpen ? "justify-center" : ""}`}
+        >
+          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+          </svg>
+          {(!collapsed || mobileOpen) && <span>Logout</span>}
+        </button>
 
         {/* Collapse toggle (desktop only) */}
         <button

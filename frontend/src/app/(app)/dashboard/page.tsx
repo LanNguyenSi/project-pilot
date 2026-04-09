@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { apiFetch } from "@/lib/api";
-import { Badge, Button, Card, SkeletonBox } from "@/components/ui";
+import { Badge, Card, SkeletonBox } from "@/components/ui";
 
 interface User {
   id: string;
@@ -122,23 +122,11 @@ export default function DashboardPage() {
   return (
     <>
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-page-title text-content-primary">Dashboard</h1>
-          <p className="text-content-secondary text-sm mt-1">
-            {user ? `Welcome, ${user.name || user.email}` : "Welcome"}
-          </p>
-        </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={async () => {
-            await apiFetch("/api/auth/logout", { method: "POST" });
-            router.push("/login");
-          }}
-        >
-          Logout
-        </Button>
+      <div className="mb-8">
+        <h1 className="text-page-title text-content-primary">Dashboard</h1>
+        <p className="text-content-secondary text-sm mt-1">
+          {user ? `Welcome, ${user.name || user.email}` : "Welcome"}
+        </p>
       </div>
 
       {/* Stat cards */}
