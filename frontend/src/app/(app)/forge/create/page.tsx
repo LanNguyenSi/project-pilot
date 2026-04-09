@@ -101,7 +101,6 @@ export default function CreateProjectPage() {
 
   return (
     <>
-      <h1 className="text-page-title text-content-primary mb-6">Create Project</h1>
 
       {/* Step indicator */}
       <div className="flex items-center gap-0 mb-8 max-w-md">

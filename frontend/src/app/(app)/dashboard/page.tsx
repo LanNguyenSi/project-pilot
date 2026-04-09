@@ -121,13 +121,9 @@ export default function DashboardPage() {
 
   return (
     <>
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-page-title text-content-primary">Dashboard</h1>
-        <p className="text-content-secondary text-sm mt-1">
-          {user ? `Welcome, ${user.name || user.email}` : "Welcome"}
-        </p>
-      </div>
+      <p className="text-content-secondary text-sm mb-8">
+        {user ? `Welcome, ${user.name || user.email}` : "Welcome"}
+      </p>
 
       {/* Stat cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">

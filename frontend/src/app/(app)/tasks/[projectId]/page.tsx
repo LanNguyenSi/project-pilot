@@ -90,14 +90,10 @@ export default function ProjectTasksPage() {
 
   return (
     <>
-      {/* Header */}
       <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-page-title text-content-primary">{project?.name || "Project"}</h1>
-          {project?.description && (
-            <p className="text-sm text-content-secondary mt-1">{project.description}</p>
-          )}
-        </div>
+        {project?.description && (
+          <p className="text-sm text-content-secondary">{project.description}</p>
+        )}
         <Button href={`/tasks/${projectId}/create`}>Create Task</Button>
       </div>
 

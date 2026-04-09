@@ -78,12 +78,9 @@ export default function CreateTaskPage() {
 
   return (
     <>
-      <div className="mb-8">
-        <h1 className="text-page-title text-content-primary">Create Task</h1>
-        {project && (
-          <p className="text-sm text-content-secondary mt-1">{project.name}</p>
-        )}
-      </div>
+      {project && (
+        <p className="text-sm text-content-secondary mb-6">{project.name}</p>
+      )}
 
       {error && (
         <Card className="border-accent-red/50 mb-6">

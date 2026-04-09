@@ -94,7 +94,6 @@ export default function SettingsPage() {
 
   return (
     <>
-      <h1 className="text-page-title text-content-primary mb-2">Settings</h1>
       <p className="text-sm text-content-secondary mb-8">
         Connect your downstream services by providing their API tokens. Tokens are stored encrypted.
       </p>

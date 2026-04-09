@@ -124,7 +124,6 @@ export default function DeploysPage() {
 
   return (
     <>
-      <h1 className="text-page-title text-content-primary mb-6">Deployments</h1>
 
       {error && (
         <Card className="border-accent-red/50 mb-6">
