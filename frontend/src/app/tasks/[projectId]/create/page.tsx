@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 
 interface Project {
@@ -12,9 +12,9 @@ interface Project {
 }
 
 export default function CreateTaskPage() {
+  const { projectId } = useParams<{ projectId: string }>();
   const router = useRouter();
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [selectedProject, setSelectedProject] = useState("");
+  const [project, setProject] = useState<Project | null>(null);
   const [title, setTitle] = useState("");
   const [priority, setPriority] = useState("MEDIUM");
   const [description, setDescription] = useState("");
@@ -28,14 +28,15 @@ export default function CreateTaskPage() {
   useEffect(() => {
     apiFetch<{ projects: Project[] }>("/api/tasks/projects")
       .then((data) => {
-        setProjects(data.projects);
-        if (data.projects.length > 0) setSelectedProject(data.projects[0].id);
+        const found = data.projects.find((p) => p.id === projectId);
+        if (found) setProject(found);
+        else setError("Project not found");
       })
       .catch((err: Error) => {
         if (err.message.includes("401")) return router.push("/login");
         setError(err.message);
       });
-  }, [router]);
+  }, [projectId, router]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -49,7 +50,7 @@ export default function CreateTaskPage() {
     if (constraints) template.constraints = constraints.split("\n").filter(Boolean);
 
     try {
-      await apiFetch(`/api/tasks/projects/${selectedProject}/tasks`, {
+      await apiFetch(`/api/tasks/projects/${encodeURIComponent(projectId)}/tasks`, {
         method: "POST",
         body: JSON.stringify({
           title,
@@ -58,7 +59,7 @@ export default function CreateTaskPage() {
           template: Object.keys(template).length > 0 ? template : undefined,
         }),
       });
-      router.push("/tasks");
+      router.push(`/tasks/${projectId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create task");
       setSubmitting(false);
@@ -69,8 +70,13 @@ export default function CreateTaskPage() {
     <main className="min-h-screen p-8">
       <div className="max-w-3xl mx-auto">
         <div className="flex items-center justify-between mb-8">
-          <h1 className="text-2xl font-bold">Create Task</h1>
-          <a href="/tasks" className="rounded-lg bg-gray-800 px-4 py-2 text-sm hover:bg-gray-700">
+          <div>
+            <h1 className="text-2xl font-bold">Create Task</h1>
+            {project && (
+              <p className="text-sm text-gray-500 mt-1">{project.name}</p>
+            )}
+          </div>
+          <a href={`/tasks/${projectId}`} className="rounded-lg bg-gray-800 px-4 py-2 text-sm hover:bg-gray-700">
             Back
           </a>
         </div>
@@ -82,21 +88,6 @@ export default function CreateTaskPage() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-400 mb-1">Project</label>
-            <select
-              value={selectedProject}
-              onChange={(e) => setSelectedProject(e.target.value)}
-              className="w-full rounded-lg bg-gray-900 border border-gray-700 px-4 py-2.5 text-sm focus:outline-none focus:border-gray-500"
-            >
-              {projects.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name} — {p.description}
-                </option>
-              ))}
-            </select>
-          </div>
-
           <div>
             <label className="block text-sm font-medium text-gray-400 mb-1">Title</label>
             <input
@@ -182,7 +173,7 @@ export default function CreateTaskPage() {
 
           <button
             type="submit"
-            disabled={submitting || !selectedProject}
+            disabled={submitting || !project}
             className="w-full rounded-lg bg-white text-black py-2.5 text-sm font-medium hover:bg-gray-200 disabled:opacity-50"
           >
             {submitting ? "Creating..." : "Create Task"}
