@@ -18,6 +18,12 @@ const sizes = {
   lg: "h-10 px-5 text-sm",
 } as const;
 
+const iconSizes = {
+  sm: "h-8 w-8 text-xs",
+  md: "h-9 w-9 text-sm",
+  lg: "h-10 w-10 text-sm",
+} as const;
+
 export type ButtonVariant = keyof typeof variants;
 export type ButtonSize = keyof typeof sizes;
 
@@ -41,12 +47,9 @@ export const Button = forwardRef<HTMLButtonElement | HTMLAnchorElement, ButtonPr
     { variant = "primary", size = "md", loading = false, icon = false, className = "", children, ...rest },
     ref,
   ) {
-    const cls = [
-      base,
-      variants[variant],
-      icon ? `${sizes[size].replace(/px-\d+/, "")} aspect-square` : sizes[size],
-      className,
-    ].join(" ");
+    const cls = [base, variants[variant], icon ? iconSizes[size] : sizes[size], className]
+      .filter(Boolean)
+      .join(" ");
 
     if ("href" in rest && typeof rest.href === "string") {
       return (
@@ -63,10 +66,14 @@ export const Button = forwardRef<HTMLButtonElement | HTMLAnchorElement, ButtonPr
         ref={ref as React.Ref<HTMLButtonElement>}
         className={cls}
         disabled={loading || buttonRest.disabled}
+        aria-busy={loading || undefined}
         {...buttonRest}
       >
         {loading ? (
-          <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+          <>
+            <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+            <span className="sr-only">Loading</span>
+          </>
         ) : (
           children
         )}

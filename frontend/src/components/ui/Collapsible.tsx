@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useState, useId, type ReactNode } from "react";
 
 interface CollapsibleProps {
   trigger: ReactNode;
@@ -11,11 +11,14 @@ interface CollapsibleProps {
 
 export function Collapsible({ trigger, children, defaultOpen = false, className = "" }: CollapsibleProps) {
   const [open, setOpen] = useState(defaultOpen);
+  const contentId = useId();
 
   return (
     <div className={className}>
       <button
         type="button"
+        aria-expanded={open}
+        aria-controls={contentId}
         onClick={() => setOpen(!open)}
         className="w-full flex items-center gap-2 text-sm font-medium text-content-secondary hover:text-content-primary transition-colors duration-fast"
       >
@@ -31,6 +34,8 @@ export function Collapsible({ trigger, children, defaultOpen = false, className 
         {trigger}
       </button>
       <div
+        id={contentId}
+        role="region"
         className="grid transition-[grid-template-rows] duration-normal"
         style={{ gridTemplateRows: open ? "1fr" : "0fr" }}
       >

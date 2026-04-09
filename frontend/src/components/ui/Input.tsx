@@ -1,6 +1,6 @@
 "use client";
 
-import { forwardRef, type InputHTMLAttributes } from "react";
+import { forwardRef, useId, type InputHTMLAttributes } from "react";
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string;
@@ -13,7 +13,10 @@ const inputBase =
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
   function Input({ label, hint, error, className = "", id, ...rest }, ref) {
-    const inputId = id || label?.toLowerCase().replace(/\s+/g, "-");
+    const autoId = useId();
+    const inputId = id || autoId;
+    const descId = `${inputId}-desc`;
+    const hasDesc = !!(error || hint);
     const borderCls = error
       ? "border-accent-red focus:ring-accent-red/50 focus:border-accent-red"
       : "border-stroke-strong focus:ring-accent-blue/50 focus:border-accent-blue";
@@ -29,10 +32,12 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           ref={ref}
           id={inputId}
           className={`${inputBase} ${borderCls} ${className}`}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={hasDesc ? descId : undefined}
           {...rest}
         />
-        {error && <p className="text-accent-red text-xs mt-1">{error}</p>}
-        {!error && hint && <p className="text-content-tertiary text-xs mt-1">{hint}</p>}
+        {error && <p id={descId} className="text-accent-red text-xs mt-1">{error}</p>}
+        {!error && hint && <p id={descId} className="text-content-tertiary text-xs mt-1">{hint}</p>}
       </div>
     );
   },

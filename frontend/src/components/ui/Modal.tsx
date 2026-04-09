@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useCallback, type ReactNode } from "react";
+import { useEffect, useCallback, useRef, useId, type ReactNode } from "react";
+import { Button } from "./Button";
 
 interface ModalProps {
   open: boolean;
@@ -9,31 +10,61 @@ interface ModalProps {
 }
 
 export function Modal({ open, onClose, children }: ModalProps) {
+  const panelRef = useRef<HTMLDivElement>(null);
+  const titleId = useId();
+
   const handleKey = useCallback(
     (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") {
+        onClose();
+        return;
+      }
+      // Focus trap
+      if (e.key === "Tab" && panelRef.current) {
+        const focusable = panelRef.current.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+        );
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
     },
     [onClose],
   );
 
   useEffect(() => {
-    if (open) {
-      document.addEventListener("keydown", handleKey);
-      return () => document.removeEventListener("keydown", handleKey);
-    }
+    if (!open) return;
+    document.addEventListener("keydown", handleKey);
+    document.body.style.overflow = "hidden";
+    // Focus first focusable element
+    requestAnimationFrame(() => {
+      const el = panelRef.current?.querySelector<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+      );
+      el?.focus();
+    });
+    return () => {
+      document.removeEventListener("keydown", handleKey);
+      document.body.style.overflow = "";
+    };
   }, [open, handleKey]);
 
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Overlay */}
+    <div role="dialog" aria-modal="true" aria-labelledby={titleId} className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in duration-normal"
-        onClick={onClose}
-      />
-      {/* Panel */}
-      <div className="relative bg-surface-secondary border border-stroke-default rounded-card shadow-2xl max-w-md w-full mx-4 p-6 animate-in fade-in slide-in-from-bottom-2 duration-normal">
+        ref={panelRef}
+        className="relative bg-surface-secondary border border-stroke-default rounded-card shadow-2xl max-w-md w-full mx-4 p-6"
+      >
         {children}
       </div>
     </div>
@@ -70,29 +101,17 @@ export function ConfirmModal({
         <p className="text-body text-content-secondary mt-2">{description}</p>
       )}
       <div className="flex gap-3 justify-end mt-6">
-        <button
-          type="button"
-          onClick={onClose}
-          className="h-9 px-4 text-sm font-medium text-content-secondary hover:text-content-primary hover:bg-surface-tertiary rounded-button transition-colors duration-fast"
-        >
+        <Button variant="ghost" size="md" onClick={onClose}>
           Cancel
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
+          variant={variant === "danger" ? "danger" : "primary"}
+          size="md"
           onClick={onConfirm}
-          disabled={loading}
-          className={`h-9 px-4 text-sm font-medium text-white rounded-button transition-colors duration-fast disabled:opacity-50 ${
-            variant === "danger"
-              ? "bg-accent-red hover:bg-accent-red/90"
-              : "bg-accent-blue hover:bg-accent-blue/90"
-          }`}
+          loading={loading}
         >
-          {loading ? (
-            <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-          ) : (
-            confirmLabel
-          )}
-        </button>
+          {confirmLabel}
+        </Button>
       </div>
     </Modal>
   );
