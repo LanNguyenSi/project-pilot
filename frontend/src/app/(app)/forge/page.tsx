@@ -69,10 +69,7 @@ export default function ForgePage() {
   return (
     <>
       <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-page-title text-content-primary">Forge</h1>
-          <p className="text-content-secondary text-sm mt-1">Created via Project Forge</p>
-        </div>
+        <p className="text-content-secondary text-sm">Created via Project Forge</p>
         <Button href="/forge/create">New Project</Button>
       </div>
 

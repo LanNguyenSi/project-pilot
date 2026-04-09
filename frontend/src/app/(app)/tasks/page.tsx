@@ -31,8 +31,6 @@ export default function TaskProjectsPage() {
 
   return (
     <>
-      <h1 className="text-page-title text-content-primary mb-6">Tasks</h1>
-
       {error && (
         <Card className="border-accent-red/50 mb-6">
           <p className="text-sm text-accent-red">{error}</p>
