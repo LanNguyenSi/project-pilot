@@ -134,11 +134,12 @@ export default function DeploysPage() {
 
       {/* Tab bar */}
       <div className="border-b border-stroke-default mb-6">
-        <div className="flex gap-0" role="toolbar" aria-label="Deployment sections">
+        <div className="flex gap-0" role="tablist" aria-label="Deployment sections">
           {tabs.map((t) => (
             <button
               key={t.key}
-              aria-pressed={tab === t.key}
+              role="tab"
+              aria-selected={tab === t.key}
               onClick={() => setTab(t.key)}
               className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors duration-fast -mb-px ${
                 tab === t.key
@@ -155,7 +156,7 @@ export default function DeploysPage() {
 
       {/* Servers tab */}
       {tab === "servers" && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div role="tabpanel" aria-label="Servers" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
           {servers.map((s) => (
             <Card key={s.id}>
               <div className="flex items-center justify-between mb-2">
@@ -171,7 +172,7 @@ export default function DeploysPage() {
 
       {/* Apps tab */}
       {tab === "apps" && (
-        <div className="space-y-2">
+        <div role="tabpanel" aria-label="Applications" className="space-y-2">
           {apps.map((a) => (
             <Card key={a.id} className="flex items-center gap-4">
               <Badge variant={statusBadge[a.status] || "neutral"} dot>{a.status}</Badge>
@@ -180,6 +181,7 @@ export default function DeploysPage() {
               <Button
                 variant="secondary"
                 size="sm"
+                disabled={deploying}
                 onClick={() => setDeployTarget({ server: a.server.name, app: a.name })}
               >
                 Deploy
@@ -190,7 +192,7 @@ export default function DeploysPage() {
       )}
 
       {/* History tab */}
-      {tab === "history" && (
+      {tab === "history" && (<div role="tabpanel" aria-label="History">
         deploys.length === 0 ? (
           <p className="text-content-secondary text-sm">No deploys yet</p>
         ) : (
@@ -200,8 +202,8 @@ export default function DeploysPage() {
               return (
                 <div
                   key={d.id}
-                  className={`flex items-center gap-4 py-3 border-b border-stroke-default ${
-                    isActive ? "border-l-2 border-l-accent-amber pl-3" : ""
+                  className={`flex items-center gap-4 py-3 border-b border-stroke-default border-l-2 pl-3 ${
+                    isActive ? "border-l-accent-amber" : "border-l-transparent"
                   }`}
                 >
                   <Badge variant={statusBadge[d.status] || "neutral"} dot>{d.status}</Badge>
@@ -222,14 +224,14 @@ export default function DeploysPage() {
             })}
           </div>
         )
-      )}
+      </div>)}
 
       <ConfirmModal
         open={!!deployTarget}
         onClose={() => setDeployTarget(null)}
         onConfirm={handleDeploy}
         title="Deploy application"
-        description={`Deploy ${deployTarget?.app} on ${deployTarget?.server}?`}
+        description={deployTarget ? `Deploy ${deployTarget.app} on ${deployTarget.server}?` : ""}
         confirmLabel="Deploy"
         loading={deploying}
       />
