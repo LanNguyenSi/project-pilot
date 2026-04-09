@@ -7,9 +7,20 @@ interface SkeletonBoxProps {
 export function SkeletonBox({ className = "", width, height }: SkeletonBoxProps) {
   return (
     <div
+      aria-hidden="true"
       className={`bg-surface-tertiary rounded-md animate-pulse ${className}`}
       style={{ width, height }}
     />
+  );
+}
+
+/** Wrapper that adds aria attributes to composed skeletons. */
+function SkeletonContainer({ children, label = "Loading" }: { children: React.ReactNode; label?: string }) {
+  return (
+    <div role="status" aria-label={label}>
+      {children}
+      <span className="sr-only">{label}</span>
+    </div>
   );
 }
 
@@ -50,21 +61,21 @@ export function SkeletonProjectCard() {
 /** Full page skeleton: title + grid of cards. */
 export function SkeletonPage({ cards = 6 }: { cards?: number }) {
   return (
-    <div>
+    <SkeletonContainer>
       <SkeletonBox className="h-7 w-40 mb-6" />
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {Array.from({ length: cards }, (_, i) => (
           <SkeletonProjectCard key={i} />
         ))}
       </div>
-    </div>
+    </SkeletonContainer>
   );
 }
 
-/** Dashboard skeleton: title + stat cards + rows. */
+/** Dashboard skeleton: title + stat cards. */
 export function SkeletonDashboard() {
   return (
-    <div>
+    <SkeletonContainer>
       <SkeletonBox className="h-7 w-40 mb-2" />
       <SkeletonBox className="h-4 w-48 mb-8" />
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
@@ -76,14 +87,14 @@ export function SkeletonDashboard() {
         <SkeletonCard />
         <SkeletonCard />
       </div>
-    </div>
+    </SkeletonContainer>
   );
 }
 
 /** Task list skeleton: title + rows. */
 export function SkeletonTaskList({ rows = 5 }: { rows?: number }) {
   return (
-    <div>
+    <SkeletonContainer>
       <div className="flex items-center justify-between mb-6">
         <div>
           <SkeletonBox className="h-7 w-40" />
@@ -96,6 +107,6 @@ export function SkeletonTaskList({ rows = 5 }: { rows?: number }) {
           <SkeletonRow key={i} />
         ))}
       </div>
-    </div>
+    </SkeletonContainer>
   );
 }
