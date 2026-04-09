@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { usePathname } from "next/navigation";
-
+import { useEffect, useCallback, useRef } from "react";
 
 const navItems = [
   {
@@ -53,6 +54,10 @@ const settingsItem = {
   ),
 };
 
+function isActive(pathname: string, href: string) {
+  return pathname === href || pathname.startsWith(href + "/");
+}
+
 interface SidebarProps {
   collapsed: boolean;
   onToggle: () => void;
@@ -62,17 +67,55 @@ interface SidebarProps {
 
 export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: SidebarProps) {
   const pathname = usePathname();
+  const overlayRef = useRef<HTMLDivElement>(null);
 
-  function isActive(href: string) {
-    if (href === "/dashboard") return pathname === "/dashboard";
-    return pathname.startsWith(href);
+  // Close mobile sidebar on route change
+  useEffect(() => {
+    onMobileClose();
+  }, [pathname]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Escape key for mobile overlay
+  const handleKey = useCallback(
+    (e: KeyboardEvent) => {
+      if (e.key === "Escape") onMobileClose();
+    },
+    [onMobileClose],
+  );
+
+  useEffect(() => {
+    if (mobileOpen) {
+      document.addEventListener("keydown", handleKey);
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.removeEventListener("keydown", handleKey);
+        document.body.style.overflow = "";
+      };
+    }
+  }, [mobileOpen, handleKey]);
+
+  function navLink(item: { label: string; href: string; icon: React.ReactNode }) {
+    const active = isActive(pathname, item.href);
+    return (
+      <Link
+        key={item.href}
+        href={item.href}
+        className={`flex items-center gap-3 px-3 py-2 rounded-button text-sm transition-colors duration-fast ${
+          active
+            ? "text-accent-blue bg-accent-blue/10 font-medium border-l-2 border-accent-blue -ml-[2px]"
+            : "text-content-secondary hover:text-content-primary hover:bg-surface-tertiary"
+        } ${collapsed && !mobileOpen ? "justify-center" : ""}`}
+      >
+        {item.icon}
+        {(!collapsed || mobileOpen) && <span>{item.label}</span>}
+      </Link>
+    );
   }
 
   const nav = (
-    <nav className="flex flex-col h-full">
+    <nav aria-label="Main navigation" className="flex flex-col h-full">
       {/* Logo */}
       <div className="h-topbar flex items-center px-4 border-b border-stroke-default shrink-0">
-        {collapsed ? (
+        {collapsed && !mobileOpen ? (
           <span className="text-lg font-bold text-content-primary mx-auto">P</span>
         ) : (
           <span className="text-sm font-bold text-content-primary tracking-wide">project-pilot</span>
@@ -81,37 +124,12 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
 
       {/* Main nav */}
       <div className="flex-1 py-3 px-2 space-y-1 overflow-y-auto">
-        {navItems.map((item) => (
-          <a
-            key={item.href}
-            href={item.href}
-            onClick={mobileOpen ? onMobileClose : undefined}
-            className={`flex items-center gap-3 px-3 py-2 rounded-button text-sm transition-colors duration-fast ${
-              isActive(item.href)
-                ? "text-accent-blue bg-accent-blue/10 font-medium border-l-2 border-accent-blue -ml-[2px]"
-                : "text-content-secondary hover:text-content-primary hover:bg-surface-tertiary"
-            } ${collapsed ? "justify-center" : ""}`}
-          >
-            {item.icon}
-            {!collapsed && <span>{item.label}</span>}
-          </a>
-        ))}
+        {navItems.map(navLink)}
       </div>
 
       {/* Bottom section */}
       <div className="border-t border-stroke-default py-3 px-2 space-y-1 shrink-0">
-        <a
-          href={settingsItem.href}
-          onClick={mobileOpen ? onMobileClose : undefined}
-          className={`flex items-center gap-3 px-3 py-2 rounded-button text-sm transition-colors duration-fast ${
-            isActive(settingsItem.href)
-              ? "text-accent-blue bg-accent-blue/10 font-medium border-l-2 border-accent-blue -ml-[2px]"
-              : "text-content-secondary hover:text-content-primary hover:bg-surface-tertiary"
-          } ${collapsed ? "justify-center" : ""}`}
-        >
-          {settingsItem.icon}
-          {!collapsed && <span>{settingsItem.label}</span>}
-        </a>
+        {navLink(settingsItem)}
 
         {/* Collapse toggle (desktop only) */}
         <button
@@ -143,8 +161,18 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
 
       {/* Mobile overlay */}
       {mobileOpen && (
-        <div className="lg:hidden fixed inset-0 z-50">
-          <div className="absolute inset-0 bg-black/60" onClick={onMobileClose} />
+        <div
+          ref={overlayRef}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Navigation"
+          className="lg:hidden fixed inset-0 z-50"
+        >
+          <div
+            className="absolute inset-0 bg-black/60"
+            onClick={onMobileClose}
+            aria-hidden="true"
+          />
           <aside className="relative w-sidebar h-full bg-surface-secondary border-r border-stroke-default">
             {nav}
           </aside>
