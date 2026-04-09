@@ -3,12 +3,24 @@
 @tailwind utilities;
 
 :root {
-  --bg: #0a0a0a;
-  --fg: #ededed;
+  --bg-primary: #0a0a0a;
+  --bg-secondary: #111827;
+  --bg-tertiary: #1f2937;
+  --bg-elevated: #374151;
+  --border-default: #1f2937;
+  --border-strong: #374151;
+  --text-primary: #ededed;
+  --text-secondary: #9ca3af;
+  --text-tertiary: #6b7280;
+  --accent-blue: #3b82f6;
+  --accent-green: #22c55e;
+  --accent-amber: #f59e0b;
+  --accent-red: #ef4444;
+  --accent-purple: #a855f7;
 }
 
 body {
-  background: var(--bg);
-  color: var(--fg);
+  background: var(--bg-primary);
+  color: var(--text-primary);
   font-family: system-ui, -apple-system, sans-serif;
 }
