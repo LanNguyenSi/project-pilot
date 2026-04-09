@@ -203,9 +203,7 @@ export default function CreateProjectPage() {
 
           <Card className="p-6">
             <h2 className="text-section-title text-content-primary mb-3">Architecture</h2>
-            <pre className="text-xs text-content-secondary whitespace-pre-wrap overflow-auto max-h-64 font-mono">
-              {preview.architectureOverview}
-            </pre>
+            <pre className="text-xs text-content-secondary whitespace-pre-wrap overflow-auto max-h-64 font-mono">{preview.architectureOverview}</pre>
           </Card>
 
           <Card className="p-6">
@@ -219,7 +217,7 @@ export default function CreateProjectPage() {
             <Button
               variant="secondary"
               className="flex-1"
-              onClick={() => { setPhase("form"); setPreview(null); }}
+              onClick={() => { setPhase("form"); setPreview(null); setSessionId(""); }}
             >
               Back to form
             </Button>

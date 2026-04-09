@@ -111,7 +111,7 @@ export default function ForgePage() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="text-accent-red hover:text-accent-red/80 opacity-0 group-hover:opacity-100 transition-opacity duration-fast"
+                  className="text-accent-red hover:text-accent-red/80 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus:opacity-100 transition-opacity duration-fast"
                   onClick={() => setDeleteTarget(p)}
                 >
                   Remove
