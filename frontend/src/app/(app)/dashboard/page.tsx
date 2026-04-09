@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { apiFetch } from "@/lib/api";
+import { Badge, Button, Card, SkeletonBox } from "@/components/ui";
 
 interface User {
   id: string;
@@ -28,39 +30,6 @@ interface DashboardData {
   };
 }
 
-function StatusBadge({ configured, error }: { configured: boolean; error?: string | null }) {
-  if (!configured) return <span className="text-xs text-gray-500">Not configured</span>;
-  if (error) return <span className="text-xs text-red-400">Error</span>;
-  return <span className="text-xs text-green-400">Connected</span>;
-}
-
-function StatCard({
-  title,
-  value,
-  subtitle,
-  configured,
-  error,
-}: {
-  title: string;
-  value: string | number | null | undefined;
-  subtitle: string;
-  configured: boolean;
-  error?: string | null;
-}) {
-  return (
-    <div className="rounded-lg bg-gray-900 border border-gray-800 p-6">
-      <div className="flex items-center justify-between mb-2">
-        <h2 className="text-sm font-medium text-gray-400">{title}</h2>
-        <StatusBadge configured={configured} error={error} />
-      </div>
-      <p className="text-3xl font-bold mt-2">
-        {!configured ? "—" : value ?? "—"}
-      </p>
-      <p className="text-xs text-gray-500 mt-1">{subtitle}</p>
-    </div>
-  );
-}
-
 export default function DashboardPage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
@@ -80,25 +49,25 @@ export default function DashboardPage() {
         if (err.message.includes("401") || err.message.includes("Not authenticated")) {
           router.push("/login");
         }
-        // Non-auth errors: stay on page with partial data
       })
       .finally(() => setLoading(false));
   }, [router]);
 
   if (loading) {
     return (
-      <div>
-        <div className="bg-surface-tertiary rounded-md animate-pulse h-7 w-40 mb-2" />
-        <div className="bg-surface-tertiary rounded-md animate-pulse h-4 w-48 mb-8" />
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          {Array.from({ length: 3 }, (_, i) => (
-            <div key={i} className="bg-surface-secondary border border-stroke-default rounded-card p-6 space-y-3">
-              <div className="bg-surface-tertiary rounded-md animate-pulse h-3 w-24" />
-              <div className="bg-surface-tertiary rounded-md animate-pulse h-8 w-16" />
-              <div className="bg-surface-tertiary rounded-md animate-pulse h-3 w-32" />
-            </div>
+      <div role="status" aria-label="Loading">
+        <SkeletonBox className="h-7 w-40 mb-2" />
+        <SkeletonBox className="h-4 w-48 mb-8" />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          {Array.from({ length: 4 }, (_, i) => (
+            <Card key={i} className="p-5 space-y-3">
+              <SkeletonBox className="h-3 w-20" />
+              <SkeletonBox className="h-8 w-14" />
+              <SkeletonBox className="h-3 w-28" />
+            </Card>
           ))}
         </div>
+        <span className="sr-only">Loading</span>
       </div>
     );
   }
@@ -107,8 +76,52 @@ export default function DashboardPage() {
   const tasks = data?.services["agent-tasks"];
   const deploy = data?.services["deploy-panel"];
 
+  const stats: StatItem[] = [
+    {
+      label: "Projects",
+      value: tasks?.projectCount,
+      subtitle: "via agent-tasks",
+      configured: tasks?.configured ?? false,
+      error: tasks?.error,
+      accent: "border-l-accent-blue",
+    },
+    {
+      label: "Open Tasks",
+      value: tasks?.claimableCount,
+      subtitle: "claimable",
+      configured: tasks?.configured ?? false,
+      error: tasks?.error,
+      accent: "border-l-accent-amber",
+    },
+    {
+      label: "Servers",
+      value: deploy?.configured && deploy?.serverCount != null
+        ? `${deploy.onlineCount ?? 0}/${deploy.serverCount}`
+        : null,
+      subtitle: "online / total",
+      configured: deploy?.configured ?? false,
+      error: deploy?.error,
+      accent: "border-l-accent-green",
+    },
+    {
+      label: "Apps",
+      value: deploy?.appCount,
+      subtitle: "deployed",
+      configured: deploy?.configured ?? false,
+      error: deploy?.error,
+      accent: "border-l-accent-purple",
+    },
+  ];
+
+  const quickActions = [
+    { label: "Create Project", href: "/forge/create", icon: <PlusIcon /> },
+    { label: "View Tasks", href: "/tasks", icon: <TaskIcon /> },
+    { label: "Deployments", href: "/deploys", icon: <RocketIcon /> },
+  ];
+
   return (
     <>
+      {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-page-title text-content-primary">Dashboard</h1>
@@ -116,111 +129,120 @@ export default function DashboardPage() {
             Welcome, {user?.name || user?.email}
           </p>
         </div>
-        <button
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={async () => {
             await apiFetch("/api/auth/logout", { method: "POST" });
             router.push("/login");
           }}
-          className="rounded-button bg-surface-tertiary px-4 py-2 text-sm text-content-secondary hover:text-content-primary hover:bg-surface-elevated transition-colors duration-fast"
         >
           Logout
-        </button>
+        </Button>
       </div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <StatCard
-            title="Projects"
-            value={tasks?.projectCount}
-            subtitle="via agent-tasks"
-            configured={tasks?.configured ?? false}
-            error={tasks?.error}
-          />
-          <StatCard
-            title="Claimable Tasks"
-            value={tasks?.claimableCount}
-            subtitle="open & unassigned"
-            configured={tasks?.configured ?? false}
-            error={tasks?.error}
-          />
-          <StatCard
-            title="Servers"
-            value={
-              deploy?.configured && deploy?.serverCount != null
-                ? `${deploy.onlineCount ?? 0}/${deploy.serverCount}`
-                : null
-            }
-            subtitle="online / total"
-            configured={deploy?.configured ?? false}
-            error={deploy?.error}
-          />
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-          <StatCard
-            title="Deployed Apps"
-            value={deploy?.appCount}
-            subtitle="via deploy-panel"
-            configured={deploy?.configured ?? false}
-            error={deploy?.error}
-          />
-          <StatCard
-            title="Project Forge"
-            value={forge?.configured ? "Token saved" : null}
-            subtitle="project scaffolding — no live check"
-            configured={forge?.configured ?? false}
-          />
-        </div>
-
-        {/* Quick Actions */}
-        <section>
-          <h2 className="text-lg font-semibold mb-4">Quick Actions</h2>
-          <div className="flex flex-wrap gap-3">
-            <a
-              href="/forge/create"
-              className="rounded-lg bg-gray-800 border border-gray-700 px-4 py-2.5 text-sm hover:bg-gray-700"
-            >
-              New Project
-            </a>
-            <a
-              href="/forge"
-              className="rounded-lg bg-gray-800 border border-gray-700 px-4 py-2.5 text-sm hover:bg-gray-700"
-            >
-              All Projects
-            </a>
-            <a
-              href="/tasks"
-              className="rounded-lg bg-gray-800 border border-gray-700 px-4 py-2.5 text-sm hover:bg-gray-700"
-            >
-              Tasks
-            </a>
-            <a
-              href="/deploys"
-              className="rounded-lg bg-gray-800 border border-gray-700 px-4 py-2.5 text-sm hover:bg-gray-700"
-            >
-              Deployments
-            </a>
-            <a
-              href="/settings"
-              className="rounded-lg bg-gray-800 border border-gray-700 px-4 py-2.5 text-sm hover:bg-gray-700"
-            >
-              Configure Services
-            </a>
-          </div>
-        </section>
-
-        {/* Not configured hint */}
-        {(!forge?.configured || !tasks?.configured || !deploy?.configured) && (
-          <div className="mt-8 rounded-lg bg-gray-900 border border-yellow-800/50 p-4">
-            <p className="text-sm text-yellow-400">
-              Some services are not configured.{" "}
-              <a href="/settings" className="underline">
-                Add your API tokens in Settings
-              </a>{" "}
-              to see live data.
+      {/* Stat cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        {stats.map((s) => (
+          <Card key={s.label} className={`p-5 border-l-[3px] ${s.accent}`}>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-label text-content-tertiary">{s.label}</span>
+              {!s.configured ? (
+                <Badge variant="neutral">Not configured</Badge>
+              ) : s.error ? (
+                <Badge variant="error">Error</Badge>
+              ) : (
+                <Badge variant="success">Connected</Badge>
+              )}
+            </div>
+            <p className="text-2xl font-semibold text-content-primary mt-1">
+              {!s.configured ? "—" : s.value ?? "—"}
             </p>
+            <p className="text-xs text-content-tertiary mt-1">{s.subtitle}</p>
+          </Card>
+        ))}
+      </div>
+
+      {/* Two-column: Quick Actions + Forge Status */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        {/* Quick actions */}
+        <div className="lg:col-span-2">
+          <h2 className="text-section-title text-content-primary mb-4">Quick Actions</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {quickActions.map((a) => (
+              <Link key={a.href} href={a.href}>
+                <Card variant="interactive" className="flex items-center gap-3 p-4">
+                  <span className="text-content-tertiary">{a.icon}</span>
+                  <span className="text-sm font-medium text-content-primary">{a.label}</span>
+                </Card>
+              </Link>
+            ))}
           </div>
-        )}
+        </div>
+
+        {/* Forge status */}
+        <div>
+          <h2 className="text-section-title text-content-primary mb-4">Forge</h2>
+          <Card className="p-5">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-content-secondary">Project Forge</span>
+              {forge?.configured ? (
+                <Badge variant="success">Token saved</Badge>
+              ) : (
+                <Badge variant="neutral">Not configured</Badge>
+              )}
+            </div>
+            <p className="text-xs text-content-tertiary mt-2">Scaffolding service — no live health check</p>
+          </Card>
+        </div>
+      </div>
+
+      {/* Not configured hint */}
+      {(!forge?.configured || !tasks?.configured || !deploy?.configured) && (
+        <Card className="border-accent-amber/50 p-4">
+          <p className="text-sm text-accent-amber">
+            Some services are not configured.{" "}
+            <Link href="/settings" className="underline hover:text-accent-amber/80 transition-colors">
+              Add your API tokens in Settings
+            </Link>
+          </p>
+        </Card>
+      )}
     </>
+  );
+}
+
+// ── Types & Icons ───────────────────────────────────────────────────────────
+
+interface StatItem {
+  label: string;
+  value: string | number | null | undefined;
+  subtitle: string;
+  configured: boolean;
+  error?: string | null;
+  accent: string;
+}
+
+function PlusIcon() {
+  return (
+    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+    </svg>
+  );
+}
+
+function TaskIcon() {
+  return (
+    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  );
+}
+
+function RocketIcon() {
+  return (
+    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15.59 14.37a6 6 0 01-5.84 7.38v-4.8m5.84-2.58a14.98 14.98 0 006.16-12.12A14.98 14.98 0 009.631 8.41m5.96 5.96a14.926 14.926 0 01-5.841 2.58m-.119-8.54a6 6 0 00-7.381 5.84h4.8m2.581-5.84a14.927 14.927 0 00-2.58 5.841m2.699 2.7c-.103.021-.207.041-.311.06a15.09 15.09 0 01-2.448-2.448 14.9 14.9 0 01.06-.312m-2.24 2.39a4.493 4.493 0 00-1.757 4.306 4.493 4.493 0 004.306-1.758M16.5 9a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z" />
+    </svg>
   );
 }
