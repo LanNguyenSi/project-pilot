@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
+import { Button, Card, Input, Textarea, useToast } from "@/components/ui";
 
 interface Task {
   id: string;
@@ -30,8 +30,20 @@ interface Preview {
 
 type Phase = "form" | "generating" | "preview" | "publishing" | "done";
 
+const steps = [
+  { key: "form", label: "Configure" },
+  { key: "preview", label: "Preview" },
+  { key: "done", label: "Publish" },
+] as const;
+
+function stepIndex(phase: Phase): number {
+  if (phase === "form" || phase === "generating") return 0;
+  if (phase === "preview" || phase === "publishing") return 1;
+  return 2;
+}
+
 export default function CreateProjectPage() {
-  const router = useRouter();
+  const { toast } = useToast();
   const [phase, setPhase] = useState<Phase>("form");
   const [projectName, setProjectName] = useState("");
   const [summary, setSummary] = useState("");
@@ -42,6 +54,8 @@ export default function CreateProjectPage() {
   const [sessionId, setSessionId] = useState("");
   const [preview, setPreview] = useState<Preview | null>(null);
   const [repoUrl, setRepoUrl] = useState("");
+
+  const currentStep = stepIndex(phase);
 
   async function handleGenerate(e: React.FormEvent) {
     e.preventDefault();
@@ -78,6 +92,7 @@ export default function CreateProjectPage() {
       });
       setRepoUrl(data.result.repoUrl);
       setPhase("done");
+      toast({ title: "Project published to GitHub", variant: "success" });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Publish failed");
       setPhase("preview");
@@ -86,139 +101,157 @@ export default function CreateProjectPage() {
 
   return (
     <>
-      <h1 className="text-page-title text-content-primary mb-8">Create Project</h1>
+      <h1 className="text-page-title text-content-primary mb-6">Create Project</h1>
 
-        {error && (
-          <div className="rounded-lg bg-gray-900 border border-red-800/50 p-4 mb-6">
-            <p className="text-sm text-red-400">{error}</p>
+      {/* Step indicator */}
+      <div className="flex items-center gap-0 mb-8 max-w-md">
+        {steps.map((step, i) => (
+          <div key={step.key} className="flex items-center flex-1">
+            <div className="flex items-center gap-2">
+              <div
+                className={`h-7 w-7 rounded-full flex items-center justify-center text-xs font-medium transition-colors ${
+                  i < currentStep
+                    ? "bg-accent-green text-white"
+                    : i === currentStep
+                      ? "bg-accent-purple text-white"
+                      : "bg-surface-tertiary text-content-tertiary"
+                }`}
+              >
+                {i < currentStep ? (
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                ) : (
+                  i + 1
+                )}
+              </div>
+              <span className={`text-xs font-medium ${i <= currentStep ? "text-content-primary" : "text-content-tertiary"}`}>
+                {step.label}
+              </span>
+            </div>
+            {i < steps.length - 1 && (
+              <div className={`flex-1 h-px mx-3 ${i < currentStep ? "bg-accent-green" : "bg-surface-tertiary"}`} />
+            )}
           </div>
-        )}
+        ))}
+      </div>
 
-        {/* Form Phase */}
-        {(phase === "form" || phase === "generating") && (
+      {error && (
+        <Card className="border-accent-red/50 mb-6">
+          <p className="text-sm text-accent-red">{error}</p>
+        </Card>
+      )}
+
+      {/* Step 1: Form */}
+      {(phase === "form" || phase === "generating") && (
+        <Card className="p-6 max-w-2xl">
           <form onSubmit={handleGenerate} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-400 mb-1">Project Name</label>
-              <input
-                type="text"
-                required
-                pattern="^[a-zA-Z0-9._-]+$"
-                value={projectName}
-                onChange={(e) => setProjectName(e.target.value)}
-                placeholder="my-project"
-                className="w-full rounded-lg bg-gray-900 border border-gray-700 px-4 py-2.5 text-sm focus:outline-none focus:border-gray-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-400 mb-1">Summary</label>
-              <textarea
-                required
-                rows={3}
-                value={summary}
-                onChange={(e) => setSummary(e.target.value)}
-                placeholder="Describe what this project does..."
-                className="w-full rounded-lg bg-gray-900 border border-gray-700 px-4 py-2.5 text-sm focus:outline-none focus:border-gray-500 resize-none"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-400 mb-1">Features (one per line, optional)</label>
-              <textarea
-                rows={3}
-                value={features}
-                onChange={(e) => setFeatures(e.target.value)}
-                placeholder="User authentication&#10;REST API&#10;Dashboard"
-                className="w-full rounded-lg bg-gray-900 border border-gray-700 px-4 py-2.5 text-sm focus:outline-none focus:border-gray-500 resize-none"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-400 mb-1">Constraints (one per line, optional)</label>
-              <textarea
-                rows={2}
-                value={constraints}
-                onChange={(e) => setConstraints(e.target.value)}
-                placeholder="Must use TypeScript&#10;PostgreSQL only"
-                className="w-full rounded-lg bg-gray-900 border border-gray-700 px-4 py-2.5 text-sm focus:outline-none focus:border-gray-500 resize-none"
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={phase === "generating"}
-              className="w-full rounded-lg bg-white text-black py-2.5 text-sm font-medium hover:bg-gray-200 disabled:opacity-50"
-            >
-              {phase === "generating" ? "Generating preview..." : "Generate Preview"}
-            </button>
+            <Input
+              label="Project Name"
+              required
+              pattern="^[a-zA-Z0-9._-]+$"
+              value={projectName}
+              onChange={(e) => setProjectName(e.target.value)}
+              placeholder="my-project"
+              hint="Alphanumeric, dots, hyphens, underscores"
+            />
+            <Textarea
+              label="Summary"
+              required
+              rows={3}
+              value={summary}
+              onChange={(e) => setSummary(e.target.value)}
+              placeholder="Describe what this project does..."
+            />
+            <Textarea
+              label="Features (one per line, optional)"
+              rows={3}
+              value={features}
+              onChange={(e) => setFeatures(e.target.value)}
+              placeholder={"User authentication\nREST API\nDashboard"}
+            />
+            <Textarea
+              label="Constraints (one per line, optional)"
+              rows={2}
+              value={constraints}
+              onChange={(e) => setConstraints(e.target.value)}
+              placeholder={"Must use TypeScript\nPostgreSQL only"}
+            />
+            <Button type="submit" loading={phase === "generating"} className="w-full" size="lg">
+              Generate Preview
+            </Button>
           </form>
-        )}
+        </Card>
+      )}
 
-        {/* Preview Phase */}
-        {(phase === "preview" || phase === "publishing") && preview && (
-          <div className="space-y-6">
-            <div className="rounded-lg bg-gray-900 border border-gray-800 p-4">
-              <h2 className="font-semibold mb-2">Tasks ({preview.taskCount})</h2>
-              <p className="text-xs text-gray-500 mb-3">{preview.waveCount} wave(s)</p>
-              <div className="space-y-2">
-                {preview.tasks.map((t) => (
-                  <div key={t.id} className="flex items-center gap-3 text-sm">
-                    <span className="text-xs bg-gray-800 rounded px-2 py-0.5 text-gray-400">{t.wave}</span>
-                    <span className="text-xs bg-gray-800 rounded px-2 py-0.5 text-gray-400">{t.priority}</span>
-                    <span>{t.title}</span>
-                  </div>
-                ))}
-              </div>
+      {/* Step 2: Preview */}
+      {(phase === "preview" || phase === "publishing") && preview && (
+        <div className="space-y-6 max-w-3xl">
+          <Card className="p-6">
+            <h2 className="text-section-title text-content-primary mb-1">Tasks ({preview.taskCount})</h2>
+            <p className="text-xs text-content-tertiary mb-4">{preview.waveCount} wave(s)</p>
+            <div className="space-y-2">
+              {preview.tasks.map((t) => (
+                <div key={t.id} className="flex items-center gap-3 text-sm">
+                  <span className="text-xs bg-surface-tertiary rounded-badge px-2 py-0.5 text-content-secondary">{t.wave}</span>
+                  <span className="text-xs bg-surface-tertiary rounded-badge px-2 py-0.5 text-content-secondary">{t.priority}</span>
+                  <span className="text-content-primary">{t.title}</span>
+                </div>
+              ))}
             </div>
+          </Card>
 
-            <div className="rounded-lg bg-gray-900 border border-gray-800 p-4">
-              <h2 className="font-semibold mb-2">Architecture</h2>
-              <pre className="text-xs text-gray-400 whitespace-pre-wrap overflow-auto max-h-64">
-                {preview.architectureOverview}
-              </pre>
-            </div>
+          <Card className="p-6">
+            <h2 className="text-section-title text-content-primary mb-3">Architecture</h2>
+            <pre className="text-xs text-content-secondary whitespace-pre-wrap overflow-auto max-h-64 font-mono">{preview.architectureOverview}</pre>
+          </Card>
 
-            <div className="rounded-lg bg-gray-900 border border-gray-800 p-4">
-              <h2 className="font-semibold mb-2">File Tree</h2>
-              <div className="text-xs text-gray-400 font-mono">
-                <FileTree nodes={preview.fileTree} />
-              </div>
+          <Card className="p-6">
+            <h2 className="text-section-title text-content-primary mb-3">File Tree</h2>
+            <div className="text-xs text-content-secondary font-mono">
+              <FileTree nodes={preview.fileTree} />
             </div>
+          </Card>
 
-            <div className="flex gap-3">
-              <button
-                onClick={() => { setPhase("form"); setPreview(null); }}
-                className="flex-1 rounded-lg bg-gray-800 py-2.5 text-sm hover:bg-gray-700"
-              >
-                Back to form
-              </button>
-              <button
-                onClick={handlePublish}
-                disabled={phase === "publishing"}
-                className="flex-1 rounded-lg bg-white text-black py-2.5 text-sm font-medium hover:bg-gray-200 disabled:opacity-50"
-              >
-                {phase === "publishing" ? "Publishing..." : "Publish to GitHub"}
-              </button>
-            </div>
+          <div className="flex gap-3">
+            <Button
+              variant="secondary"
+              className="flex-1"
+              onClick={() => { setPhase("form"); setPreview(null); setSessionId(""); }}
+            >
+              Back to form
+            </Button>
+            <Button
+              className="flex-1"
+              onClick={handlePublish}
+              loading={phase === "publishing"}
+            >
+              Publish to GitHub
+            </Button>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Done Phase */}
-        {phase === "done" && (
-          <div className="rounded-lg bg-gray-900 border border-green-800/50 p-8 text-center">
-            <h2 className="text-xl font-bold mb-2">Project Created</h2>
-            <p className="text-gray-400 mb-4">{projectName}</p>
-            <div className="flex gap-3 justify-center">
-              <a
-                href={repoUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="rounded-lg bg-white text-black px-4 py-2 text-sm font-medium hover:bg-gray-200"
-              >
-                Open on GitHub
-              </a>
-              <a href="/forge" className="rounded-lg bg-gray-800 px-4 py-2 text-sm hover:bg-gray-700">
-                All Projects
-              </a>
-            </div>
+      {/* Step 3: Done */}
+      {phase === "done" && (
+        <Card className="border-accent-green/50 p-8 text-center max-w-lg mx-auto">
+          <div className="text-accent-green mb-3">
+            <svg className="h-10 w-10 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
           </div>
-        )}
+          <h2 className="text-section-title text-content-primary mb-1">Project Created</h2>
+          <p className="text-content-secondary text-sm mb-6">{projectName}</p>
+          <div className="flex gap-3 justify-center">
+            <Button href={repoUrl} target="_blank" rel="noopener noreferrer">
+              Open on GitHub
+            </Button>
+            <Button variant="secondary" href="/forge">
+              All Projects
+            </Button>
+          </div>
+        </Card>
+      )}
     </>
   );
 }
