@@ -73,6 +73,10 @@ export class PilotClient {
     return this.tasksRequest<unknown>("POST", `/api/tasks/${taskId}/claim`);
   }
 
+  async createTask(projectId: string, input: { title: string; priority?: string; description?: string; template?: Record<string, unknown> }) {
+    return this.tasksRequest<{ task: Record<string, unknown> }>("POST", `/api/projects/${projectId}/tasks`, input);
+  }
+
   async transitionTask(taskId: string, status: string) {
     return this.tasksRequest<unknown>("POST", `/api/tasks/${taskId}/transition`, { status });
   }

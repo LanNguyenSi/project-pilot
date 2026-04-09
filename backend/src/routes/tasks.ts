@@ -90,6 +90,19 @@ tasks.get("/:taskId/instructions", async (c) => {
   return c.json(result.data);
 });
 
+// POST /tasks/projects/:projectId/tasks — create task
+tasks.post("/projects/:projectId/tasks", async (c) => {
+  const userId = c.get("userId")!;
+  const projectId = c.req.param("projectId");
+  const body = await c.req.json();
+  const result = await tasksRequest<unknown>(userId, `/api/projects/${encodeURIComponent(projectId)}/tasks`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  if (!result.ok) return c.json({ error: result.error }, result.status as any);
+  return c.json(result.data);
+});
+
 // POST /tasks/:taskId/transition — change task status
 tasks.post("/:taskId/transition", async (c) => {
   const userId = c.get("userId")!;
