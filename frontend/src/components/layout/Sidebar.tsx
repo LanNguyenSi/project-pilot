@@ -167,11 +167,7 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
   return (
     <>
       {/* Desktop sidebar */}
-      <aside
-        className={`hidden lg:block fixed top-0 left-0 h-full bg-surface-secondary border-r border-stroke-default z-40 transition-[width] duration-normal ${
-          collapsed ? "w-sidebar-collapsed" : "w-sidebar"
-        }`}
-      >
+      <aside className="hidden lg:flex flex-col sticky top-0 h-screen bg-surface-secondary border-r border-stroke-default z-40 overflow-hidden">
         {nav}
       </aside>
 
