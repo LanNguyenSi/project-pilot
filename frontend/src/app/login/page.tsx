@@ -3,11 +3,10 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
-import { Button, Card, Input, useToast } from "@/components/ui";
+import { Button, Card, Input } from "@/components/ui";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { toast } = useToast();
   const [isRegister, setIsRegister] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -32,7 +31,6 @@ export default function LoginPage() {
           body: JSON.stringify({ email, password }),
         });
       }
-      toast({ title: isRegister ? "Account created" : "Welcome back", variant: "success" });
       router.push("/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
@@ -55,6 +53,7 @@ export default function LoginPage() {
         <div className="flex bg-surface-tertiary rounded-button p-0.5 mb-6">
           <button
             type="button"
+            aria-pressed={!isRegister}
             onClick={() => { setIsRegister(false); setError(""); }}
             className={`flex-1 py-1.5 text-xs font-medium rounded-button transition-colors duration-fast ${
               !isRegister ? "bg-surface-secondary text-content-primary shadow-sm" : "text-content-tertiary"
@@ -64,6 +63,7 @@ export default function LoginPage() {
           </button>
           <button
             type="button"
+            aria-pressed={isRegister}
             onClick={() => { setIsRegister(true); setError(""); }}
             className={`flex-1 py-1.5 text-xs font-medium rounded-button transition-colors duration-fast ${
               isRegister ? "bg-surface-secondary text-content-primary shadow-sm" : "text-content-tertiary"
@@ -98,8 +98,11 @@ export default function LoginPage() {
             minLength={8}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            error={error || undefined}
           />
+
+          {error && (
+            <p className="text-accent-red text-sm">{error}</p>
+          )}
 
           <Button type="submit" loading={loading} className="w-full" size="lg">
             {isRegister ? "Register" : "Sign in"}
