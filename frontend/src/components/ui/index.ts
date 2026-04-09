@@ -8,3 +8,4 @@ export { Collapsible } from "./Collapsible";
 export { Badge } from "./Badge";
 export type { BadgeVariant } from "./Badge";
 export { Card } from "./Card";
+export { ToastProvider, useToast } from "./Toast";

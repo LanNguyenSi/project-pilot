@@ -31,3 +31,8 @@ body {
   color: var(--content-primary);
   font-family: system-ui, -apple-system, sans-serif;
 }
+
+@keyframes toast-progress {
+  from { width: 100%; }
+  to { width: 0%; }
+}
