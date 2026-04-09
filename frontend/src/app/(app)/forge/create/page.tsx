@@ -148,9 +148,11 @@ export default function CreateProjectPage() {
             <Input
               label="Project Name"
               required
-              pattern="^[a-zA-Z0-9._-]+$"
               value={projectName}
-              onChange={(e) => setProjectName(e.target.value)}
+              onChange={(e) => {
+                const v = e.target.value.replace(/[^a-zA-Z0-9._-]/g, "");
+                setProjectName(v);
+              }}
               placeholder="my-project"
               hint="Alphanumeric, dots, hyphens, underscores"
             />
