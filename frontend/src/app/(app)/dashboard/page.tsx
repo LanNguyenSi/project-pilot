@@ -197,19 +197,24 @@ interface StatItem {
 }
 
 // Full literal strings so Tailwind JIT can scan them:
-// border-l-accent-blue border-l-accent-amber border-l-accent-green border-l-accent-purple
-const accentBorder: Record<StatItem["accent"], string> = {
-  blue: "border-l-accent-blue",
-  amber: "border-l-accent-amber",
-  green: "border-l-accent-green",
-  purple: "border-l-accent-purple",
+// bg-accent-blue/5 bg-accent-amber/5 bg-accent-green/5 bg-accent-purple/5
+// text-accent-blue text-accent-amber text-accent-green text-accent-purple
+const accentTint: Record<StatItem["accent"], { bg: string; dot: string }> = {
+  blue: { bg: "bg-accent-blue/5", dot: "text-accent-blue" },
+  amber: { bg: "bg-accent-amber/5", dot: "text-accent-amber" },
+  green: { bg: "bg-accent-green/5", dot: "text-accent-green" },
+  purple: { bg: "bg-accent-purple/5", dot: "text-accent-purple" },
 };
 
 function StatCard({ stat: s }: { stat: StatItem }) {
+  const tint = accentTint[s.accent];
   return (
-    <Card noPadding className={`p-5 border-l-[3px] ${accentBorder[s.accent]}`}>
+    <Card noPadding className={`p-5 ${tint.bg}`}>
       <div className="flex items-center justify-between mb-2">
-        <span className="text-label text-content-tertiary">{s.label}</span>
+        <span className="text-label text-content-tertiary flex items-center gap-1.5">
+          <span className={`inline-block h-1.5 w-1.5 rounded-full ${tint.dot} bg-current`} />
+          {s.label}
+        </span>
         {!s.configured ? (
           <Badge variant="neutral">Not configured</Badge>
         ) : s.error ? (

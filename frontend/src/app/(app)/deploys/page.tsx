@@ -202,11 +202,13 @@ export default function DeploysPage() {
               return (
                 <div
                   key={d.id}
-                  className={`flex items-center gap-4 py-3 border-b border-stroke-default border-l-2 pl-3 ${
-                    isActive ? "border-l-accent-amber" : "border-l-transparent"
+                  className={`flex items-center gap-4 py-3 border-b border-stroke-default ${
+                    isActive ? "bg-accent-amber/5" : ""
                   }`}
                 >
-                  <Badge variant={statusBadge[d.status] || "neutral"} dot>{d.status}</Badge>
+                  <span className={isActive ? "animate-pulse" : ""}>
+                    <Badge variant={statusBadge[d.status] || "neutral"} dot>{d.status}</Badge>
+                  </span>
                   <span className="flex-1 text-sm text-content-primary">
                     {d.app} <span className="text-content-tertiary">on</span> {d.server}
                   </span>
