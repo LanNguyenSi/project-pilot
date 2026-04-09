@@ -24,7 +24,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen">
+    <div
+      className="min-h-screen lg:grid transition-[grid-template-columns] duration-normal"
+      style={{ gridTemplateColumns: collapsed ? "4rem 1fr" : "15rem 1fr" }}
+    >
       <Sidebar
         collapsed={collapsed}
         onToggle={toggleCollapsed}
@@ -32,11 +35,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         onMobileClose={() => setMobileOpen(false)}
       />
 
-      <div
-        className={`transition-[margin-left] duration-normal ${
-          collapsed ? "lg:ml-sidebar-collapsed" : "lg:ml-sidebar"
-        }`}
-      >
+      <div className="min-w-0">
         <TopBar onMenuClick={() => setMobileOpen(true)} />
         <main className="max-w-6xl mx-auto px-6 py-6">
           {children}
