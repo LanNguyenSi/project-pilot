@@ -86,11 +86,7 @@ export default function DashboardPage() {
   }, [router]);
 
   if (loading) {
-    return (
-      <main className="flex min-h-screen items-center justify-center">
-        <p className="text-gray-400">Loading...</p>
-      </main>
-    );
+    return <p className="text-content-secondary">Loading...</p>;
   }
 
   const forge = data?.services["project-forge"];
@@ -98,33 +94,24 @@ export default function DashboardPage() {
   const deploy = data?.services["deploy-panel"];
 
   return (
-    <main className="min-h-screen p-8">
-      <div className="max-w-5xl mx-auto">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-2xl font-bold">Dashboard</h1>
-            <p className="text-gray-400 text-sm mt-1">
-              Welcome, {user?.name || user?.email}
-            </p>
-          </div>
-          <div className="flex gap-3">
-            <a
-              href="/settings"
-              className="rounded-lg bg-gray-800 px-4 py-2 text-sm hover:bg-gray-700"
-            >
-              Settings
-            </a>
-            <button
-              onClick={async () => {
-                await apiFetch("/api/auth/logout", { method: "POST" });
-                router.push("/login");
-              }}
-              className="rounded-lg bg-gray-800 px-4 py-2 text-sm hover:bg-gray-700"
-            >
-              Logout
-            </button>
-          </div>
+    <>
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <h1 className="text-page-title text-content-primary">Dashboard</h1>
+          <p className="text-content-secondary text-sm mt-1">
+            Welcome, {user?.name || user?.email}
+          </p>
         </div>
+        <button
+          onClick={async () => {
+            await apiFetch("/api/auth/logout", { method: "POST" });
+            router.push("/login");
+          }}
+          className="rounded-button bg-surface-tertiary px-4 py-2 text-sm text-content-secondary hover:text-content-primary hover:bg-surface-elevated transition-colors duration-fast"
+        >
+          Logout
+        </button>
+      </div>
 
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
@@ -220,7 +207,6 @@ export default function DashboardPage() {
             </p>
           </div>
         )}
-      </div>
-    </main>
+    </>
   );
 }

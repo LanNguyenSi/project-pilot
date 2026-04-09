@@ -73,25 +73,12 @@ export default function SettingsPage() {
   }
 
   if (loading) {
-    return (
-      <main className="flex min-h-screen items-center justify-center">
-        <p className="text-gray-400">Loading...</p>
-      </main>
-    );
+    return <p className="text-content-secondary">Loading...</p>;
   }
 
   return (
-    <main className="min-h-screen p-8">
-      <div className="max-w-2xl mx-auto">
-        <div className="flex items-center justify-between mb-8">
-          <h1 className="text-2xl font-bold">Settings</h1>
-          <a
-            href="/dashboard"
-            className="rounded-lg bg-gray-800 px-4 py-2 text-sm hover:bg-gray-700"
-          >
-            Back
-          </a>
-        </div>
+    <>
+      <h1 className="text-page-title text-content-primary mb-8">Settings</h1>
 
         <section>
           <h2 className="text-lg font-semibold mb-4">Service Credentials</h2>
@@ -152,7 +139,6 @@ export default function SettingsPage() {
             })}
           </div>
         </section>
-      </div>
-    </main>
+    </>
   );
 }

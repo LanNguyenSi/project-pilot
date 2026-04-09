@@ -85,14 +85,8 @@ export default function CreateProjectPage() {
   }
 
   return (
-    <main className="min-h-screen p-8">
-      <div className="max-w-3xl mx-auto">
-        <div className="flex items-center justify-between mb-8">
-          <h1 className="text-2xl font-bold">Create Project</h1>
-          <a href="/forge" className="rounded-lg bg-gray-800 px-4 py-2 text-sm hover:bg-gray-700">
-            Back
-          </a>
-        </div>
+    <>
+      <h1 className="text-page-title text-content-primary mb-8">Create Project</h1>
 
         {error && (
           <div className="rounded-lg bg-gray-900 border border-red-800/50 p-4 mb-6">
@@ -225,8 +219,7 @@ export default function CreateProjectPage() {
             </div>
           </div>
         )}
-      </div>
-    </main>
+    </>
   );
 }
 
