@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
+import { Button, Card, Input, Textarea, Select, Collapsible, useToast } from "@/components/ui";
 
 interface Project {
   id: string;
@@ -11,9 +12,17 @@ interface Project {
   description: string;
 }
 
+const priorityOptions = [
+  { value: "CRITICAL", label: "Critical" },
+  { value: "HIGH", label: "High" },
+  { value: "MEDIUM", label: "Medium" },
+  { value: "LOW", label: "Low" },
+];
+
 export default function CreateTaskPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const router = useRouter();
+  const { toast } = useToast();
   const [project, setProject] = useState<Project | null>(null);
   const [title, setTitle] = useState("");
   const [priority, setPriority] = useState("MEDIUM");
@@ -59,6 +68,7 @@ export default function CreateTaskPage() {
           template: Object.keys(template).length > 0 ? template : undefined,
         }),
       });
+      toast({ title: "Task created", variant: "success" });
       router.push(`/tasks/${projectId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create task");
@@ -75,104 +85,81 @@ export default function CreateTaskPage() {
         )}
       </div>
 
-        {error && (
-          <div className="rounded-lg bg-gray-900 border border-red-800/50 p-4 mb-6">
-            <p className="text-sm text-red-400">{error}</p>
-          </div>
-        )}
+      {error && (
+        <Card className="border-accent-red/50 mb-6">
+          <p className="text-sm text-accent-red">{error}</p>
+        </Card>
+      )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-400 mb-1">Title</label>
-            <input
-              type="text"
-              required
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Task title"
-              className="w-full rounded-lg bg-gray-900 border border-gray-700 px-4 py-2.5 text-sm focus:outline-none focus:border-gray-500"
-            />
-          </div>
+      <form onSubmit={handleSubmit} className="space-y-4 max-w-2xl">
+        <Input
+          label="Title"
+          required
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="Task title"
+        />
 
-          <div>
-            <label className="block text-sm font-medium text-gray-400 mb-1">Priority</label>
-            <select
-              value={priority}
-              onChange={(e) => setPriority(e.target.value)}
-              className="w-full rounded-lg bg-gray-900 border border-gray-700 px-4 py-2.5 text-sm focus:outline-none focus:border-gray-500"
-            >
-              <option value="CRITICAL">Critical</option>
-              <option value="HIGH">High</option>
-              <option value="MEDIUM">Medium</option>
-              <option value="LOW">Low</option>
-            </select>
-          </div>
+        <Select
+          label="Priority"
+          options={priorityOptions}
+          value={priority}
+          onChange={setPriority}
+        />
 
-          <div>
-            <label className="block text-sm font-medium text-gray-400 mb-1">Description</label>
-            <textarea
-              rows={3}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Brief description of the task..."
-              className="w-full rounded-lg bg-gray-900 border border-gray-700 px-4 py-2.5 text-sm focus:outline-none focus:border-gray-500 resize-none"
-            />
-          </div>
+        <Textarea
+          label="Description"
+          rows={3}
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="Brief description of the task..."
+        />
 
-          <details className="rounded-lg bg-gray-900 border border-gray-800 p-4">
-            <summary className="text-sm font-medium text-gray-400 cursor-pointer">Template Fields (optional)</summary>
-            <div className="mt-4 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-400 mb-1">Goal</label>
-                <textarea
-                  rows={2}
-                  value={goal}
-                  onChange={(e) => setGoal(e.target.value)}
-                  placeholder="What should be achieved?"
-                  className="w-full rounded-lg bg-gray-900 border border-gray-700 px-4 py-2.5 text-sm focus:outline-none focus:border-gray-500 resize-none"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-400 mb-1">Acceptance Criteria (one per line)</label>
-                <textarea
-                  rows={3}
-                  value={acceptanceCriteria}
-                  onChange={(e) => setAcceptanceCriteria(e.target.value)}
-                  placeholder="Backend endpoint works&#10;Frontend form submits&#10;MCP tool registered"
-                  className="w-full rounded-lg bg-gray-900 border border-gray-700 px-4 py-2.5 text-sm focus:outline-none focus:border-gray-500 resize-none"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-400 mb-1">Context</label>
-                <textarea
-                  rows={2}
-                  value={context}
-                  onChange={(e) => setContext(e.target.value)}
-                  placeholder="Background information..."
-                  className="w-full rounded-lg bg-gray-900 border border-gray-700 px-4 py-2.5 text-sm focus:outline-none focus:border-gray-500 resize-none"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-400 mb-1">Constraints (one per line)</label>
-                <textarea
-                  rows={2}
-                  value={constraints}
-                  onChange={(e) => setConstraints(e.target.value)}
-                  placeholder="Must use existing patterns&#10;No new dependencies"
-                  className="w-full rounded-lg bg-gray-900 border border-gray-700 px-4 py-2.5 text-sm focus:outline-none focus:border-gray-500 resize-none"
-                />
-              </div>
+        <Card>
+          <Collapsible trigger="Template Fields (optional)">
+            <div className="space-y-4">
+              <Textarea
+                label="Goal"
+                rows={2}
+                value={goal}
+                onChange={(e) => setGoal(e.target.value)}
+                placeholder="What should be achieved?"
+              />
+              <Textarea
+                label="Acceptance Criteria (one per line)"
+                rows={3}
+                value={acceptanceCriteria}
+                onChange={(e) => setAcceptanceCriteria(e.target.value)}
+                placeholder={"Backend endpoint works\nFrontend form submits\nMCP tool registered"}
+              />
+              <Textarea
+                label="Context"
+                rows={2}
+                value={context}
+                onChange={(e) => setContext(e.target.value)}
+                placeholder="Background information..."
+              />
+              <Textarea
+                label="Constraints (one per line)"
+                rows={2}
+                value={constraints}
+                onChange={(e) => setConstraints(e.target.value)}
+                placeholder={"Must use existing patterns\nNo new dependencies"}
+              />
             </div>
-          </details>
+          </Collapsible>
+        </Card>
 
-          <button
-            type="submit"
-            disabled={submitting || !project}
-            className="w-full rounded-lg bg-white text-black py-2.5 text-sm font-medium hover:bg-gray-200 disabled:opacity-50"
-          >
-            {submitting ? "Creating..." : "Create Task"}
-          </button>
-        </form>
+        <Button
+          type="submit"
+          loading={submitting}
+          disabled={!project}
+          className="w-full"
+          size="lg"
+        >
+          Create Task
+        </Button>
+      </form>
     </>
   );
 }
