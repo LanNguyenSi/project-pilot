@@ -10,6 +10,8 @@ import {
   type ReactNode,
 } from "react";
 
+export type { ToastVariant };
+
 // ── Types ───────────────────────────────────────────────────────────────────
 
 type ToastVariant = "success" | "error" | "info";
@@ -20,7 +22,6 @@ interface ToastItem {
   description?: string;
   variant: ToastVariant;
   duration: number;
-  createdAt: number;
 }
 
 interface ToastFn {
@@ -57,7 +58,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     const id = nextId.current++;
     const duration = variant === "error" ? 8000 : 4000;
     setToasts((prev) => {
-      const next = [...prev, { id, title, description, variant, duration, createdAt: Date.now() }];
+      const next = [...prev, { id, title, description, variant, duration }];
       return next.length > MAX_TOASTS ? next.slice(next.length - MAX_TOASTS) : next;
     });
   }, []);
@@ -100,27 +101,34 @@ const icons: Record<ToastVariant, ReactNode> = {
   ),
 };
 
+const progressColor: Record<ToastVariant, string> = {
+  success: "bg-accent-green",
+  error: "bg-accent-red",
+  info: "bg-accent-blue",
+};
+
 function ToastCard({ item, onDismiss }: { item: ToastItem; onDismiss: (id: number) => void }) {
   const [exiting, setExiting] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const autoTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const exitTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  const startExit = useCallback(() => {
+    clearTimeout(autoTimer.current);
+    clearTimeout(exitTimer.current);
+    setExiting(true);
+    exitTimer.current = setTimeout(() => onDismiss(item.id), 200);
+  }, [item.id, onDismiss]);
 
   useEffect(() => {
-    timerRef.current = setTimeout(() => {
-      setExiting(true);
-      setTimeout(() => onDismiss(item.id), 200);
-    }, item.duration);
-    return () => clearTimeout(timerRef.current);
-  }, [item.id, item.duration, onDismiss]);
-
-  const progressColor: Record<ToastVariant, string> = {
-    success: "bg-accent-green",
-    error: "bg-accent-red",
-    info: "bg-accent-blue",
-  };
+    autoTimer.current = setTimeout(startExit, item.duration);
+    return () => {
+      clearTimeout(autoTimer.current);
+      clearTimeout(exitTimer.current);
+    };
+  }, [item.id, item.duration, startExit]);
 
   return (
     <div
-      role="status"
       className={`pointer-events-auto bg-surface-elevated border border-stroke-strong rounded-card shadow-xl min-w-[320px] max-w-[420px] overflow-hidden transition-all duration-normal ${
         exiting ? "opacity-0 translate-x-4" : "opacity-100 translate-x-0"
       }`}
@@ -134,10 +142,7 @@ function ToastCard({ item, onDismiss }: { item: ToastItem; onDismiss: (id: numbe
           )}
         </div>
         <button
-          onClick={() => {
-            setExiting(true);
-            setTimeout(() => onDismiss(item.id), 200);
-          }}
+          onClick={startExit}
           className="text-content-tertiary hover:text-content-primary shrink-0 transition-colors duration-fast"
           aria-label="Dismiss notification"
         >
