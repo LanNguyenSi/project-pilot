@@ -46,6 +46,10 @@ const priorityLabel: Record<string, string> = {
 };
 
 type StatusFilter = "all" | "open" | "in_progress" | "review" | "done";
+type ViewMode = "list" | "board";
+
+const STATUSES: StatusFilter[] = ["open", "in_progress", "review", "done"];
+const VIEW_KEY = "project-pilot:task-view";
 
 export default function ProjectTasksPage() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -56,6 +60,12 @@ export default function ProjectTasksPage() {
   const [error, setError] = useState("");
   const [filter, setFilter] = useState<StatusFilter>("all");
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [view, setView] = useState<ViewMode>(() => {
+    if (typeof window !== "undefined") {
+      return (localStorage.getItem(VIEW_KEY) as ViewMode) || "list";
+    }
+    return "list";
+  });
 
   useEffect(() => {
     if (!projectId) return;
@@ -105,28 +115,50 @@ export default function ProjectTasksPage() {
         </Card>
       )}
 
-      {/* Filter bar */}
+      {/* Filter bar + View toggle */}
       {!loading && tasks.length > 0 && (
-        <div className="flex gap-1 mb-4" role="toolbar" aria-label="Filter by status">
-          {filters.map((f) => (
+        <div className="flex items-center justify-between mb-4">
+          {view === "list" ? (
+            <div className="flex gap-1" role="toolbar" aria-label="Filter by status">
+              {filters.map((f) => (
+                <button
+                  key={f.key}
+                  aria-pressed={filter === f.key}
+                  onClick={() => setFilter(f.key)}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-button transition-colors duration-fast ${
+                    filter === f.key
+                      ? "bg-accent-blue/10 text-accent-blue"
+                      : "text-content-tertiary hover:text-content-primary hover:bg-surface-tertiary"
+                  }`}
+                >
+                  {f.label}
+                  {f.key !== "all" && (
+                    <span className="ml-1 text-content-tertiary">
+                      {tasks.filter((t) => t.status === f.key).length}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div />
+          )}
+          <div className="flex gap-1 border border-stroke-default rounded-button p-0.5">
             <button
-              key={f.key}
-              aria-pressed={filter === f.key}
-              onClick={() => setFilter(f.key)}
-              className={`px-3 py-1.5 text-xs font-medium rounded-button transition-colors duration-fast ${
-                filter === f.key
-                  ? "bg-accent-blue/10 text-accent-blue"
-                  : "text-content-tertiary hover:text-content-primary hover:bg-surface-tertiary"
-              }`}
+              onClick={() => { setView("list"); localStorage.setItem(VIEW_KEY, "list"); }}
+              className={`px-2.5 py-1 text-xs font-medium rounded-button transition-colors ${view === "list" ? "bg-surface-tertiary text-content-primary" : "text-content-tertiary hover:text-content-primary"}`}
+              aria-label="List view"
             >
-              {f.label}
-              {f.key !== "all" && (
-                <span className="ml-1 text-content-tertiary">
-                  {tasks.filter((t) => t.status === f.key).length}
-                </span>
-              )}
+              List
             </button>
-          ))}
+            <button
+              onClick={() => { setView("board"); localStorage.setItem(VIEW_KEY, "board"); }}
+              className={`px-2.5 py-1 text-xs font-medium rounded-button transition-colors ${view === "board" ? "bg-surface-tertiary text-content-primary" : "text-content-tertiary hover:text-content-primary"}`}
+              aria-label="Board view"
+            >
+              Board
+            </button>
+          </div>
         </div>
       )}
 
@@ -146,11 +178,55 @@ export default function ProjectTasksPage() {
           actionLabel="Create Task"
           actionHref={`/tasks/${projectId}/create`}
         />
+      ) : view === "board" ? (
+        /* Board view */
+        <div className="grid grid-cols-4 gap-3">
+          {STATUSES.map((col) => {
+            const colStatus = statusMap[col] || { label: col, variant: "neutral" as const };
+            const colTasks = tasks.filter((t) => t.status === col);
+            return (
+              <div key={col}>
+                <div className="flex items-center gap-2 mb-3 px-1">
+                  <Badge variant={colStatus.variant} dot>{colStatus.label}</Badge>
+                  <span className="text-xs text-content-tertiary tabular-nums">{colTasks.length}</span>
+                </div>
+                <div className="space-y-2">
+                  {colTasks.map((t) => {
+                    const barColor = priorityBar[t.priority] || "bg-surface-tertiary";
+                    return (
+                      <Card
+                        key={t.id}
+                        noPadding
+                        className="overflow-hidden cursor-pointer hover:border-stroke-strong transition-colors"
+                        onClick={() => setSelectedTaskId(t.id)}
+                      >
+                        <div className="flex">
+                          <div className={`w-1 shrink-0 ${barColor}`} />
+                          <div className="p-3 min-w-0 flex-1">
+                            <p className="text-sm font-medium text-content-primary truncate mb-1">{t.title}</p>
+                            <div className="flex items-center gap-2 text-xs text-content-tertiary">
+                              <span>{priorityLabel[t.priority] || t.priority}</span>
+                              <span className="truncate">{t.claimedByAgent?.name || t.claimedByUser?.email || "—"}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </Card>
+                    );
+                  })}
+                  {colTasks.length === 0 && (
+                    <p className="text-xs text-content-tertiary text-center py-4">—</p>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       ) : filtered.length === 0 ? (
         <Card className="p-8 text-center">
           <p className="text-content-secondary text-sm">No {filter.replaceAll("_", " ")} tasks</p>
         </Card>
       ) : (
+        /* List view */
         <div className="space-y-2">
           {filtered.map((t) => {
             const status = statusMap[t.status] || { label: t.status, variant: "neutral" as const };
@@ -158,10 +234,8 @@ export default function ProjectTasksPage() {
             return (
               <Card key={t.id} noPadding className="overflow-hidden cursor-pointer hover:border-stroke-strong transition-colors" onClick={() => setSelectedTaskId(t.id)}>
                 <div className="flex">
-                  {/* Priority bar */}
                   <div className={`w-1 shrink-0 ${barColor}`} />
                   <div className="flex-1 p-4 flex items-center gap-4 min-w-0">
-                    {/* Top: title + status */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <span className="text-sm font-medium text-content-primary truncate">{t.title}</span>
