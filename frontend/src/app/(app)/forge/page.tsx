@@ -3,23 +3,40 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
-import { Button, Card, ConfirmModal, EmptyState, SkeletonBox, useToast } from "@/components/ui";
+import Link from "next/link";
+import { Badge, Button, Card, ConfirmModal, EmptyState, SkeletonBox, useToast } from "@/components/ui";
 
 interface Project {
   id: string;
   repoUrl: string;
   projectName: string;
+  description?: string | null;
   createdAt: string;
+}
+
+interface TasksProject {
+  id: string;
+  name: string;
+  githubRepo: string | null;
 }
 
 export default function ForgePage() {
   const router = useRouter();
   const { toast } = useToast();
   const [projects, setProjects] = useState<Project[]>([]);
+  const [tasksProjects, setTasksProjects] = useState<TasksProject[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<Project | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  function findTasksProject(repoUrl: string): TasksProject | undefined {
+    // Extract owner/repo from GitHub URL
+    const match = repoUrl.match(/github\.com\/([^/]+\/[^/]+)/);
+    if (!match) return undefined;
+    const ownerRepo = match[1].replace(/\.git$/, "");
+    return tasksProjects.find((tp) => tp.githubRepo === ownerRepo);
+  }
 
   async function handleDelete() {
     if (!deleteTarget) return;
@@ -37,8 +54,14 @@ export default function ForgePage() {
   }
 
   useEffect(() => {
-    apiFetch<{ projects: Project[] }>("/api/forge/projects")
-      .then((data) => setProjects(data.projects))
+    Promise.all([
+      apiFetch<{ projects: Project[] }>("/api/forge/projects"),
+      apiFetch<{ projects: TasksProject[] }>("/api/tasks/projects").catch(() => ({ projects: [] })),
+    ])
+      .then(([forgeData, tasksData]) => {
+        setProjects(forgeData.projects);
+        setTasksProjects(tasksData.projects);
+      })
       .catch((err: Error) => {
         if (err.message.includes("401")) return router.push("/login");
         setError(err.message);
@@ -89,33 +112,45 @@ export default function ForgePage() {
         />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {projects.map((p) => (
-            <Card key={p.id} className="group relative">
-              <h3 className="font-medium text-sm text-content-primary">{p.projectName}</h3>
-              <p className="text-xs text-content-tertiary mt-1">
-                {new Date(p.createdAt).toLocaleDateString()}
-              </p>
-              <div className="flex gap-2 mt-3">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  href={p.repoUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  GitHub
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-accent-red hover:text-accent-red/80 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus:opacity-100 transition-opacity duration-fast"
-                  onClick={() => setDeleteTarget(p)}
-                >
-                  Remove
-                </Button>
-              </div>
-            </Card>
-          ))}
+          {projects.map((p) => {
+            const linkedProject = findTasksProject(p.repoUrl);
+            return (
+              <Card key={p.id} className="group relative">
+                <h3 className="font-medium text-sm text-content-primary">{p.projectName}</h3>
+                {p.description && (
+                  <p className="text-xs text-content-secondary mt-1 line-clamp-2">{p.description}</p>
+                )}
+                <p className="text-xs text-content-tertiary mt-1">
+                  {new Date(p.createdAt).toLocaleDateString()}
+                </p>
+                {linkedProject && (
+                  <Link href={`/tasks/${linkedProject.id}`} className="inline-flex items-center gap-1 mt-2 text-xs text-accent-blue hover:underline">
+                    <Badge variant="info">Tasks</Badge>
+                    <span>{linkedProject.name}</span>
+                  </Link>
+                )}
+                <div className="flex gap-2 mt-3">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    href={p.repoUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    GitHub
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-accent-red hover:text-accent-red/80 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus:opacity-100 transition-opacity duration-fast"
+                    onClick={() => setDeleteTarget(p)}
+                  >
+                    Remove
+                  </Button>
+                </div>
+              </Card>
+            );
+          })}
         </div>
       )}
 
