@@ -57,6 +57,13 @@ export default function ProjectTasksPage() {
   const [filter, setFilter] = useState<StatusFilter>("all");
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
 
+  function reloadTasks() {
+    if (!projectId) return;
+    apiFetch<{ tasks: Task[] }>(`/api/tasks/projects/${encodeURIComponent(projectId)}/tasks`)
+      .then((data) => setTasks(data.tasks))
+      .catch(() => {});
+  }
+
   useEffect(() => {
     if (!projectId) return;
 
@@ -186,6 +193,7 @@ export default function ProjectTasksPage() {
           taskId={selectedTaskId}
           open={!!selectedTaskId}
           onClose={() => setSelectedTaskId(null)}
+          onTaskUpdated={reloadTasks}
         />
       )}
     </>
