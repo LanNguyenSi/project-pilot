@@ -52,11 +52,11 @@ export default function CreateTaskPage() {
     setError("");
     setSubmitting(true);
 
-    const template: Record<string, unknown> = {};
-    if (goal) template.goal = goal;
-    if (acceptanceCriteria) template.acceptanceCriteria = acceptanceCriteria.split("\n").filter(Boolean);
-    if (context) template.context = context;
-    if (constraints) template.constraints = constraints.split("\n").filter(Boolean);
+    const templateData: Record<string, string> = {};
+    if (goal) templateData.goal = goal;
+    if (acceptanceCriteria) templateData.acceptanceCriteria = acceptanceCriteria;
+    if (context) templateData.context = context;
+    if (constraints) templateData.constraints = constraints;
 
     try {
       await apiFetch(`/api/tasks/projects/${encodeURIComponent(projectId)}/tasks`, {
@@ -65,7 +65,7 @@ export default function CreateTaskPage() {
           title,
           priority,
           description: description || undefined,
-          template: Object.keys(template).length > 0 ? template : undefined,
+          templateData: Object.keys(templateData).length > 0 ? templateData : undefined,
         }),
       });
       toast({ title: "Task created", variant: "success" });
