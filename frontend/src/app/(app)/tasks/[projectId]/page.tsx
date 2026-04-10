@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import { Badge, Button, Card, EmptyState, SkeletonRow } from "@/components/ui";
 import type { BadgeVariant } from "@/components/ui";
+import { TaskDetailPanel } from "@/components/TaskDetailPanel";
 
 interface Task {
   id: string;
@@ -54,6 +55,7 @@ export default function ProjectTasksPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [filter, setFilter] = useState<StatusFilter>("all");
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!projectId) return;
@@ -154,7 +156,7 @@ export default function ProjectTasksPage() {
             const status = statusMap[t.status] || { label: t.status, variant: "neutral" as const };
             const barColor = priorityBar[t.priority] || "bg-surface-tertiary";
             return (
-              <Card key={t.id} noPadding className="overflow-hidden">
+              <Card key={t.id} noPadding className="overflow-hidden cursor-pointer hover:border-stroke-strong transition-colors" onClick={() => setSelectedTaskId(t.id)}>
                 <div className="flex">
                   {/* Priority bar */}
                   <div className={`w-1 shrink-0 ${barColor}`} />
@@ -177,6 +179,14 @@ export default function ProjectTasksPage() {
             );
           })}
         </div>
+      )}
+
+      {selectedTaskId && (
+        <TaskDetailPanel
+          taskId={selectedTaskId}
+          open={!!selectedTaskId}
+          onClose={() => setSelectedTaskId(null)}
+        />
       )}
     </>
   );
