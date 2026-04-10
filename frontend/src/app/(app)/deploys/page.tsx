@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
-import { Badge, Button, Card, ConfirmModal, SkeletonBox, useToast } from "@/components/ui";
+import { Badge, Button, Card, ConfirmModal, Modal, SkeletonBox, useToast } from "@/components/ui";
 import type { BadgeVariant } from "@/components/ui";
 
 interface Server {
@@ -59,6 +59,9 @@ export default function DeploysPage() {
   const [tab, setTab] = useState<Tab>("servers");
   const [deployTarget, setDeployTarget] = useState<{ server: string; app: string } | null>(null);
   const [deploying, setDeploying] = useState(false);
+  const [logDeploy, setLogDeploy] = useState<Deploy | null>(null);
+  const [logContent, setLogContent] = useState<string | null>(null);
+  const [logLoading, setLogLoading] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -95,6 +98,31 @@ export default function DeploysPage() {
     } finally {
       setDeploying(false);
       setDeployTarget(null);
+    }
+  }
+
+  async function handleViewLogs(d: Deploy) {
+    setLogDeploy(d);
+    setLogContent(null);
+    setLogLoading(true);
+    try {
+      const data = await apiFetch<{ deploy?: { log?: string; steps?: unknown[] } }>(`/api/deploy/status/${encodeURIComponent(d.id)}`);
+      const log = data.deploy?.log;
+      if (log) {
+        // Try to parse as JSON steps, fall back to raw text
+        try {
+          const steps = JSON.parse(log) as { step: string; status: string; output?: string }[];
+          setLogContent(steps.map((s) => `[${s.status}] ${s.step}${s.output ? `\n${s.output}` : ""}`).join("\n\n"));
+        } catch {
+          setLogContent(log);
+        }
+      } else {
+        setLogContent("No logs available for this deploy.");
+      }
+    } catch (err) {
+      setLogContent(err instanceof Error ? err.message : "Failed to load logs");
+    } finally {
+      setLogLoading(false);
     }
   }
 
@@ -201,7 +229,8 @@ export default function DeploysPage() {
               return (
                 <div
                   key={d.id}
-                  className={`flex items-center gap-4 py-3 border-b border-stroke-default ${
+                  onClick={() => void handleViewLogs(d)}
+                  className={`flex items-center gap-4 py-3 border-b border-stroke-default cursor-pointer hover:bg-surface-tertiary/50 transition-colors ${
                     isActive ? "bg-accent-amber/5" : ""
                   }`}
                 >
@@ -236,6 +265,40 @@ export default function DeploysPage() {
         confirmLabel="Deploy"
         loading={deploying}
       />
+
+      <Modal open={!!logDeploy} onClose={() => setLogDeploy(null)}>
+        {logDeploy && (
+          <>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-sm font-semibold text-content-primary">
+                  {logDeploy.app} <span className="text-content-tertiary font-normal">on</span> {logDeploy.server}
+                </h2>
+                <div className="flex items-center gap-2 mt-1">
+                  <Badge variant={statusBadge[logDeploy.status] || "neutral"} dot>{logDeploy.status}</Badge>
+                  <span className="text-xs text-content-tertiary">{new Date(logDeploy.createdAt).toLocaleString()}</span>
+                </div>
+              </div>
+              <button onClick={() => setLogDeploy(null)} className="text-content-tertiary hover:text-content-primary p-1" aria-label="Close">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="bg-surface-primary border border-stroke-default rounded-button p-3 max-h-80 overflow-y-auto">
+              {logLoading ? (
+                <div className="space-y-2">
+                  <SkeletonBox className="h-3 w-full" />
+                  <SkeletonBox className="h-3 w-3/4" />
+                  <SkeletonBox className="h-3 w-5/6" />
+                </div>
+              ) : (
+                <pre className="text-xs text-content-secondary font-mono whitespace-pre-wrap break-words">{logContent}</pre>
+              )}
+            </div>
+          </>
+        )}
+      </Modal>
     </>
   );
 }
