@@ -91,6 +91,7 @@ export function TaskDetailPanel({ taskId, open, onClose }: TaskDetailPanelProps)
     if (!open || !taskId) return;
     setLoading(true);
     setError("");
+    setTask(null);
 
     Promise.all([
       apiFetch<{ task: TaskDetail }>(`/api/tasks/${encodeURIComponent(taskId)}`),
@@ -106,7 +107,25 @@ export function TaskDetailPanel({ taskId, open, onClose }: TaskDetailPanelProps)
 
   const handleKey = useCallback(
     (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") {
+        onClose();
+        return;
+      }
+      if (e.key === "Tab" && panelRef.current) {
+        const focusable = panelRef.current.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+        );
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
     },
     [onClose],
   );
@@ -115,6 +134,12 @@ export function TaskDetailPanel({ taskId, open, onClose }: TaskDetailPanelProps)
     if (!open) return;
     document.addEventListener("keydown", handleKey);
     document.body.style.overflow = "hidden";
+    requestAnimationFrame(() => {
+      const el = panelRef.current?.querySelector<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+      );
+      el?.focus();
+    });
     return () => {
       document.removeEventListener("keydown", handleKey);
       document.body.style.overflow = "";
@@ -152,7 +177,7 @@ export function TaskDetailPanel({ taskId, open, onClose }: TaskDetailPanelProps)
                   <span className={`text-xs font-medium tabular-nums ${
                     confidence.score >= 70 ? "text-accent-green" : confidence.score >= 40 ? "text-accent-amber" : "text-accent-red"
                   }`}>
-                    Confidence: {confidence.score}
+                    Confidence: {confidence.score}%
                   </span>
                 )}
               </div>
