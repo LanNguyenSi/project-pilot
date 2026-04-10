@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import { Badge, Button, Card, ConfirmModal, SkeletonBox, useToast } from "@/components/ui";
@@ -60,23 +60,41 @@ export default function DeploysPage() {
   const [deployTarget, setDeployTarget] = useState<{ server: string; app: string } | null>(null);
   const [deploying, setDeploying] = useState(false);
 
-  useEffect(() => {
-    Promise.all([
-      apiFetch<{ servers: Server[] }>("/api/deploy/servers"),
-      apiFetch<{ apps: App[] }>("/api/deploy/apps"),
-      apiFetch<{ deploys: Deploy[] }>("/api/deploy/history?limit=20"),
-    ])
-      .then(([srvData, appData, deployData]) => {
-        setServers(srvData.servers);
-        setApps(appData.apps);
-        setDeploys(deployData.deploys);
-      })
-      .catch((err: Error) => {
-        if (err.message.includes("401")) return router.push("/login");
-        setError(err.message);
-      })
-      .finally(() => setLoading(false));
+  const fetchData = useCallback(async () => {
+    try {
+      const [srvData, appData, deployData] = await Promise.all([
+        apiFetch<{ servers: Server[] }>("/api/deploy/servers"),
+        apiFetch<{ apps: App[] }>("/api/deploy/apps"),
+        apiFetch<{ deploys: Deploy[] }>("/api/deploy/history?limit=20"),
+      ]);
+      setServers(srvData.servers);
+      setApps(appData.apps);
+      setDeploys(deployData.deploys);
+    } catch (err) {
+      if (err instanceof Error && err.message.includes("401")) {
+        router.push("/login");
+        return;
+      }
+      setError(err instanceof Error ? err.message : "Failed to load");
+    }
   }, [router]);
+
+  useEffect(() => {
+    void fetchData().finally(() => setLoading(false));
+  }, [fetchData]);
+
+  // Auto-refresh while active deploys exist
+  const hasActiveDeploys = deploys.some((d) => d.status === "running" || d.status === "deploying");
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (hasActiveDeploys) {
+      pollRef.current = setInterval(() => void fetchData(), 5_000);
+    }
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, [hasActiveDeploys, fetchData]);
 
   async function handleDeploy() {
     if (!deployTarget) return;
