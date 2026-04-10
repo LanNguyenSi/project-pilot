@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef, useId } from "react";
 import { apiFetch } from "@/lib/api";
-import { Badge, Card, SkeletonBox } from "@/components/ui";
+import { Badge, Button, Card, SkeletonBox, useToast } from "@/components/ui";
 import type { BadgeVariant } from "@/components/ui";
 
 interface TemplateData {
@@ -54,6 +54,7 @@ interface TaskDetailPanelProps {
   taskId: string;
   open: boolean;
   onClose: () => void;
+  onTaskUpdated?: () => void;
 }
 
 const statusMap: Record<string, { label: string; variant: BadgeVariant }> = {
@@ -79,13 +80,15 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-export function TaskDetailPanel({ taskId, open, onClose }: TaskDetailPanelProps) {
+export function TaskDetailPanel({ taskId, open, onClose, onTaskUpdated }: TaskDetailPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
+  const { toast } = useToast();
   const [task, setTask] = useState<TaskDetail | null>(null);
   const [instructions, setInstructions] = useState<InstructionsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [transitioning, setTransitioning] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open || !taskId) return;
@@ -146,6 +149,26 @@ export function TaskDetailPanel({ taskId, open, onClose }: TaskDetailPanelProps)
     };
   }, [open, handleKey]);
 
+  async function handleTransition(toStatus: string) {
+    setTransitioning(toStatus);
+    try {
+      const result = await apiFetch<{ task: TaskDetail }>(`/api/tasks/${encodeURIComponent(taskId)}/transition`, {
+        method: "POST",
+        body: JSON.stringify({ status: toStatus }),
+      });
+      setTask(result.task);
+      // Refetch instructions for updated transitions
+      const instrData = await apiFetch<InstructionsData>(`/api/tasks/${encodeURIComponent(taskId)}/instructions`).catch(() => null);
+      setInstructions(instrData);
+      toast({ title: `Status changed to ${toStatus.replaceAll("_", " ")}`, variant: "success" });
+      onTaskUpdated?.();
+    } catch (err) {
+      toast({ title: err instanceof Error ? err.message : "Transition failed", variant: "error" });
+    } finally {
+      setTransitioning(null);
+    }
+  }
+
   if (!open) return null;
 
   const status = task ? statusMap[task.status] || { label: task.status, variant: "neutral" as const } : null;
@@ -193,6 +216,25 @@ export function TaskDetailPanel({ taskId, open, onClose }: TaskDetailPanelProps)
             </svg>
           </button>
         </div>
+
+        {/* Transition Actions */}
+        {!loading && instructions?.allowedTransitions && instructions.allowedTransitions.length > 0 && (
+          <div className="px-6 py-3 border-b border-stroke-default flex items-center gap-2 flex-wrap">
+            <span className="text-xs text-content-tertiary mr-1">Actions:</span>
+            {instructions.allowedTransitions.map((tr) => (
+              <Button
+                key={tr.to}
+                variant="secondary"
+                size="sm"
+                onClick={() => void handleTransition(tr.to)}
+                disabled={!!transitioning}
+                loading={transitioning === tr.to}
+              >
+                {tr.label}
+              </Button>
+            ))}
+          </div>
+        )}
 
         {/* Body */}
         <div className="px-6 py-5">
