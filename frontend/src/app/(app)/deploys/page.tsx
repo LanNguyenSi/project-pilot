@@ -60,7 +60,7 @@ export default function DeploysPage() {
   const [tab, setTab] = useState<Tab>("servers");
   const [deployTarget, setDeployTarget] = useState<{ server: string; app: string } | null>(null);
   const [deploying, setDeploying] = useState(false);
-  const [tasksProjects, setTasksProjects] = useState<{ id: string; name: string; slug: string }[]>([]);
+  const [tasksProjects, setTasksProjects] = useState<{ id: string; name: string; slug: string; githubRepo: string | null }[]>([]);
   const [logDeploy, setLogDeploy] = useState<Deploy | null>(null);
   const [logContent, setLogContent] = useState<string | null>(null);
   const [logLoading, setLogLoading] = useState(false);
@@ -71,7 +71,7 @@ export default function DeploysPage() {
         apiFetch<{ servers: Server[] }>("/api/deploy/servers"),
         apiFetch<{ apps: App[] }>("/api/deploy/apps"),
         apiFetch<{ deploys: Deploy[] }>("/api/deploy/history?limit=20"),
-        apiFetch<{ projects: { id: string; name: string; slug: string }[] }>("/api/tasks/projects").catch(() => ({ projects: [] })),
+        apiFetch<{ projects: { id: string; name: string; slug: string; githubRepo: string | null }[] }>("/api/tasks/projects").catch(() => ({ projects: [] as { id: string; name: string; slug: string; githubRepo: string | null }[] })),
       ]);
       setServers(srvData.servers);
       setApps(appData.apps);
@@ -223,7 +223,8 @@ export default function DeploysPage() {
       {tab === "apps" && (
         <div role="tabpanel" aria-label="Applications" className="space-y-2">
           {apps.map((a) => {
-            const linkedProject = tasksProjects.find((tp) => tp.slug === a.name || tp.name === a.name);
+            const appLower = a.name.toLowerCase();
+            const linkedProject = tasksProjects.find((tp) => tp.slug.toLowerCase() === appLower || tp.name.toLowerCase() === appLower);
             return (
             <Card key={a.id} className="flex items-center gap-4">
               <Badge variant={statusBadge[a.status] || "neutral"} dot>{a.status}</Badge>
