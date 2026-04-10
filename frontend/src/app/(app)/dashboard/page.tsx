@@ -37,20 +37,30 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([
-      apiFetch<{ user: User }>("/api/auth/me"),
-      apiFetch<DashboardData>("/api/dashboard/summary"),
-    ])
-      .then(([userData, dashData]) => {
-        setUser(userData.user);
-        setData(dashData);
-      })
-      .catch((err: Error) => {
-        if (err.message.includes("401") || err.message.includes("Not authenticated")) {
+    let cancelled = false;
+
+    async function fetchDashboard() {
+      try {
+        const [userData, dashData] = await Promise.all([
+          apiFetch<{ user: User }>("/api/auth/me"),
+          apiFetch<DashboardData>("/api/dashboard/summary"),
+        ]);
+        if (!cancelled) {
+          setUser(userData.user);
+          setData(dashData);
+        }
+      } catch (err) {
+        if (err instanceof Error && (err.message.includes("401") || err.message.includes("Not authenticated"))) {
           router.push("/login");
         }
-      })
-      .finally(() => setLoading(false));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    void fetchDashboard();
+    const interval = setInterval(() => void fetchDashboard(), 30_000);
+    return () => { cancelled = true; clearInterval(interval); };
   }, [router]);
 
   if (loading) {
