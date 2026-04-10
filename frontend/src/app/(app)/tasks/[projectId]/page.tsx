@@ -152,7 +152,7 @@ export default function ProjectTasksPage() {
               List
             </button>
             <button
-              onClick={() => { setView("board"); localStorage.setItem(VIEW_KEY, "board"); }}
+              onClick={() => { setView("board"); setFilter("all"); localStorage.setItem(VIEW_KEY, "board"); }}
               className={`px-2.5 py-1 text-xs font-medium rounded-button transition-colors ${view === "board" ? "bg-surface-tertiary text-content-primary" : "text-content-tertiary hover:text-content-primary"}`}
               aria-label="Board view"
             >
@@ -180,7 +180,7 @@ export default function ProjectTasksPage() {
         />
       ) : view === "board" ? (
         /* Board view */
-        <div className="grid grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {STATUSES.map((col) => {
             const colStatus = statusMap[col] || { label: col, variant: "neutral" as const };
             const colTasks = tasks.filter((t) => t.status === col);
