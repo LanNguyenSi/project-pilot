@@ -88,7 +88,7 @@ export function TaskDetailPanel({ taskId, open, onClose, onTaskUpdated }: TaskDe
   const [instructions, setInstructions] = useState<InstructionsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [transitioning, setTransitioning] = useState(false);
+  const [transitioning, setTransitioning] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open || !taskId) return;
@@ -125,7 +125,7 @@ export function TaskDetailPanel({ taskId, open, onClose, onTaskUpdated }: TaskDe
   }, [open, handleKey]);
 
   async function handleTransition(toStatus: string) {
-    setTransitioning(true);
+    setTransitioning(toStatus);
     try {
       const result = await apiFetch<{ task: TaskDetail }>(`/api/tasks/${encodeURIComponent(taskId)}/transition`, {
         method: "POST",
@@ -140,7 +140,7 @@ export function TaskDetailPanel({ taskId, open, onClose, onTaskUpdated }: TaskDe
     } catch (err) {
       toast({ title: err instanceof Error ? err.message : "Transition failed", variant: "error" });
     } finally {
-      setTransitioning(false);
+      setTransitioning(null);
     }
   }
 
@@ -202,7 +202,8 @@ export function TaskDetailPanel({ taskId, open, onClose, onTaskUpdated }: TaskDe
                 variant="secondary"
                 size="sm"
                 onClick={() => void handleTransition(tr.to)}
-                loading={transitioning}
+                disabled={!!transitioning}
+                loading={transitioning === tr.to}
               >
                 {tr.label}
               </Button>
