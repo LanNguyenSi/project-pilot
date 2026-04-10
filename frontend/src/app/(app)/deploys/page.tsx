@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { apiFetch } from "@/lib/api";
 import { Badge, Button, Card, ConfirmModal, Modal, SkeletonBox, useToast } from "@/components/ui";
 import type { BadgeVariant } from "@/components/ui";
@@ -59,20 +60,23 @@ export default function DeploysPage() {
   const [tab, setTab] = useState<Tab>("servers");
   const [deployTarget, setDeployTarget] = useState<{ server: string; app: string } | null>(null);
   const [deploying, setDeploying] = useState(false);
+  const [tasksProjects, setTasksProjects] = useState<{ id: string; name: string; slug: string; githubRepo: string | null }[]>([]);
   const [logDeploy, setLogDeploy] = useState<Deploy | null>(null);
   const [logContent, setLogContent] = useState<string | null>(null);
   const [logLoading, setLogLoading] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
-      const [srvData, appData, deployData] = await Promise.all([
+      const [srvData, appData, deployData, tasksData] = await Promise.all([
         apiFetch<{ servers: Server[] }>("/api/deploy/servers"),
         apiFetch<{ apps: App[] }>("/api/deploy/apps"),
         apiFetch<{ deploys: Deploy[] }>("/api/deploy/history?limit=20"),
+        apiFetch<{ projects: { id: string; name: string; slug: string; githubRepo: string | null }[] }>("/api/tasks/projects").catch(() => ({ projects: [] as { id: string; name: string; slug: string; githubRepo: string | null }[] })),
       ]);
       setServers(srvData.servers);
       setApps(appData.apps);
       setDeploys(deployData.deploys);
+      setTasksProjects(tasksData.projects);
     } catch (err) {
       if (err instanceof Error && err.message.includes("401")) {
         router.push("/login");
@@ -218,10 +222,20 @@ export default function DeploysPage() {
       {/* Apps tab */}
       {tab === "apps" && (
         <div role="tabpanel" aria-label="Applications" className="space-y-2">
-          {apps.map((a) => (
+          {apps.map((a) => {
+            const appLower = a.name.toLowerCase();
+            const linkedProject = tasksProjects.find((tp) => tp.slug.toLowerCase() === appLower || tp.name.toLowerCase() === appLower);
+            return (
             <Card key={a.id} className="flex items-center gap-4">
               <Badge variant={statusBadge[a.status] || "neutral"} dot>{a.status}</Badge>
-              <span className="flex-1 text-sm text-content-primary">{a.name}</span>
+              <span className="flex-1 text-sm text-content-primary">
+                {a.name}
+                {linkedProject && (
+                  <Link href={`/tasks/${linkedProject.id}`} className="ml-2 text-xs text-accent-blue hover:underline" onClick={(e) => e.stopPropagation()}>
+                    Tasks →
+                  </Link>
+                )}
+              </span>
               <span className="text-xs text-content-tertiary">{a.server.name}</span>
               <Button
                 variant="secondary"
@@ -232,7 +246,8 @@ export default function DeploysPage() {
                 Deploy
               </Button>
             </Card>
-          ))}
+            );
+          })}
         </div>
       )}
 
