@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { ZodError } from "zod";
 import type { AppEnv } from "./types/hono.js";
 import { corsMiddleware } from "./middleware/cors.js";
 import { securityHeaders } from "./middleware/security.js";
@@ -12,6 +13,19 @@ import { tasks } from "./routes/tasks.js";
 import { deploy } from "./routes/deploy.js";
 
 const app = new Hono<AppEnv>();
+
+app.onError((err, c) => {
+  if (err instanceof ZodError) {
+    const issues = err.issues.map((i) => `${i.path.join(".")}: ${i.message}`);
+    return c.json({ error: "Validation failed", issues }, 400);
+  }
+  console.error(`[${new Date().toISOString()}] ${c.req.method} ${c.req.path}:`, err.message);
+  const status = "status" in err && typeof err.status === "number" ? err.status : 500;
+  return c.json(
+    { error: status === 500 ? "Internal server error" : err.message },
+    status as any,
+  );
+});
 
 app.use("*", corsMiddleware);
 app.use("*", securityHeaders);
