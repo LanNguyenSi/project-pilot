@@ -16,12 +16,12 @@ WORKDIR /app
 ENV NODE_ENV=production
 
 COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
-COPY --from=builder /app/public ./public
+COPY --from=builder /app/.next/static ./frontend/.next/static
+COPY --from=builder /app/public ./frontend/public
 
 EXPOSE 3000
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s \
   CMD node -e "fetch('http://localhost:3000').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
 
-CMD ["node", "server.js"]
+CMD ["node", "frontend/server.js"]
