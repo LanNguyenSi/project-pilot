@@ -71,22 +71,24 @@ export default function DeploysPage() {
   const [appFilter, setAppFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
 
-  const fetchHistory = useCallback(async (page: number, filters?: { server?: string; app?: string; status?: string }) => {
+  const buildHistoryParams = useCallback((page: number, server: string, app: string, status: string) => {
     const params = new URLSearchParams();
     params.set("limit", String(deploysPerPage));
     params.set("offset", String(page * deploysPerPage));
-    const sf = filters?.server ?? serverFilter;
-    const af = filters?.app ?? appFilter;
-    const stf = filters?.status ?? statusFilter;
-    if (sf) params.set("server_id", sf);
-    if (af) params.set("app_id", af);
-    if (stf) params.set("status", stf);
+    if (server) params.set("server_id", server);
+    if (app) params.set("app_id", app);
+    if (status) params.set("status", status);
+    return params;
+  }, []);
+
+  const fetchHistory = useCallback(async (page: number, server: string, app: string, status: string) => {
+    const params = buildHistoryParams(page, server, app, status);
     const data = await apiFetch<{ deploys: Deploy[]; total: number }>(
       `/api/deploy/history?${params}`,
     );
     setDeploys(data.deploys);
     setDeployTotal(data.total ?? data.deploys.length);
-  }, [serverFilter, appFilter, statusFilter]);
+  }, [buildHistoryParams]);
 
   const fetchData = useCallback(async () => {
     try {
@@ -98,7 +100,6 @@ export default function DeploysPage() {
       setServers(srvData.servers);
       setApps(appData.apps);
       setTasksProjects(tasksData.projects);
-      await fetchHistory(deployPage);
     } catch (err) {
       if (err instanceof Error && err.message.includes("401")) {
         router.push("/login");
@@ -106,18 +107,18 @@ export default function DeploysPage() {
       }
       setError(err instanceof Error ? err.message : "Failed to load");
     }
-  }, [router, deployPage, fetchHistory]);
+  }, [router]);
 
   useEffect(() => {
-    void fetchData().finally(() => setLoading(false));
-  }, [fetchData]);
+    void Promise.all([fetchData(), fetchHistory(deployPage, serverFilter, appFilter, statusFilter)])
+      .finally(() => setLoading(false));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!loading) {
-      void fetchHistory(deployPage);
+      void fetchHistory(deployPage, serverFilter, appFilter, statusFilter);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [deployPage, serverFilter, appFilter, statusFilter]);
+  }, [deployPage, serverFilter, appFilter, statusFilter, fetchHistory]);
 
   // Auto-refresh while active deploys exist
   const hasActiveDeploys = deploys.some((d) => d.status === "running" || d.status === "deploying");
@@ -125,7 +126,10 @@ export default function DeploysPage() {
 
   useEffect(() => {
     if (hasActiveDeploys) {
-      pollRef.current = setInterval(() => void fetchData(), 5_000);
+      pollRef.current = setInterval(() => {
+        void fetchData();
+        void fetchHistory(deployPage, serverFilter, appFilter, statusFilter);
+      }, 5_000);
     }
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
@@ -145,7 +149,7 @@ export default function DeploysPage() {
       setServerFilter("");
       setAppFilter("");
       setStatusFilter("");
-      await fetchHistory(0, { server: "", app: "", status: "" });
+      await fetchHistory(0, "", "", "");
       setTab("history");
     } catch (err) {
       toast({ title: err instanceof Error ? err.message : "Deploy failed", variant: "error" });
@@ -330,7 +334,9 @@ export default function DeploysPage() {
         </div>
 
         {deploys.length === 0 ? (
-          <p className="text-content-secondary text-sm">No deploys yet</p>
+          <p className="text-content-secondary text-sm">
+            {serverFilter || appFilter || statusFilter ? "No matching deploys" : "No deploys yet"}
+          </p>
         ) : (
           <>
             <div className="space-y-0">
