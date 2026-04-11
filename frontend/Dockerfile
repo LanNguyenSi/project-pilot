@@ -21,9 +21,7 @@ COPY --from=builder /app/public ./frontend/public
 
 EXPOSE 3000
 
-WORKDIR /app/frontend
-
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s \
   CMD node -e "fetch('http://localhost:3000').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
 
-CMD ["node", "server.js"]
+CMD ["node", "frontend/server.js"]
