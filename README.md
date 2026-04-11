@@ -4,6 +4,17 @@ Unified control plane for the full project lifecycle: **Create** (project-forge)
 
 One login, one dashboard, one MCP server — aggregating three independent services via their APIs.
 
+### Key Features
+
+- Unified dark-mode dashboard with aggregated stats from all services
+- Encrypted service credential storage with **Test Connection** validation
+- Pagination and search on tasks, deploys, and projects
+- Deploy history filters (by server, app, status, date range)
+- Password reset flow (forgot password / reset with token)
+- Error boundaries for graceful failure handling
+- Zod input validation on all API endpoints
+- Security headers (CSP, HSTS) in production
+
 ## Architecture
 
 ```
@@ -98,11 +109,14 @@ Backend: http://localhost:3001
 - `POST /api/auth/login` — Sign in
 - `POST /api/auth/logout` — Sign out
 - `GET /api/auth/me` — Current user
+- `POST /api/auth/forgot-password` — Request password reset email
+- `POST /api/auth/reset-password` — Reset password with token
 
 ### Service Credentials
 - `GET /api/credentials` — List configured services
 - `PUT /api/credentials` — Add/update service token
 - `DELETE /api/credentials/:service` — Remove token
+- `POST /api/credentials/validate` — Test connection to a service
 
 ### Dashboard
 - `GET /api/dashboard/summary` — Aggregated stats from all services
@@ -198,3 +212,10 @@ Exposes via Traefik at `project-pilot.opentriologue.ai` with automatic HTTPS.
 | `/forge/create` | Create project wizard |
 | `/tasks` | Task board |
 | `/deploys` | Server fleet & deploy management |
+
+## Roadmap
+
+- [ ] Email notifications for password reset
+- [ ] Request logging (structured access / error logs)
+- [ ] User profile management (display name, avatar)
+- [ ] Session management (list active sessions, revoke)
