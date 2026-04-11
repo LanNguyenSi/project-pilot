@@ -61,13 +61,13 @@ const SERVICE_TEST_PATHS: Record<string, string> = {
   "deploy-panel": "/api/v1/servers",
 };
 
-credentials.post("/validate", async (c) => {
-  const userId = c.get("userId")!;
-  const { service } = await c.req.json<{ service: string }>();
+const validateSchema = z.object({
+  service: z.enum(["project-forge", "agent-tasks", "deploy-panel"]),
+});
 
-  if (!service || !isValidService(service)) {
-    return c.json({ error: "Invalid service" }, 400);
-  }
+credentials.post("/validate", zValidator("json", validateSchema), async (c) => {
+  const userId = c.get("userId")!;
+  const { service } = c.req.valid("json");
 
   const token = await getCredential(userId, service);
   if (!token) {
@@ -85,7 +85,7 @@ credentials.post("/validate", async (c) => {
     if (res.ok) {
       return c.json({ valid: true });
     }
-    return c.json({ valid: false, error: res.status === 401 ? "Invalid token" : `Service returned ${res.status}` });
+    return c.json({ valid: false, error: res.status === 401 || res.status === 403 ? "Invalid token" : "Service rejected the request" });
   } catch (err) {
     if (err instanceof DOMException && err.name === "AbortError") {
       return c.json({ valid: false, error: "Service timed out" });

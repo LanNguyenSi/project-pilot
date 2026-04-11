@@ -55,6 +55,7 @@ export default function SettingsPage() {
         body: JSON.stringify({ service, token }),
       });
       setTokens((prev) => ({ ...prev, [service]: "" }));
+      setTestResults((prev) => { const next = { ...prev }; delete next[service]; return next; });
       await loadCredentials();
       toast({ title: `${service} token saved`, variant: "success" });
     } catch (err) {
