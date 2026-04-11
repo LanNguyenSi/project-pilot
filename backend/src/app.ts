@@ -16,7 +16,8 @@ const app = new Hono<AppEnv>();
 
 app.onError((err, c) => {
   if (err instanceof ZodError) {
-    return c.json({ error: "Validation failed", details: err.flatten().fieldErrors }, 400);
+    const issues = err.issues.map((i) => `${i.path.join(".")}: ${i.message}`);
+    return c.json({ error: "Validation failed", issues }, 400);
   }
   console.error(`[${new Date().toISOString()}] ${c.req.method} ${c.req.path}:`, err.message);
   const status = "status" in err && typeof err.status === "number" ? err.status : 500;
