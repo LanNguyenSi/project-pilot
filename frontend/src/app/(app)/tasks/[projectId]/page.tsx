@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import { Badge, Button, Card, EmptyState, SkeletonRow } from "@/components/ui";
@@ -99,19 +99,21 @@ export default function ProjectTasksPage() {
 
   const filtered = filter === "all" ? tasks : tasks.filter((t) => t.status === filter);
 
-  const sorted = [...filtered].sort((a, b) => {
+  const sorted = useMemo(() => [...filtered].sort((a, b) => {
     const dir = sortDir === "asc" ? 1 : -1;
     if (sortBy === "priority") {
-      return dir * ((PRIORITY_ORDER[a.priority] ?? 99) - (PRIORITY_ORDER[b.priority] ?? 99));
+      const cmp = (PRIORITY_ORDER[a.priority] ?? 99) - (PRIORITY_ORDER[b.priority] ?? 99);
+      if (cmp !== 0) return dir * cmp;
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     }
     if (sortBy === "title") {
       return dir * a.title.localeCompare(b.title);
     }
     return dir * (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-  });
+  }), [filtered, sortBy, sortDir]);
 
   const totalPages = Math.ceil(sorted.length / TASKS_PER_PAGE);
-  const paginated = sorted.slice(page * TASKS_PER_PAGE, (page + 1) * TASKS_PER_PAGE);
+  const paginated = useMemo(() => sorted.slice(page * TASKS_PER_PAGE, (page + 1) * TASKS_PER_PAGE), [sorted, page]);
 
   const filters: { key: StatusFilter; label: string }[] = [
     { key: "all", label: "All" },
@@ -261,7 +263,7 @@ export default function ProjectTasksPage() {
             );
           })}
         </div>
-      ) : sorted.length === 0 ? (
+      ) : filtered.length === 0 ? (
         <Card className="p-8 text-center">
           <p className="text-content-secondary text-sm">No {filter.replaceAll("_", " ")} tasks</p>
         </Card>
