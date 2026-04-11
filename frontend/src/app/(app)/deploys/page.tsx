@@ -67,14 +67,28 @@ export default function DeploysPage() {
   const [deployTotal, setDeployTotal] = useState(0);
   const [deployPage, setDeployPage] = useState(0);
   const deploysPerPage = 20;
+  const [serverFilter, setServerFilter] = useState("");
+  const [appFilter, setAppFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
 
-  const fetchHistory = useCallback(async (page: number) => {
+  const buildHistoryParams = useCallback((page: number, server: string, app: string, status: string) => {
+    const params = new URLSearchParams();
+    params.set("limit", String(deploysPerPage));
+    params.set("offset", String(page * deploysPerPage));
+    if (server) params.set("server_id", server);
+    if (app) params.set("app_id", app);
+    if (status) params.set("status", status);
+    return params;
+  }, []);
+
+  const fetchHistory = useCallback(async (page: number, server: string, app: string, status: string) => {
+    const params = buildHistoryParams(page, server, app, status);
     const data = await apiFetch<{ deploys: Deploy[]; total: number }>(
-      `/api/deploy/history?limit=${deploysPerPage}&offset=${page * deploysPerPage}`,
+      `/api/deploy/history?${params}`,
     );
     setDeploys(data.deploys);
     setDeployTotal(data.total ?? data.deploys.length);
-  }, []);
+  }, [buildHistoryParams]);
 
   const fetchData = useCallback(async () => {
     try {
@@ -86,7 +100,6 @@ export default function DeploysPage() {
       setServers(srvData.servers);
       setApps(appData.apps);
       setTasksProjects(tasksData.projects);
-      await fetchHistory(deployPage);
     } catch (err) {
       if (err instanceof Error && err.message.includes("401")) {
         router.push("/login");
@@ -94,18 +107,18 @@ export default function DeploysPage() {
       }
       setError(err instanceof Error ? err.message : "Failed to load");
     }
-  }, [router, deployPage, fetchHistory]);
+  }, [router]);
 
   useEffect(() => {
-    void fetchData().finally(() => setLoading(false));
-  }, [fetchData]);
+    void Promise.all([fetchData(), fetchHistory(deployPage, serverFilter, appFilter, statusFilter)])
+      .finally(() => setLoading(false));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!loading) {
-      void fetchHistory(deployPage);
+      void fetchHistory(deployPage, serverFilter, appFilter, statusFilter);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [deployPage]);
+  }, [deployPage, serverFilter, appFilter, statusFilter, fetchHistory]);
 
   // Auto-refresh while active deploys exist
   const hasActiveDeploys = deploys.some((d) => d.status === "running" || d.status === "deploying");
@@ -113,7 +126,10 @@ export default function DeploysPage() {
 
   useEffect(() => {
     if (hasActiveDeploys) {
-      pollRef.current = setInterval(() => void fetchData(), 5_000);
+      pollRef.current = setInterval(() => {
+        void fetchData();
+        void fetchHistory(deployPage, serverFilter, appFilter, statusFilter);
+      }, 5_000);
     }
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
@@ -130,9 +146,10 @@ export default function DeploysPage() {
       });
       toast({ title: `Deploy started for ${deployTarget.app}`, variant: "success" });
       setDeployPage(0);
-      const data = await apiFetch<{ deploys: Deploy[]; total: number }>(`/api/deploy/history?limit=${deploysPerPage}&offset=0`);
-      setDeploys(data.deploys);
-      setDeployTotal(data.total ?? data.deploys.length);
+      setServerFilter("");
+      setAppFilter("");
+      setStatusFilter("");
+      await fetchHistory(0, "", "", "");
       setTab("history");
     } catch (err) {
       toast({ title: err instanceof Error ? err.message : "Deploy failed", variant: "error" });
@@ -272,8 +289,54 @@ export default function DeploysPage() {
 
       {/* History tab */}
       {tab === "history" && (<div role="tabpanel" aria-label="History">
+        {/* Filters */}
+        <div className="flex items-center gap-2 mb-4 flex-wrap">
+          <select
+            value={serverFilter}
+            onChange={(e) => { setServerFilter(e.target.value); setDeployPage(0); }}
+            className="px-2.5 py-1.5 text-xs rounded-button border border-stroke-default bg-surface-primary text-content-primary"
+          >
+            <option value="">All servers</option>
+            {servers.map((s) => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+          </select>
+          <select
+            value={appFilter}
+            onChange={(e) => { setAppFilter(e.target.value); setDeployPage(0); }}
+            className="px-2.5 py-1.5 text-xs rounded-button border border-stroke-default bg-surface-primary text-content-primary"
+          >
+            <option value="">All apps</option>
+            {apps.map((a) => (
+              <option key={a.id} value={a.id}>{a.name}</option>
+            ))}
+          </select>
+          <select
+            value={statusFilter}
+            onChange={(e) => { setStatusFilter(e.target.value); setDeployPage(0); }}
+            className="px-2.5 py-1.5 text-xs rounded-button border border-stroke-default bg-surface-primary text-content-primary"
+          >
+            <option value="">All statuses</option>
+            <option value="success">Success</option>
+            <option value="failed">Failed</option>
+            <option value="running">Running</option>
+            <option value="deploying">Deploying</option>
+            <option value="rolled_back">Rolled back</option>
+          </select>
+          {(serverFilter || appFilter || statusFilter) && (
+            <button
+              onClick={() => { setServerFilter(""); setAppFilter(""); setStatusFilter(""); setDeployPage(0); }}
+              className="px-2.5 py-1.5 text-xs text-content-tertiary hover:text-content-primary transition-colors"
+            >
+              Clear filters
+            </button>
+          )}
+        </div>
+
         {deploys.length === 0 ? (
-          <p className="text-content-secondary text-sm">No deploys yet</p>
+          <p className="text-content-secondary text-sm">
+            {serverFilter || appFilter || statusFilter ? "No matching deploys" : "No deploys yet"}
+          </p>
         ) : (
           <>
             <div className="space-y-0">
