@@ -26,6 +26,8 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState<string | null>(null);
   const [tokens, setTokens] = useState<Record<string, string>>({});
   const [removeTarget, setRemoveTarget] = useState<{ key: string; label: string } | null>(null);
+  const [testing, setTesting] = useState<string | null>(null);
+  const [testResults, setTestResults] = useState<Record<string, { valid: boolean; error?: string }>>({});
 
   useEffect(() => {
     loadCredentials();
@@ -59,6 +61,22 @@ export default function SettingsPage() {
       toast({ title: err instanceof Error ? err.message : "Failed to save", variant: "error" });
     } finally {
       setSaving(null);
+    }
+  }
+
+  async function testConnection(service: string) {
+    setTesting(service);
+    setTestResults((prev) => { const next = { ...prev }; delete next[service]; return next; });
+    try {
+      const data = await apiFetch<{ valid: boolean; error?: string }>("/api/credentials/validate", {
+        method: "POST",
+        body: JSON.stringify({ service }),
+      });
+      setTestResults((prev) => ({ ...prev, [service]: data }));
+    } catch {
+      setTestResults((prev) => ({ ...prev, [service]: { valid: false, error: "Test failed" } }));
+    } finally {
+      setTesting(null);
     }
   }
 
@@ -110,7 +128,22 @@ export default function SettingsPage() {
                 </div>
                 {existing && (
                   <div className="flex items-center gap-3">
-                    <Badge variant="success" dot>Connected</Badge>
+                    {testResults[key] ? (
+                      <Badge variant={testResults[key].valid ? "success" : "error"} dot>
+                        {testResults[key].valid ? "Valid" : testResults[key].error || "Invalid"}
+                      </Badge>
+                    ) : (
+                      <Badge variant="success" dot>Connected</Badge>
+                    )}
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      disabled={testing === key}
+                      loading={testing === key}
+                      onClick={() => testConnection(key)}
+                    >
+                      Test
+                    </Button>
                     <Button
                       variant="ghost"
                       size="sm"
