@@ -47,9 +47,13 @@ const priorityLabel: Record<string, string> = {
 
 type StatusFilter = "all" | "open" | "in_progress" | "review" | "done";
 type ViewMode = "list" | "board";
+type SortField = "createdAt" | "priority" | "title";
+type SortDir = "asc" | "desc";
 
 const STATUSES: StatusFilter[] = ["open", "in_progress", "review", "done"];
 const VIEW_KEY = "project-pilot:task-view";
+const PRIORITY_ORDER: Record<string, number> = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
+const TASKS_PER_PAGE = 20;
 
 export default function ProjectTasksPage() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -59,6 +63,9 @@ export default function ProjectTasksPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [filter, setFilter] = useState<StatusFilter>("all");
+  const [sortBy, setSortBy] = useState<SortField>("createdAt");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [page, setPage] = useState(0);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [view, setView] = useState<ViewMode>(() => {
     if (typeof window !== "undefined") {
@@ -92,6 +99,20 @@ export default function ProjectTasksPage() {
 
   const filtered = filter === "all" ? tasks : tasks.filter((t) => t.status === filter);
 
+  const sorted = [...filtered].sort((a, b) => {
+    const dir = sortDir === "asc" ? 1 : -1;
+    if (sortBy === "priority") {
+      return dir * ((PRIORITY_ORDER[a.priority] ?? 99) - (PRIORITY_ORDER[b.priority] ?? 99));
+    }
+    if (sortBy === "title") {
+      return dir * a.title.localeCompare(b.title);
+    }
+    return dir * (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  });
+
+  const totalPages = Math.ceil(sorted.length / TASKS_PER_PAGE);
+  const paginated = sorted.slice(page * TASKS_PER_PAGE, (page + 1) * TASKS_PER_PAGE);
+
   const filters: { key: StatusFilter; label: string }[] = [
     { key: "all", label: "All" },
     { key: "open", label: "Open" },
@@ -119,26 +140,45 @@ export default function ProjectTasksPage() {
       {!loading && tasks.length > 0 && (
         <div className="flex items-center justify-between mb-4">
           {view === "list" ? (
-            <div className="flex gap-1" role="toolbar" aria-label="Filter by status">
-              {filters.map((f) => (
-                <button
-                  key={f.key}
-                  aria-pressed={filter === f.key}
-                  onClick={() => setFilter(f.key)}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-button transition-colors duration-fast ${
-                    filter === f.key
-                      ? "bg-accent-blue/10 text-accent-blue"
-                      : "text-content-tertiary hover:text-content-primary hover:bg-surface-tertiary"
-                  }`}
-                >
-                  {f.label}
-                  {f.key !== "all" && (
-                    <span className="ml-1 text-content-tertiary">
-                      {tasks.filter((t) => t.status === f.key).length}
-                    </span>
-                  )}
-                </button>
-              ))}
+            <div className="flex items-center gap-3">
+              <div className="flex gap-1" role="toolbar" aria-label="Filter by status">
+                {filters.map((f) => (
+                  <button
+                    key={f.key}
+                    aria-pressed={filter === f.key}
+                    onClick={() => { setFilter(f.key); setPage(0); }}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-button transition-colors duration-fast ${
+                      filter === f.key
+                        ? "bg-accent-blue/10 text-accent-blue"
+                        : "text-content-tertiary hover:text-content-primary hover:bg-surface-tertiary"
+                    }`}
+                  >
+                    {f.label}
+                    {f.key !== "all" && (
+                      <span className="ml-1 text-content-tertiary">
+                        {tasks.filter((t) => t.status === f.key).length}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+              <select
+                value={`${sortBy}-${sortDir}`}
+                onChange={(e) => {
+                  const [field, dir] = e.target.value.split("-") as [SortField, SortDir];
+                  setSortBy(field);
+                  setSortDir(dir);
+                  setPage(0);
+                }}
+                className="px-2.5 py-1.5 text-xs rounded-button border border-stroke-default bg-surface-primary text-content-primary"
+              >
+                <option value="createdAt-desc">Newest first</option>
+                <option value="createdAt-asc">Oldest first</option>
+                <option value="priority-asc">Priority: High → Low</option>
+                <option value="priority-desc">Priority: Low → High</option>
+                <option value="title-asc">Title: A → Z</option>
+                <option value="title-desc">Title: Z → A</option>
+              </select>
             </div>
           ) : (
             <div />
@@ -221,38 +261,65 @@ export default function ProjectTasksPage() {
             );
           })}
         </div>
-      ) : filtered.length === 0 ? (
+      ) : sorted.length === 0 ? (
         <Card className="p-8 text-center">
           <p className="text-content-secondary text-sm">No {filter.replaceAll("_", " ")} tasks</p>
         </Card>
       ) : (
         /* List view */
-        <div className="space-y-2">
-          {filtered.map((t) => {
-            const status = statusMap[t.status] || { label: t.status, variant: "neutral" as const };
-            const barColor = priorityBar[t.priority] || "bg-surface-tertiary";
-            return (
-              <Card key={t.id} noPadding className="overflow-hidden cursor-pointer hover:border-stroke-strong transition-colors" onClick={() => setSelectedTaskId(t.id)}>
-                <div className="flex">
-                  <div className={`w-1 shrink-0 ${barColor}`} />
-                  <div className="flex-1 p-4 flex items-center gap-4 min-w-0">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-sm font-medium text-content-primary truncate">{t.title}</span>
+        <>
+          <div className="space-y-2">
+            {paginated.map((t) => {
+              const status = statusMap[t.status] || { label: t.status, variant: "neutral" as const };
+              const barColor = priorityBar[t.priority] || "bg-surface-tertiary";
+              return (
+                <Card key={t.id} noPadding className="overflow-hidden cursor-pointer hover:border-stroke-strong transition-colors" onClick={() => setSelectedTaskId(t.id)}>
+                  <div className="flex">
+                    <div className={`w-1 shrink-0 ${barColor}`} />
+                    <div className="flex-1 p-4 flex items-center gap-4 min-w-0">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-sm font-medium text-content-primary truncate">{t.title}</span>
+                        </div>
+                        <div className="flex items-center gap-3 text-xs text-content-tertiary">
+                          <span>{priorityLabel[t.priority] || t.priority}</span>
+                          <span>{t.claimedByAgent?.name || t.claimedByUser?.email || "Unassigned"}</span>
+                          <span>{new Date(t.createdAt).toLocaleDateString()}</span>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-3 text-xs text-content-tertiary">
-                        <span>{priorityLabel[t.priority] || t.priority}</span>
-                        <span>{t.claimedByAgent?.name || t.claimedByUser?.email || "Unassigned"}</span>
-                        <span>{new Date(t.createdAt).toLocaleDateString()}</span>
-                      </div>
+                      <Badge variant={status.variant} dot>{status.label}</Badge>
                     </div>
-                    <Badge variant={status.variant} dot>{status.label}</Badge>
                   </div>
-                </div>
-              </Card>
-            );
-          })}
-        </div>
+                </Card>
+              );
+            })}
+          </div>
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between pt-4">
+              <span className="text-xs text-content-tertiary">
+                {page * TASKS_PER_PAGE + 1}–{Math.min((page + 1) * TASKS_PER_PAGE, sorted.length)} of {sorted.length}
+              </span>
+              <div className="flex gap-1">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={page === 0}
+                  onClick={() => setPage((p) => p - 1)}
+                >
+                  Previous
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={page + 1 >= totalPages}
+                  onClick={() => setPage((p) => p + 1)}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {selectedTaskId && (
