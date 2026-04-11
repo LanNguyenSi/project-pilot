@@ -1,7 +1,20 @@
 import { Hono } from "hono";
+import { zValidator } from "@hono/zod-validator";
+import { z } from "zod";
 import { requireAuth } from "../middleware/auth.js";
 import { getCredential } from "../services/credentials.js";
 import type { AppEnv } from "../types/hono.js";
+
+const deployTriggerSchema = z.object({
+  server: z.string().min(1),
+  app: z.string().min(1),
+  force: z.boolean().optional(),
+});
+
+const rollbackSchema = z.object({
+  server: z.string().min(1),
+  app: z.string().min(1),
+});
 
 const deploy = new Hono<AppEnv>();
 
@@ -58,9 +71,9 @@ deploy.get("/apps", async (c) => {
 });
 
 // POST /deploy/trigger — deploy an app
-deploy.post("/trigger", async (c) => {
+deploy.post("/trigger", zValidator("json", deployTriggerSchema), async (c) => {
   const userId = c.get("userId")!;
-  const body = await c.req.json();
+  const body = c.req.valid("json");
   const result = await deployRequest<unknown>(userId, "/api/v1/deploy", {
     method: "POST",
     body: JSON.stringify(body),
@@ -99,9 +112,9 @@ deploy.get("/history", async (c) => {
 });
 
 // POST /deploy/rollback — rollback
-deploy.post("/rollback", async (c) => {
+deploy.post("/rollback", zValidator("json", rollbackSchema), async (c) => {
   const userId = c.get("userId")!;
-  const body = await c.req.json();
+  const body = c.req.valid("json");
   const result = await deployRequest<unknown>(userId, "/api/v1/rollback", {
     method: "POST",
     body: JSON.stringify(body),

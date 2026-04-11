@@ -46,3 +46,7 @@ export function generateSessionToken(): string {
 export function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
+
+export async function hashPassword(password: string): Promise<string> {
+  return hash(password, SALT_ROUNDS);
+}

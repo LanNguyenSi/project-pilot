@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { apiFetch } from "@/lib/api";
 import { Button, Card, Input } from "@/components/ui";
 
@@ -107,6 +108,14 @@ export default function LoginPage() {
           <Button type="submit" loading={loading} className="w-full" size="lg">
             {isRegister ? "Register" : "Sign in"}
           </Button>
+
+          {!isRegister && (
+            <div className="text-center">
+              <Link href="/forgot-password" className="text-xs text-content-tertiary hover:text-content-primary transition-colors">
+                Forgot password?
+              </Link>
+            </div>
+          )}
         </form>
       </Card>
     </main>
