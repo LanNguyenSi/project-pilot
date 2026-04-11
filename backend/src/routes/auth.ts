@@ -121,8 +121,7 @@ auth.post("/forgot-password", rateLimit({ max: 3, windowMs: 60_000 }), zValidato
     data: { tokenHash, userId: user.id, expiresAt },
   });
 
-  // TODO: send email via notification-service
-  console.log(`[password-reset] token for ${email}: ${token}`);
+  // TODO: send email via notification-service — for now, token is only accessible via DB
 
   return c.json({ ok: true });
 });
@@ -137,20 +136,22 @@ auth.post("/reset-password", rateLimit({ max: 5, windowMs: 60_000 }), zValidator
   const { token, password } = c.req.valid("json");
   const tokenHash = hashToken(token);
 
-  const reset = await prisma.passwordReset.findFirst({
-    where: { tokenHash, usedAt: null, expiresAt: { gt: new Date() } },
-  });
+  // Always hash the password to prevent timing attacks that reveal token validity
+  const [reset, passwordHash] = await Promise.all([
+    prisma.passwordReset.findFirst({
+      where: { tokenHash, usedAt: null, expiresAt: { gt: new Date() } },
+    }),
+    hashPassword(password),
+  ]);
 
   if (!reset) {
     return c.json({ error: "invalid_token", message: "Invalid or expired reset link" }, 400);
   }
 
-  const passwordHash = await hashPassword(password);
-
   await prisma.$transaction([
     prisma.user.update({ where: { id: reset.userId }, data: { passwordHash } }),
     prisma.passwordReset.update({ where: { id: reset.id }, data: { usedAt: new Date() } }),
-    prisma.session.deleteMany({ where: { userId: reset.userId } }), // revoke all sessions
+    prisma.session.deleteMany({ where: { userId: reset.userId } }),
   ]);
 
   return c.json({ ok: true });

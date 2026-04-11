@@ -124,9 +124,9 @@ deploy.post("/rollback", zValidator("json", rollbackSchema), async (c) => {
 });
 
 // POST /deploy/preflight — preflight checks
-deploy.post("/preflight", async (c) => {
+deploy.post("/preflight", zValidator("json", deployTriggerSchema), async (c) => {
   const userId = c.get("userId")!;
-  const body = await c.req.json();
+  const body = c.req.valid("json");
   const result = await deployRequest<unknown>(userId, "/api/v1/preflight", {
     method: "POST",
     body: JSON.stringify(body),
