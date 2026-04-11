@@ -64,19 +64,29 @@ export default function DeploysPage() {
   const [logDeploy, setLogDeploy] = useState<Deploy | null>(null);
   const [logContent, setLogContent] = useState<string | null>(null);
   const [logLoading, setLogLoading] = useState(false);
+  const [deployTotal, setDeployTotal] = useState(0);
+  const [deployPage, setDeployPage] = useState(0);
+  const deploysPerPage = 20;
+
+  const fetchHistory = useCallback(async (page: number) => {
+    const data = await apiFetch<{ deploys: Deploy[]; total: number }>(
+      `/api/deploy/history?limit=${deploysPerPage}&offset=${page * deploysPerPage}`,
+    );
+    setDeploys(data.deploys);
+    setDeployTotal(data.total ?? data.deploys.length);
+  }, []);
 
   const fetchData = useCallback(async () => {
     try {
-      const [srvData, appData, deployData, tasksData] = await Promise.all([
+      const [srvData, appData, tasksData] = await Promise.all([
         apiFetch<{ servers: Server[] }>("/api/deploy/servers"),
         apiFetch<{ apps: App[] }>("/api/deploy/apps"),
-        apiFetch<{ deploys: Deploy[] }>("/api/deploy/history?limit=20"),
         apiFetch<{ projects: { id: string; name: string; slug: string; githubRepo: string | null }[] }>("/api/tasks/projects").catch(() => ({ projects: [] as { id: string; name: string; slug: string; githubRepo: string | null }[] })),
       ]);
       setServers(srvData.servers);
       setApps(appData.apps);
-      setDeploys(deployData.deploys);
       setTasksProjects(tasksData.projects);
+      await fetchHistory(deployPage);
     } catch (err) {
       if (err instanceof Error && err.message.includes("401")) {
         router.push("/login");
@@ -84,11 +94,18 @@ export default function DeploysPage() {
       }
       setError(err instanceof Error ? err.message : "Failed to load");
     }
-  }, [router]);
+  }, [router, deployPage, fetchHistory]);
 
   useEffect(() => {
     void fetchData().finally(() => setLoading(false));
   }, [fetchData]);
+
+  useEffect(() => {
+    if (!loading) {
+      void fetchHistory(deployPage);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deployPage]);
 
   // Auto-refresh while active deploys exist
   const hasActiveDeploys = deploys.some((d) => d.status === "running" || d.status === "deploying");
@@ -112,8 +129,10 @@ export default function DeploysPage() {
         body: JSON.stringify({ server: deployTarget.server, app: deployTarget.app, force: true }),
       });
       toast({ title: `Deploy started for ${deployTarget.app}`, variant: "success" });
-      const data = await apiFetch<{ deploys: Deploy[] }>("/api/deploy/history?limit=20");
+      setDeployPage(0);
+      const data = await apiFetch<{ deploys: Deploy[]; total: number }>(`/api/deploy/history?limit=${deploysPerPage}&offset=0`);
       setDeploys(data.deploys);
+      setDeployTotal(data.total ?? data.deploys.length);
       setTab("history");
     } catch (err) {
       toast({ title: err instanceof Error ? err.message : "Deploy failed", variant: "error" });
@@ -169,7 +188,7 @@ export default function DeploysPage() {
   const tabs: { key: Tab; label: string; count: number }[] = [
     { key: "servers", label: "Servers", count: servers.length },
     { key: "apps", label: "Applications", count: apps.length },
-    { key: "history", label: "History", count: deploys.length },
+    { key: "history", label: "History", count: deployTotal },
   ];
 
   return (
@@ -256,36 +275,63 @@ export default function DeploysPage() {
         {deploys.length === 0 ? (
           <p className="text-content-secondary text-sm">No deploys yet</p>
         ) : (
-          <div className="space-y-0">
-            {deploys.map((d) => {
-              const isActive = d.status === "running" || d.status === "deploying";
-              return (
-                <div
-                  key={d.id}
-                  onClick={() => void handleViewLogs(d)}
-                  className={`flex items-center gap-4 py-3 border-b border-stroke-default cursor-pointer hover:bg-surface-tertiary/50 transition-colors ${
-                    isActive ? "bg-accent-amber/5" : ""
-                  }`}
-                >
-                  <span className={isActive ? "animate-pulse" : ""}>
-                    <Badge variant={statusBadge[d.status] || "neutral"} dot>{d.status}</Badge>
-                  </span>
-                  <span className="flex-1 text-sm text-content-primary">
-                    {d.app} <span className="text-content-tertiary">on</span> {d.server}
-                  </span>
-                  <span className="text-xs text-content-tertiary font-mono">
-                    {d.commitAfter?.slice(0, 7) || "—"}
-                  </span>
-                  <span className="text-xs text-content-tertiary">
-                    {d.duration ? `${(d.duration / 1000).toFixed(1)}s` : "—"}
-                  </span>
-                  <span className="text-xs text-content-tertiary">
-                    {new Date(d.createdAt).toLocaleString()}
-                  </span>
+          <>
+            <div className="space-y-0">
+              {deploys.map((d) => {
+                const isActive = d.status === "running" || d.status === "deploying";
+                return (
+                  <div
+                    key={d.id}
+                    onClick={() => void handleViewLogs(d)}
+                    className={`flex items-center gap-4 py-3 border-b border-stroke-default cursor-pointer hover:bg-surface-tertiary/50 transition-colors ${
+                      isActive ? "bg-accent-amber/5" : ""
+                    }`}
+                  >
+                    <span className={isActive ? "animate-pulse" : ""}>
+                      <Badge variant={statusBadge[d.status] || "neutral"} dot>{d.status}</Badge>
+                    </span>
+                    <span className="flex-1 text-sm text-content-primary">
+                      {d.app} <span className="text-content-tertiary">on</span> {d.server}
+                    </span>
+                    <span className="text-xs text-content-tertiary font-mono">
+                      {d.commitAfter?.slice(0, 7) || "—"}
+                    </span>
+                    <span className="text-xs text-content-tertiary">
+                      {d.duration ? `${(d.duration / 1000).toFixed(1)}s` : "—"}
+                    </span>
+                    <span className="text-xs text-content-tertiary">
+                      {new Date(d.createdAt).toLocaleString()}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+            {deployTotal > deploysPerPage && (
+              <div className="flex items-center justify-between pt-4">
+                <span className="text-xs text-content-tertiary">
+                  {deployPage * deploysPerPage + 1}–{Math.min((deployPage + 1) * deploysPerPage, deployTotal)} of {deployTotal}
+                </span>
+                <div className="flex gap-1">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    disabled={deployPage === 0}
+                    onClick={() => setDeployPage((p) => p - 1)}
+                  >
+                    Previous
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    disabled={(deployPage + 1) * deploysPerPage >= deployTotal}
+                    onClick={() => setDeployPage((p) => p + 1)}
+                  >
+                    Next
+                  </Button>
                 </div>
-              );
-            })}
-          </div>
+              </div>
+            )}
+          </>
         )}
       </div>)}
 
