@@ -86,7 +86,7 @@ deploy.get("/history", async (c) => {
   const appId = c.req.query("app_id");
   const status = c.req.query("status");
   const limit = Math.min(parseInt(c.req.query("limit") || "50", 10) || 50, 200).toString();
-  const offset = Math.max(parseInt(c.req.query("offset") || "0", 10) || 0, 0).toString();
+  const offset = Math.max(Number(c.req.query("offset") ?? 0), 0).toString();
   if (serverId) params.set("server_id", serverId);
   if (appId) params.set("app_id", appId);
   if (status) params.set("status", status);

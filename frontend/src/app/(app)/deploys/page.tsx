@@ -68,19 +68,25 @@ export default function DeploysPage() {
   const [deployPage, setDeployPage] = useState(0);
   const deploysPerPage = 20;
 
+  const fetchHistory = useCallback(async (page: number) => {
+    const data = await apiFetch<{ deploys: Deploy[]; total: number }>(
+      `/api/deploy/history?limit=${deploysPerPage}&offset=${page * deploysPerPage}`,
+    );
+    setDeploys(data.deploys);
+    setDeployTotal(data.total ?? data.deploys.length);
+  }, []);
+
   const fetchData = useCallback(async () => {
     try {
-      const [srvData, appData, deployData, tasksData] = await Promise.all([
+      const [srvData, appData, tasksData] = await Promise.all([
         apiFetch<{ servers: Server[] }>("/api/deploy/servers"),
         apiFetch<{ apps: App[] }>("/api/deploy/apps"),
-        apiFetch<{ deploys: Deploy[]; total: number }>(`/api/deploy/history?limit=${deploysPerPage}&offset=${deployPage * deploysPerPage}`),
         apiFetch<{ projects: { id: string; name: string; slug: string; githubRepo: string | null }[] }>("/api/tasks/projects").catch(() => ({ projects: [] as { id: string; name: string; slug: string; githubRepo: string | null }[] })),
       ]);
       setServers(srvData.servers);
       setApps(appData.apps);
-      setDeploys(deployData.deploys);
-      setDeployTotal(deployData.total ?? deployData.deploys.length);
       setTasksProjects(tasksData.projects);
+      await fetchHistory(deployPage);
     } catch (err) {
       if (err instanceof Error && err.message.includes("401")) {
         router.push("/login");
@@ -88,11 +94,18 @@ export default function DeploysPage() {
       }
       setError(err instanceof Error ? err.message : "Failed to load");
     }
-  }, [router, deployPage]);
+  }, [router, deployPage, fetchHistory]);
 
   useEffect(() => {
     void fetchData().finally(() => setLoading(false));
   }, [fetchData]);
+
+  useEffect(() => {
+    if (!loading) {
+      void fetchHistory(deployPage);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deployPage]);
 
   // Auto-refresh while active deploys exist
   const hasActiveDeploys = deploys.some((d) => d.status === "running" || d.status === "deploying");
