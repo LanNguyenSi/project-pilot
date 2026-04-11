@@ -10,7 +10,7 @@ interface Project {
   id: string;
   name: string;
   slug: string;
-  description: string;
+  description: string | null;
 }
 
 const PROJECTS_PER_PAGE = 18;
