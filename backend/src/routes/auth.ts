@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { setCookie, deleteCookie, getCookie } from "hono/cookie";
-import { registerUser, loginUser, generateSessionToken, hashToken } from "../services/auth.js";
+import { registerUser, loginUser, generateSessionToken, hashToken, hashPassword } from "../services/auth.js";
 import { prisma } from "../lib/prisma.js";
 import { config } from "../config/index.js";
 import { requireAuth } from "../middleware/auth.js";
@@ -93,6 +93,68 @@ auth.get("/me", requireAuth, async (c) => {
     select: { id: true, email: true, name: true, createdAt: true },
   });
   return c.json({ user });
+});
+
+// POST /auth/forgot-password
+const forgotSchema = z.object({ email: z.string().email() });
+
+auth.post("/forgot-password", rateLimit({ max: 3, windowMs: 60_000 }), zValidator("json", forgotSchema), async (c) => {
+  const { email } = c.req.valid("json");
+  const user = await prisma.user.findUnique({ where: { email } });
+
+  // Always return success to prevent account enumeration
+  if (!user) {
+    return c.json({ ok: true });
+  }
+
+  // Invalidate existing reset tokens
+  await prisma.passwordReset.updateMany({
+    where: { userId: user.id, usedAt: null },
+    data: { usedAt: new Date() },
+  });
+
+  const token = generateSessionToken();
+  const tokenHash = hashToken(token);
+  const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+  await prisma.passwordReset.create({
+    data: { tokenHash, userId: user.id, expiresAt },
+  });
+
+  // TODO: send email via notification-service — for now, token is only accessible via DB
+
+  return c.json({ ok: true });
+});
+
+// POST /auth/reset-password
+const resetSchema = z.object({
+  token: z.string().min(1),
+  password: z.string().min(8).max(128),
+});
+
+auth.post("/reset-password", rateLimit({ max: 5, windowMs: 60_000 }), zValidator("json", resetSchema), async (c) => {
+  const { token, password } = c.req.valid("json");
+  const tokenHash = hashToken(token);
+
+  // Always hash the password to prevent timing attacks that reveal token validity
+  const [reset, passwordHash] = await Promise.all([
+    prisma.passwordReset.findFirst({
+      where: { tokenHash, usedAt: null, expiresAt: { gt: new Date() } },
+    }),
+    hashPassword(password),
+  ]);
+
+  if (!reset) {
+    return c.json({ error: "invalid_token", message: "Invalid or expired reset link" }, 400);
+  }
+
+  await prisma.$transaction([
+    prisma.user.update({ where: { id: reset.userId }, data: { passwordHash } }),
+    prisma.passwordReset.update({ where: { id: reset.id }, data: { usedAt: new Date() } }),
+    prisma.session.deleteMany({ where: { userId: reset.userId } }),
+  ]);
+
+  return c.json({ ok: true });
 });
 
 export { auth };

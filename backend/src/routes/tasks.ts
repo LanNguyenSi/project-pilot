@@ -1,7 +1,24 @@
 import { Hono } from "hono";
+import { zValidator } from "@hono/zod-validator";
+import { z } from "zod";
 import { requireAuth } from "../middleware/auth.js";
 import { getCredential } from "../services/credentials.js";
 import type { AppEnv } from "../types/hono.js";
+
+const createTaskSchema = z.object({
+  title: z.string().min(1).max(500),
+  description: z.string().max(10000).optional(),
+  priority: z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]).optional(),
+  labels: z.array(z.string()).optional(),
+});
+
+const transitionSchema = z.object({
+  status: z.enum(["open", "in_progress", "review", "done"]),
+});
+
+const commentSchema = z.object({
+  content: z.string().min(1).max(5000),
+});
 
 const tasks = new Hono<AppEnv>();
 
@@ -91,10 +108,10 @@ tasks.get("/:taskId/instructions", async (c) => {
 });
 
 // POST /tasks/projects/:projectId/tasks — create task
-tasks.post("/projects/:projectId/tasks", async (c) => {
+tasks.post("/projects/:projectId/tasks", zValidator("json", createTaskSchema), async (c) => {
   const userId = c.get("userId")!;
   const projectId = c.req.param("projectId");
-  const body = await c.req.json();
+  const body = c.req.valid("json");
   const result = await tasksRequest<unknown>(userId, `/api/projects/${encodeURIComponent(projectId)}/tasks`, {
     method: "POST",
     body: JSON.stringify(body),
@@ -104,10 +121,10 @@ tasks.post("/projects/:projectId/tasks", async (c) => {
 });
 
 // POST /tasks/:taskId/transition — change task status
-tasks.post("/:taskId/transition", async (c) => {
+tasks.post("/:taskId/transition", zValidator("json", transitionSchema), async (c) => {
   const userId = c.get("userId")!;
   const taskId = c.req.param("taskId");
-  const body = await c.req.json();
+  const body = c.req.valid("json");
   const result = await tasksRequest<unknown>(userId, `/api/tasks/${encodeURIComponent(taskId)}/transition`, {
     method: "POST",
     body: JSON.stringify(body),
@@ -117,10 +134,10 @@ tasks.post("/:taskId/transition", async (c) => {
 });
 
 // POST /tasks/:taskId/comments — add comment
-tasks.post("/:taskId/comments", async (c) => {
+tasks.post("/:taskId/comments", zValidator("json", commentSchema), async (c) => {
   const userId = c.get("userId")!;
   const taskId = c.req.param("taskId");
-  const body = await c.req.json();
+  const body = c.req.valid("json");
   const result = await tasksRequest<unknown>(userId, `/api/tasks/${encodeURIComponent(taskId)}/comments`, {
     method: "POST",
     body: JSON.stringify(body),
