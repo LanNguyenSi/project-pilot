@@ -1,23 +1,27 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { apiFetch } from "@/lib/api";
-import { Card, EmptyState, SkeletonProjectCard } from "@/components/ui";
+import { Button, Card, EmptyState, SkeletonProjectCard } from "@/components/ui";
 
 interface Project {
   id: string;
   name: string;
   slug: string;
-  description: string;
+  description: string | null;
 }
+
+const PROJECTS_PER_PAGE = 18;
 
 export default function TaskProjectsPage() {
   const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(0);
 
   useEffect(() => {
     apiFetch<{ projects: Project[] }>("/api/tasks/projects")
@@ -28,6 +32,20 @@ export default function TaskProjectsPage() {
       })
       .finally(() => setLoading(false));
   }, [router]);
+
+  const filtered = useMemo(() => {
+    if (!search) return projects;
+    const q = search.toLowerCase();
+    return projects.filter(
+      (p) => p.name.toLowerCase().includes(q) || p.slug.toLowerCase().includes(q) || p.description?.toLowerCase().includes(q),
+    );
+  }, [projects, search]);
+
+  const totalPages = Math.ceil(filtered.length / PROJECTS_PER_PAGE);
+  const paginated = useMemo(
+    () => filtered.slice(page * PROJECTS_PER_PAGE, (page + 1) * PROJECTS_PER_PAGE),
+    [filtered, page],
+  );
 
   return (
     <>
@@ -53,18 +71,57 @@ export default function TaskProjectsPage() {
           actionHref="/settings"
         />
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {projects.map((p) => (
-            <Link key={p.id} href={`/tasks/${p.id}`}>
-              <Card variant="interactive" className="h-full">
-                <h2 className="font-medium text-sm text-content-primary mb-1">{p.name}</h2>
-                {p.description && (
-                  <p className="text-xs text-content-secondary line-clamp-2">{p.description}</p>
-                )}
-              </Card>
-            </Link>
-          ))}
-        </div>
+        <>
+          {/* Search + count */}
+          <div className="flex items-center gap-3 mb-4">
+            <input
+              type="text"
+              placeholder="Search projects..."
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setPage(0); }}
+              className="px-3 py-1.5 text-sm rounded-button border border-stroke-default bg-surface-primary text-content-primary placeholder:text-content-tertiary flex-1 max-w-xs"
+            />
+            <span className="text-xs text-content-tertiary">
+              {filtered.length} project{filtered.length !== 1 ? "s" : ""}
+            </span>
+          </div>
+
+          {filtered.length === 0 ? (
+            <Card className="p-8 text-center">
+              <p className="text-content-secondary text-sm">No projects matching &ldquo;{search}&rdquo;</p>
+            </Card>
+          ) : (
+            <>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {paginated.map((p) => (
+                  <Link key={p.id} href={`/tasks/${p.id}`}>
+                    <Card variant="interactive" className="h-full">
+                      <h2 className="font-medium text-sm text-content-primary mb-1">{p.name}</h2>
+                      {p.description && (
+                        <p className="text-xs text-content-secondary line-clamp-2">{p.description}</p>
+                      )}
+                    </Card>
+                  </Link>
+                ))}
+              </div>
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between pt-4">
+                  <span className="text-xs text-content-tertiary">
+                    {page * PROJECTS_PER_PAGE + 1}–{Math.min((page + 1) * PROJECTS_PER_PAGE, filtered.length)} of {filtered.length}
+                  </span>
+                  <div className="flex gap-1">
+                    <Button variant="secondary" size="sm" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>
+                      Previous
+                    </Button>
+                    <Button variant="secondary" size="sm" disabled={page + 1 >= totalPages} onClick={() => setPage((p) => p + 1)}>
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </>
       )}
     </>
   );
