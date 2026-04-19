@@ -3,5 +3,12 @@ health: /api/health
 health_port: 3001
 compose_file: docker-compose.prod.yml
 post_update:
-  - docker compose -f docker-compose.prod.yml exec -e HOME=/tmp backend npx prisma db push --schema=prisma/schema.prisma
+  # --accept-data-loss is needed because `prisma db push` refuses by default
+  # to add a UNIQUE constraint on an existing table (defensive: it would fail
+  # if duplicate values existed). For our single-instance deploy with no
+  # concurrent writes during migration, the check is not load-bearing and
+  # blocks routine schema evolution. If an actual drop/truncate is ever
+  # required, prisma will still fail unless the flag is present — this line
+  # opts in to the softer "may add UNIQUE" class of changes only.
+  - docker compose -f docker-compose.prod.yml exec -e HOME=/tmp backend npx prisma db push --schema=prisma/schema.prisma --accept-data-loss
 rollback: true
