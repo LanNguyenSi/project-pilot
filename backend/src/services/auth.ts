@@ -27,7 +27,9 @@ export async function registerUser(email: string, password: string, name?: strin
 
 export async function loginUser(email: string, password: string) {
   const user = await prisma.user.findUnique({ where: { email } });
-  if (!user) {
+  // Users created via GitHub OAuth have no passwordHash — treat them as
+  // non-local-auth to avoid leaking their existence via a different error.
+  if (!user || !user.passwordHash) {
     throw new Error("Invalid credentials");
   }
 

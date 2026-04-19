@@ -3,7 +3,7 @@ import { encrypt, decrypt } from "../lib/crypto.js";
 
 export type ServiceName = "project-forge" | "agent-tasks" | "deploy-panel";
 
-const VALID_SERVICES: ServiceName[] = ["project-forge", "agent-tasks", "deploy-panel"];
+export const VALID_SERVICES: ServiceName[] = ["project-forge", "agent-tasks", "deploy-panel"];
 
 export function isValidService(s: string): s is ServiceName {
   return VALID_SERVICES.includes(s as ServiceName);
