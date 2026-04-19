@@ -6,6 +6,7 @@ import { securityHeaders } from "./middleware/security.js";
 import { csrfProtection } from "./middleware/csrf.js";
 import { health } from "./routes/health.js";
 import { auth } from "./routes/auth.js";
+import { oauth } from "./routes/oauth.js";
 import { credentials } from "./routes/credentials.js";
 import { dashboard } from "./routes/dashboard.js";
 import { forge } from "./routes/forge.js";
@@ -30,6 +31,11 @@ app.onError((err, c) => {
 app.use("*", corsMiddleware);
 app.use("*", securityHeaders);
 app.use("/api/auth/*", csrfProtection);
+// /api/oauth/* is GET-only (state cookie + redirect dance) so CSRF's
+// X-Requested-With check would reject the browser's direct navigation. The
+// CSRF middleware already no-ops for GET, but we skip it entirely to keep
+// intent explicit. State-cookie validation in oauth.ts is the OAuth-standard
+// CSRF defense for this flow.
 app.use("/api/credentials/*", csrfProtection);
 app.use("/api/dashboard/*", csrfProtection);
 app.use("/api/forge/*", csrfProtection);
@@ -38,6 +44,7 @@ app.use("/api/deploy/*", csrfProtection);
 
 app.route("/api", health);
 app.route("/api/auth", auth);
+app.route("/api/oauth", oauth);
 app.route("/api/credentials", credentials);
 app.route("/api/dashboard", dashboard);
 app.route("/api/forge", forge);

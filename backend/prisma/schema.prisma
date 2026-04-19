@@ -9,10 +9,17 @@ datasource db {
 }
 
 model User {
+  // Users can now originate from two sources: local email/password registration
+  // (passwordHash populated, email required) or GitHub OAuth (githubId populated,
+  // passwordHash null, email optional since GitHub may hide it). Hence both
+  // `email` and `passwordHash` are nullable; one of them is always set.
   id           String   @id @default(uuid())
-  email        String   @unique
-  passwordHash String
+  email        String?  @unique
+  passwordHash String?
   name         String?
+  githubId     String?  @unique
+  githubLogin  String?
+  avatarUrl    String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
