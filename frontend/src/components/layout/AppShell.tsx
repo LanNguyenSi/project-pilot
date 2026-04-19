@@ -1,12 +1,21 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { usePathname } from "next/navigation";
 import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
 
 const COLLAPSED_KEY = "sidebar-collapsed";
 
+// Routes that embed an external module via iframe and need the full viewport
+// width/height — the default max-w-6xl + px-6 py-6 wrapper letterboxes them.
+const FULL_BLEED_ROUTES = ["/security"];
+
 export function AppShell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const fullBleed = FULL_BLEED_ROUTES.some(
+    (r) => pathname === r || pathname.startsWith(r + "/"),
+  );
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -37,7 +46,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       <div className="min-w-0">
         <TopBar onMenuClick={() => setMobileOpen(true)} />
-        <main className="max-w-6xl mx-auto px-6 py-6">
+        <main className={fullBleed ? "" : "max-w-6xl mx-auto px-6 py-6"}>
           {children}
         </main>
       </div>
