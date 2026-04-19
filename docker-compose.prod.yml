@@ -32,7 +32,12 @@ services:
       PORT: "3001"
       CORS_ORIGINS: https://project-pilot.opentriologue.ai
       FRONTEND_URL: https://project-pilot.opentriologue.ai
+      BACKEND_URL: https://project-pilot.opentriologue.ai
       NODE_ENV: production
+      # GitHub OAuth — optional; the /api/oauth/github/* routes return 503
+      # when either value is empty, so leaving them unset is a safe no-op.
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.project-pilot-api.rule=Host(`project-pilot.opentriologue.ai`) && PathPrefix(`/api`)"
