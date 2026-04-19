@@ -55,6 +55,9 @@ services:
       dockerfile: Dockerfile
       args:
         NEXT_PUBLIC_API_URL: https://project-pilot.opentriologue.ai
+        # URL the /security page embeds as an iframe. Baked at build time
+        # because Next.js inlines NEXT_PUBLIC_* into the client bundle.
+        NEXT_PUBLIC_DEPSIGHT_URL: https://depsight.opentriologue.ai
     container_name: project-pilot-frontend
     restart: unless-stopped
     depends_on:
@@ -62,6 +65,7 @@ services:
     environment:
       HOSTNAME: "0.0.0.0"
       NEXT_PUBLIC_API_URL: https://project-pilot.opentriologue.ai
+      NEXT_PUBLIC_DEPSIGHT_URL: https://depsight.opentriologue.ai
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.project-pilot.rule=Host(`project-pilot.opentriologue.ai`)"
