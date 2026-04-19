@@ -21,7 +21,7 @@ const DEPSIGHT_URL =
 
 export default function SecurityPage() {
   return (
-    <div className="flex flex-col h-[calc(100vh-var(--h-topbar))]">
+    <div className="flex flex-col h-[calc(100vh-theme(spacing.topbar))]">
       <div className="px-6 py-3 border-b border-stroke-default bg-surface-secondary text-xs text-content-tertiary flex items-center justify-between">
         <span>
           Embedded depsight.{" "}
