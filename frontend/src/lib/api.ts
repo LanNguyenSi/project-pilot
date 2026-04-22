@@ -16,7 +16,11 @@ export async function apiFetch<T>(
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(body.message || `API error: ${res.status}`);
+    // Pilot's proxy routes wrap upstream errors as { error: "..." };
+    // some backends use { message: "..." }. Fall back in that order so
+    // actionable server messages (e.g. "Connect your GitHub account")
+    // reach the UI instead of a generic "API error: 403".
+    throw new Error(body.error || body.message || `API error: ${res.status}`);
   }
 
   return res.json();
