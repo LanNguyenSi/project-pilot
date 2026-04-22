@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { Button, Card, Input, Textarea, useToast } from "@/components/ui";
 
@@ -55,7 +55,44 @@ export default function CreateProjectPage() {
   const [preview, setPreview] = useState<Preview | null>(null);
   const [repoUrl, setRepoUrl] = useState("");
 
+  const [magicEnabled, setMagicEnabled] = useState(false);
+  const [magicPrompt, setMagicPrompt] = useState("");
+  const [magicLoading, setMagicLoading] = useState(false);
+
+  useEffect(() => {
+    apiFetch<{ enabled: boolean; features: { magicFill?: boolean } }>("/api/forge/ai-assist/capabilities")
+      .then((data) => setMagicEnabled(!!data.enabled && !!data.features?.magicFill))
+      .catch(() => setMagicEnabled(false));
+  }, []);
+
   const currentStep = stepIndex(phase);
+
+  async function handleMagicFill() {
+    if (!magicPrompt.trim()) return;
+    setError("");
+    setMagicLoading(true);
+    try {
+      const data = await apiFetch<{
+        data: { projectName: string; summary: string; features: string[]; constraints?: string[] };
+      }>("/api/forge/ai-assist/magic-fill", {
+        method: "POST",
+        body: JSON.stringify({ prompt: magicPrompt }),
+      });
+      const ai = data.data;
+      // The form's Project Name input filters to `[a-zA-Z0-9._-]+`; apply
+      // the same filter here so the LLM's kebab-case output survives
+      // the controlled-input sanitizer without silently dropping chars.
+      setProjectName((ai.projectName || "").replace(/[^a-zA-Z0-9._-]/g, ""));
+      setSummary(ai.summary || "");
+      setFeatures((ai.features || []).join("\n"));
+      setConstraints((ai.constraints || []).join("\n"));
+      setMagicPrompt("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "AI assist failed");
+    } finally {
+      setMagicLoading(false);
+    }
+  }
 
   async function handleGenerate(e: React.FormEvent) {
     e.preventDefault();
@@ -138,6 +175,44 @@ export default function CreateProjectPage() {
       {error && (
         <Card className="border-accent-red/50 mb-6">
           <p className="text-sm text-accent-red">{error}</p>
+        </Card>
+      )}
+
+      {/* Magic Fill (only when AI is configured on the forge side) */}
+      {magicEnabled && (phase === "form" || phase === "generating") && (
+        <Card className="p-4 max-w-2xl mb-4 border-accent-purple/40">
+          <div className="flex items-center gap-2 mb-2">
+            <svg className="h-5 w-5 text-accent-purple" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456z" />
+            </svg>
+            <h3 className="text-sm font-semibold text-accent-purple">AI Magic Fill</h3>
+          </div>
+          <p className="text-xs text-content-tertiary mb-3">
+            Describe your project idea in one sentence. AI will fill the form.
+          </p>
+          <div className="flex gap-2">
+            <Input
+              value={magicPrompt}
+              onChange={(e) => setMagicPrompt(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  void handleMagicFill();
+                }
+              }}
+              placeholder="E.g., 'A todo app with React and TypeScript that syncs across devices'"
+              disabled={magicLoading || phase === "generating"}
+              className="flex-1"
+            />
+            <Button
+              type="button"
+              onClick={handleMagicFill}
+              disabled={!magicPrompt.trim() || phase === "generating"}
+              loading={magicLoading}
+            >
+              Fill Form
+            </Button>
+          </div>
         </Card>
       )}
 
