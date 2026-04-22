@@ -49,6 +49,7 @@ export default function CreateProjectPage() {
   const [summary, setSummary] = useState("");
   const [features, setFeatures] = useState("");
   const [constraints, setConstraints] = useState("");
+  const [targetUsers, setTargetUsers] = useState("");
   const [error, setError] = useState("");
 
   const [sessionId, setSessionId] = useState("");
@@ -73,7 +74,13 @@ export default function CreateProjectPage() {
     setMagicLoading(true);
     try {
       const data = await apiFetch<{
-        data: { projectName: string; summary: string; features: string[]; constraints?: string[] };
+        data: {
+          projectName: string;
+          summary: string;
+          features: string[];
+          constraints?: string[];
+          targetUsers?: string[];
+        };
       }>("/api/forge/ai-assist/magic-fill", {
         method: "POST",
         body: JSON.stringify({ prompt: magicPrompt }),
@@ -86,6 +93,7 @@ export default function CreateProjectPage() {
       setSummary(ai.summary || "");
       setFeatures((ai.features || []).join("\n"));
       setConstraints((ai.constraints || []).join("\n"));
+      setTargetUsers((ai.targetUsers || []).join("\n"));
       setMagicPrompt("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "AI assist failed");
@@ -107,6 +115,7 @@ export default function CreateProjectPage() {
           summary,
           features: features ? features.split("\n").filter(Boolean) : undefined,
           constraints: constraints ? constraints.split("\n").filter(Boolean) : undefined,
+          targetUsers: targetUsers ? targetUsers.split("\n").filter(Boolean) : undefined,
         }),
       });
       setSessionId(data.sessionId);
@@ -238,6 +247,13 @@ export default function CreateProjectPage() {
               value={summary}
               onChange={(e) => setSummary(e.target.value)}
               placeholder="Describe what this project does..."
+            />
+            <Textarea
+              label="Target Users (one per line, optional)"
+              rows={2}
+              value={targetUsers}
+              onChange={(e) => setTargetUsers(e.target.value)}
+              placeholder={"productivity users\ndevelopers"}
             />
             <Textarea
               label="Features (one per line, optional)"
