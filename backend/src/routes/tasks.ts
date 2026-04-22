@@ -20,27 +20,46 @@ const commentSchema = z.object({
   content: z.string().min(1).max(5000),
 });
 
+// Mirrors agent-tasks createProjectSchema in
+// backend/src/routes/projects.ts:21-34. Keep in sync if upstream changes.
+const createProjectSchema = z.object({
+  name: z.string().min(1).max(255),
+  slug: z
+    .string()
+    .min(1)
+    .max(100)
+    .regex(/^[a-z0-9-]+$/, "Slug must be lowercase alphanumeric with dashes"),
+  description: z.string().optional(),
+  teamId: z.string().uuid(),
+  githubRepo: z
+    .string()
+    .regex(/^[^/]+\/[^/]+$/, "GitHub repo format: owner/repo")
+    .optional(),
+});
+
 const tasks = new Hono<AppEnv>();
 
 tasks.use("*", requireAuth);
 
 const TASKS_URL = process.env.AGENT_TASKS_URL || "https://agent-tasks.opentriologue.ai";
 
-async function tasksRequest<T>(userId: string, path: string, options?: RequestInit): Promise<{ ok: true; data: T } | { ok: false; error: string; status: number }> {
+async function tasksRequest<T>(userId: string, path: string, options?: RequestInit & { timeoutMs?: number }): Promise<{ ok: true; data: T } | { ok: false; error: string; status: number }> {
   const token = await getCredential(userId, "agent-tasks");
   if (!token) {
     return { ok: false, error: "Agent Tasks not configured. Add your token in Settings.", status: 400 };
   }
 
+  const { timeoutMs = 10_000, ...fetchOptions } = options ?? {};
+
   try {
     const res = await fetch(`${TASKS_URL}${path}`, {
-      ...options,
+      ...fetchOptions,
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
-        ...options?.headers,
+        ...fetchOptions.headers,
       },
-      signal: AbortSignal.timeout(10_000),
+      signal: AbortSignal.timeout(timeoutMs),
     });
 
     const body = await res.json() as T;
@@ -87,6 +106,43 @@ tasks.get("/signals/inbox", async (c) => {
   const result = await tasksRequest<unknown>(userId, "/api/agent/signals");
   if (!result.ok) return c.json({ error: result.error }, result.status as any);
   return c.json(result.data);
+});
+
+// GET /tasks/teams — teams the user is a member of. Needed to let the
+// UI pick a team when creating a project or triggering a GitHub sync.
+// Must stay above /:taskId to avoid route shadowing.
+tasks.get("/teams", async (c) => {
+  const userId = c.get("userId")!;
+  const result = await tasksRequest<unknown>(userId, "/api/teams");
+  if (!result.ok) return c.json({ error: result.error }, result.status as any);
+  return c.json(result.data);
+});
+
+// POST /tasks/teams/:teamId/sync — sync projects from user's GitHub account
+// into the given team. agent-tasks returns counts the UI surfaces as a toast.
+// Longer timeout than the default — this iterates over every repo the user
+// has on GitHub plus a create/update round per repo.
+tasks.post("/teams/:teamId/sync", async (c) => {
+  const userId = c.get("userId")!;
+  const teamId = c.req.param("teamId");
+  const result = await tasksRequest<unknown>(userId, `/api/teams/${encodeURIComponent(teamId)}/sync`, {
+    method: "POST",
+    timeoutMs: 120_000,
+  });
+  if (!result.ok) return c.json({ error: result.error }, result.status as any);
+  return c.json(result.data);
+});
+
+// POST /tasks/projects — create a project inside a team.
+tasks.post("/projects", zValidator("json", createProjectSchema), async (c) => {
+  const userId = c.get("userId")!;
+  const body = c.req.valid("json");
+  const result = await tasksRequest<unknown>(userId, "/api/projects", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  if (!result.ok) return c.json({ error: result.error }, result.status as any);
+  return c.json(result.data, 201);
 });
 
 // GET /tasks/:taskId — task details
