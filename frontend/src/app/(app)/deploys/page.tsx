@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { apiFetch } from "@/lib/api";
-import { Badge, Button, Card, ConfirmModal, Modal, SkeletonBox, useToast } from "@/components/ui";
+import { Badge, Button, Card, ConfirmModal, Input, Modal, SkeletonBox, useToast } from "@/components/ui";
 import type { BadgeVariant } from "@/components/ui";
 
 interface Server {
@@ -70,6 +70,17 @@ export default function DeploysPage() {
   const [serverFilter, setServerFilter] = useState("");
   const [appFilter, setAppFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+
+  const [addServerOpen, setAddServerOpen] = useState(false);
+  const [addServerSubmitting, setAddServerSubmitting] = useState(false);
+  const [addServerError, setAddServerError] = useState("");
+  const [newServerName, setNewServerName] = useState("");
+  const [newServerHost, setNewServerHost] = useState("");
+  const [newServerSshKeyPath, setNewServerSshKeyPath] = useState("");
+  const [newServerRelayUrl, setNewServerRelayUrl] = useState("");
+  const [newServerRelayToken, setNewServerRelayToken] = useState("");
+  const [deleteServerTarget, setDeleteServerTarget] = useState<Server | null>(null);
+  const [deleteServerSubmitting, setDeleteServerSubmitting] = useState(false);
 
   const buildHistoryParams = useCallback((page: number, server: string, app: string, status: string) => {
     const params = new URLSearchParams();
@@ -159,6 +170,62 @@ export default function DeploysPage() {
     }
   }
 
+  function resetAddServerForm() {
+    setNewServerName("");
+    setNewServerHost("");
+    setNewServerSshKeyPath("");
+    setNewServerRelayUrl("");
+    setNewServerRelayToken("");
+    setAddServerError("");
+  }
+
+  async function handleAddServer(e: React.FormEvent) {
+    e.preventDefault();
+    setAddServerError("");
+    if (!newServerName.trim() || !newServerHost.trim()) {
+      setAddServerError("Name and host are required");
+      return;
+    }
+    setAddServerSubmitting(true);
+    try {
+      await apiFetch("/api/deploy/servers", {
+        method: "POST",
+        body: JSON.stringify({
+          name: newServerName.trim(),
+          host: newServerHost.trim(),
+          sshKeyPath: newServerSshKeyPath.trim() || undefined,
+          relayUrl: newServerRelayUrl.trim() || undefined,
+          relayToken: newServerRelayToken.trim() || undefined,
+        }),
+      });
+      toast({ title: `Server "${newServerName.trim()}" added`, variant: "success" });
+      setAddServerOpen(false);
+      resetAddServerForm();
+      await fetchData();
+    } catch (err) {
+      setAddServerError(err instanceof Error ? err.message : "Failed to add server");
+    } finally {
+      setAddServerSubmitting(false);
+    }
+  }
+
+  async function handleDeleteServer() {
+    if (!deleteServerTarget) return;
+    setDeleteServerSubmitting(true);
+    try {
+      await apiFetch(`/api/deploy/servers/${encodeURIComponent(deleteServerTarget.id)}`, {
+        method: "DELETE",
+      });
+      toast({ title: `Server "${deleteServerTarget.name}" deleted`, variant: "success" });
+      setDeleteServerTarget(null);
+      await fetchData();
+    } catch (err) {
+      toast({ title: err instanceof Error ? err.message : "Failed to delete server", variant: "error" });
+    } finally {
+      setDeleteServerSubmitting(false);
+    }
+  }
+
   async function handleViewLogs(d: Deploy) {
     setLogDeploy(d);
     setLogContent(null);
@@ -241,17 +308,36 @@ export default function DeploysPage() {
 
       {/* Servers tab */}
       {tab === "servers" && (
-        <div role="tabpanel" aria-label="Servers" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {servers.map((s) => (
-            <Card key={s.id}>
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="font-medium text-sm text-content-primary">{s.name}</h3>
-                <Badge variant={statusBadge[s.status] || "neutral"} dot>{s.status}</Badge>
-              </div>
-              <p className="text-xs text-content-tertiary font-mono">{s.host}</p>
-              <p className="text-xs text-content-tertiary mt-1">{s.appCount} app{s.appCount !== 1 ? "s" : ""}</p>
-            </Card>
-          ))}
+        <div role="tabpanel" aria-label="Servers">
+          <div className="flex justify-end mb-4">
+            <Button size="sm" onClick={() => setAddServerOpen(true)}>+ Add Server</Button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {servers.map((s) => (
+              <Card key={s.id}>
+                <div className="flex items-center justify-between mb-2 gap-2">
+                  <h3 className="font-medium text-sm text-content-primary truncate" title={s.name}>{s.name}</h3>
+                  <Badge variant={statusBadge[s.status] || "neutral"} dot>{s.status}</Badge>
+                </div>
+                <p className="text-xs text-content-tertiary font-mono truncate" title={s.host}>{s.host}</p>
+                <div className="flex items-center justify-between mt-1">
+                  <p className="text-xs text-content-tertiary">{s.appCount} app{s.appCount !== 1 ? "s" : ""}</p>
+                  <button
+                    onClick={() => setDeleteServerTarget(s)}
+                    className="text-xs text-content-tertiary hover:text-accent-red transition-colors"
+                    aria-label={`Delete ${s.name}`}
+                  >
+                    Delete
+                  </button>
+                </div>
+              </Card>
+            ))}
+            {servers.length === 0 && (
+              <p className="col-span-full text-content-secondary text-sm">
+                No servers configured. Click &ldquo;Add Server&rdquo; to connect one.
+              </p>
+            )}
+          </div>
         </div>
       )}
 
@@ -407,6 +493,113 @@ export default function DeploysPage() {
         confirmLabel="Deploy"
         loading={deploying}
       />
+
+      <ConfirmModal
+        open={!!deleteServerTarget}
+        onClose={() => deleteServerSubmitting ? undefined : setDeleteServerTarget(null)}
+        onConfirm={handleDeleteServer}
+        title="Delete server"
+        description={
+          deleteServerTarget
+            ? `Delete "${deleteServerTarget.name}" (${deleteServerTarget.host})? This permanently removes the server${
+                deleteServerTarget.appCount > 0
+                  ? `, its ${deleteServerTarget.appCount} app${deleteServerTarget.appCount === 1 ? "" : "s"},`
+                  : ""
+              } and all deploy history for it. This cannot be undone.`
+            : ""
+        }
+        confirmLabel="Delete"
+        loading={deleteServerSubmitting}
+      />
+
+      <Modal
+        open={addServerOpen}
+        onClose={() => {
+          if (addServerSubmitting) return;
+          setAddServerOpen(false);
+          resetAddServerForm();
+        }}
+      >
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-sm font-semibold text-content-primary">Add Server</h2>
+          <button
+            type="button"
+            onClick={() => {
+              if (addServerSubmitting) return;
+              setAddServerOpen(false);
+              resetAddServerForm();
+            }}
+            className="text-content-tertiary hover:text-content-primary p-1"
+            aria-label="Close"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <form onSubmit={handleAddServer} className="space-y-3">
+          <Input
+            label="Name"
+            required
+            value={newServerName}
+            onChange={(e) => setNewServerName(e.target.value)}
+            placeholder="vps-01"
+            disabled={addServerSubmitting}
+          />
+          <Input
+            label="Host"
+            required
+            value={newServerHost}
+            onChange={(e) => setNewServerHost(e.target.value)}
+            placeholder="1.2.3.4 or example.com"
+            disabled={addServerSubmitting}
+          />
+          <Input
+            label="SSH Key Path (optional)"
+            value={newServerSshKeyPath}
+            onChange={(e) => setNewServerSshKeyPath(e.target.value)}
+            placeholder="/root/.ssh/id_ed25519"
+            disabled={addServerSubmitting}
+            hint="Path on the deploy-panel host, not your local machine."
+          />
+          <Input
+            label="Relay URL (optional)"
+            type="url"
+            value={newServerRelayUrl}
+            onChange={(e) => setNewServerRelayUrl(e.target.value)}
+            placeholder="https://relay.example.com"
+            disabled={addServerSubmitting}
+          />
+          <Input
+            label="Relay Token (optional)"
+            type="password"
+            value={newServerRelayToken}
+            onChange={(e) => setNewServerRelayToken(e.target.value)}
+            placeholder="••••••••"
+            disabled={addServerSubmitting}
+            autoComplete="new-password"
+          />
+          {addServerError && (
+            <p className="text-sm text-accent-red">{addServerError}</p>
+          )}
+          <div className="flex gap-2 justify-end pt-1">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => {
+                setAddServerOpen(false);
+                resetAddServerForm();
+              }}
+              disabled={addServerSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" loading={addServerSubmitting}>
+              Add
+            </Button>
+          </div>
+        </form>
+      </Modal>
 
       <Modal open={!!logDeploy} onClose={() => setLogDeploy(null)}>
         {logDeploy && (

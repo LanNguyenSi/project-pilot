@@ -16,6 +16,16 @@ const rollbackSchema = z.object({
   app: z.string().min(1),
 });
 
+// Mirrors deploy-panel's createServerSchema in
+// backend/src/routes/servers.ts — keep in sync if that ever changes.
+const createServerSchema = z.object({
+  name: z.string().min(1).max(100),
+  host: z.string().min(1).max(255),
+  sshKeyPath: z.string().optional(),
+  relayUrl: z.string().url().optional(),
+  relayToken: z.string().optional(),
+});
+
 const deploy = new Hono<AppEnv>();
 
 deploy.use("*", requireAuth);
@@ -56,6 +66,31 @@ async function deployRequest<T>(userId: string, path: string, options?: RequestI
 deploy.get("/servers", async (c) => {
   const userId = c.get("userId")!;
   const result = await deployRequest<unknown>(userId, "/api/v1/servers");
+  if (!result.ok) return c.json({ error: result.error }, result.status as any);
+  return c.json(result.data);
+});
+
+// POST /deploy/servers — add a server. deploy-panel's CRUD lives at
+// /api/servers (not /api/v1/servers which is read-only); both accept
+// the same Bearer API key so existing credential flow works.
+deploy.post("/servers", zValidator("json", createServerSchema), async (c) => {
+  const userId = c.get("userId")!;
+  const body = c.req.valid("json");
+  const result = await deployRequest<unknown>(userId, "/api/servers", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  if (!result.ok) return c.json({ error: result.error }, result.status as any);
+  return c.json(result.data, 201);
+});
+
+// DELETE /deploy/servers/:id — remove a server (owner only on the panel side).
+deploy.delete("/servers/:id", async (c) => {
+  const userId = c.get("userId")!;
+  const id = c.req.param("id");
+  const result = await deployRequest<unknown>(userId, `/api/servers/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
   if (!result.ok) return c.json({ error: result.error }, result.status as any);
   return c.json(result.data);
 });
