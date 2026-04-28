@@ -1,10 +1,87 @@
 # project-pilot
 
-Unified control plane for the full project lifecycle: **Create** (project-forge) **Develop** (agent-tasks) **Deploy** (deploy-panel).
+Unified control plane for the full project lifecycle: **Create**, **Develop**, **Deploy**, all in one dashboard.
 
-One login, one dashboard, one MCP server — aggregating three independent services via their APIs.
+project-pilot aggregates three independent services, [project-forge](https://github.com/LanNguyenSi/project-forge) (scaffolding), [agent-tasks](https://github.com/LanNguyenSi/agent-tasks) (task management), and [deploy-panel](https://github.com/LanNguyenSi/deploy-panel) (VPS deploys), behind a single login. Service credentials are stored encrypted per-user, validated via **Test Connection** before save, and exposed to AI agents over a stdio MCP server. The backend is a thin Hono proxy with Zod-validated inputs; the frontend is Next.js 15 with a unified dark-mode UI.
 
-### Key Features
+<!-- TODO: hero screenshot of /dashboard showing aggregated stats from all three services -->
+
+```
+                  ┌──────────────────────┐
+                  │    project-pilot     │
+                  │  (one login, one UI) │
+                  └──────────┬───────────┘
+                             │
+        ┌────────────────────┼────────────────────┐
+        ▼                    ▼                    ▼
+  ┌───────────┐        ┌───────────┐        ┌───────────┐
+  │  Create   │        │  Develop  │        │  Deploy   │
+  │project-   │        │  agent-   │        │  deploy-  │
+  │  forge    │        │   tasks   │        │   panel   │
+  └───────────┘        └───────────┘        └───────────┘
+```
+
+## Try it in 60 seconds
+
+```bash
+git clone https://github.com/LanNguyenSi/project-pilot.git
+cd project-pilot
+
+# Install + start Postgres + push schema + run dev servers in one shot
+make dev-full
+```
+
+`make dev-full` installs deps, starts the `db` container, generates the Prisma client, copies `.env.example` files if missing, pushes the schema, and starts both servers.
+
+- Frontend: http://localhost:3000
+- Backend:  http://localhost:3001
+
+Then connect your existing service credentials:
+
+1. Register an account at http://localhost:3000/login.
+2. Open `/settings`.
+3. Paste your `pf_...` Forge key, agent-tasks Bearer token, and `dp_...` Deploy key. Hit **Test Connection** on each.
+4. Visit `/dashboard`, you should see aggregated stats from all three services.
+
+Need to run pieces individually (no Docker, separate terminals, etc.)? See [docs/configuration.md](docs/configuration.md).
+
+## What you get
+
+### Create, project-forge
+
+AI-powered project scaffolding. List existing projects, generate previews, and publish to GitHub from `/forge` and `/forge/create`.
+
+### Develop, agent-tasks
+
+Task management for human-agent collaboration. Browse projects, claim tasks, transition status, and read agent instructions from `/tasks`. Signals inbox for agent-driven workflows.
+
+### Deploy, deploy-panel
+
+VPS deployment management. List servers and apps, trigger deploys, watch status, run preflight checks, roll back, and filter history by server / app / status / date range from `/deploys`.
+
+## MCP server
+
+The MCP server exposes 15 tools (forge, tasks, deploy, plus `dashboard_summary`) over stdio for Claude Code and other MCP clients.
+
+```json
+{
+  "mcpServers": {
+    "project-pilot": {
+      "command": "npx",
+      "args": ["tsx", "/path/to/project-pilot/mcp/src/index.ts"],
+      "env": {
+        "FORGE_API_KEY": "pf_...",
+        "TASKS_TOKEN":   "at_...",
+        "DEPLOY_API_KEY":"dp_..."
+      }
+    }
+  }
+}
+```
+
+Full tool list and env reference: [docs/architecture.md](docs/architecture.md#mcp-surface).
+
+## Key features
 
 - Unified dark-mode dashboard with aggregated stats from all services
 - Encrypted service credential storage with **Test Connection** validation
@@ -15,203 +92,39 @@ One login, one dashboard, one MCP server — aggregating three independent servi
 - Zod input validation on all API endpoints
 - Security headers (CSP, HSTS) in production
 
-## Architecture
+## Next steps
 
-```
-project-pilot/
-├── backend/     Hono API (port 3001)
-├── frontend/    Next.js 15 (port 3000)
-└── mcp/         MCP server (stdio)
-```
+| If you want to... | Read |
+|------|------|
+| Understand the aggregation model and MCP surface | [docs/architecture.md](docs/architecture.md) |
+| Configure env vars, credentials, password reset, Docker | [docs/configuration.md](docs/configuration.md) |
+| Browse the HTTP API and Zod input validation | [docs/api.md](docs/api.md) |
 
-project-pilot does not duplicate business logic. It acts as a proxy layer:
+## Setup (manual)
 
-- **Backend** authenticates users, stores encrypted service credentials, and forwards requests to downstream APIs.
-- **Frontend** provides a unified dark-mode UI across all services.
-- **MCP** exposes 15 tools for AI agent integration.
-
-### Downstream Services
-
-| Service | Purpose | Auth |
-|---------|---------|------|
-| [project-forge](https://github.com/LanNguyenSi/project-forge) | AI-powered project scaffolding | `X-API-Key` |
-| [agent-tasks](https://github.com/LanNguyenSi/agent-tasks) | Task management for human-agent collaboration | `Bearer` token |
-| [deploy-panel](https://github.com/LanNguyenSi/deploy-panel) | VPS deployment management | `Bearer` API key |
-
-## Tech Stack
-
-- **Frontend:** Next.js 15, React 19, Tailwind CSS
-- **Backend:** Hono 4, TypeScript (strict), Prisma 5, PostgreSQL 16
-- **MCP:** @modelcontextprotocol/sdk 1.29
-- **Deployment:** Docker, Traefik
-
-## Setup
+If you don't want `make dev-full`:
 
 ```bash
-# Install dependencies
-make install
+make install        # npm install at the root (workspaces: backend, frontend, mcp)
+make docker-up      # start Postgres on :5432
+make db-generate    # prisma generate
+make db-push        # prisma db push
 
-# Start PostgreSQL
-make docker-up
-
-# Generate Prisma client and push schema
-make db-generate
-make db-push
-
-# Copy and edit environment files
 cp backend/.env.example backend/.env
 cp frontend/.env.example frontend/.env
 
-# Start development servers
-make dev
+make dev            # backend on :3001, frontend on :3000
 ```
 
-Frontend: http://localhost:3000
-Backend: http://localhost:3001
+See [docs/configuration.md](docs/configuration.md) for env var reference.
 
-## Environment Variables
-
-### Backend (`backend/.env`)
-
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `DATABASE_URL` | yes | — | PostgreSQL connection string |
-| `SESSION_SECRET` | yes | — | Session signing key (min 16 chars) |
-| `PORT` | no | 3001 | Backend port |
-| `CORS_ORIGINS` | no | http://localhost:3000 | Allowed origins |
-| `FRONTEND_URL` | no | http://localhost:3000 | Frontend URL |
-| `NODE_ENV` | no | development | development, production, test |
-| `PROJECT_FORGE_URL` | no | https://project-forge.opentriologue.ai | Forge API base URL |
-| `AGENT_TASKS_URL` | no | https://agent-tasks.opentriologue.ai | Tasks API base URL |
-| `DEPLOY_PANEL_URL` | no | https://deploy-panel.opentriologue.ai | Deploy API base URL |
-
-### Frontend (`frontend/.env`)
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `NEXT_PUBLIC_API_URL` | http://localhost:3001 | Backend URL for browser requests |
-
-### MCP Server
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `FORGE_API_KEY` | yes | project-forge API key (`pf_...`) |
-| `TASKS_TOKEN` | yes | agent-tasks Bearer token |
-| `DEPLOY_API_KEY` | yes | deploy-panel API key (`dp_...`) |
-| `FORGE_URL` | no | Override Forge API URL |
-| `TASKS_URL` | no | Override Tasks API URL |
-| `DEPLOY_URL` | no | Override Deploy API URL |
-
-## API Endpoints
-
-### Auth
-- `POST /api/auth/register` — Create account
-- `POST /api/auth/login` — Sign in
-- `POST /api/auth/logout` — Sign out
-- `GET /api/auth/me` — Current user
-- `POST /api/auth/forgot-password` — Request password reset email
-- `POST /api/auth/reset-password` — Reset password with token
-
-### Service Credentials
-- `GET /api/credentials` — List configured services
-- `PUT /api/credentials` — Add/update service token
-- `DELETE /api/credentials/:service` — Remove token
-- `POST /api/credentials/validate` — Test connection to a service
-
-### Dashboard
-- `GET /api/dashboard/summary` — Aggregated stats from all services
-
-### Forge (project-forge proxy)
-- `GET /api/forge/projects` — List created projects
-- `POST /api/forge/generate` — Generate preview
-- `GET /api/forge/preview?sessionId=` — Get preview data
-- `POST /api/forge/publish` — Publish to GitHub
-
-### Tasks (agent-tasks proxy)
-- `GET /api/tasks/projects` — List projects
-- `GET /api/tasks/projects/:id/tasks` — List tasks
-- `GET /api/tasks/claimable` — Open tasks
-- `GET /api/tasks/:id` — Task details
-- `GET /api/tasks/:id/instructions` — Agent instructions
-- `POST /api/tasks/:id/transition` — Change status
-- `POST /api/tasks/:id/comments` — Add comment
-- `GET /api/tasks/signals/inbox` — Agent signals
-
-### Deploy (deploy-panel proxy)
-- `GET /api/deploy/servers` — List servers
-- `GET /api/deploy/apps` — List apps
-- `POST /api/deploy/trigger` — Deploy app
-- `GET /api/deploy/status/:id` — Deploy status
-- `GET /api/deploy/history` — Deploy history
-- `POST /api/deploy/rollback` — Rollback
-- `POST /api/deploy/preflight` — Preflight checks
-- `GET /api/deploy/logs` — App logs
-
-### Health
-- `GET /api/health` — Health check with DB status
-
-## MCP Server
-
-The MCP server provides 15 tools for Claude Code and other MCP clients.
-
-### Setup with Claude Code
-
-Add to your Claude Code MCP config:
-
-```json
-{
-  "mcpServers": {
-    "project-pilot": {
-      "command": "npx",
-      "args": ["tsx", "/path/to/project-pilot/mcp/src/index.ts"],
-      "env": {
-        "FORGE_API_KEY": "pf_...",
-        "TASKS_TOKEN": "at_...",
-        "DEPLOY_API_KEY": "dp_..."
-      }
-    }
-  }
-}
-```
-
-### Available Tools
-
-**Forge:** `forge_list_projects`, `forge_create_project`, `forge_publish_project`
-
-**Tasks:** `tasks_list_projects`, `tasks_list_tasks`, `tasks_claimable`, `tasks_get_instructions`, `tasks_claim`, `tasks_transition`
-
-**Deploy:** `deploy_list_servers`, `deploy_list_apps`, `deploy_app`, `deploy_status`, `deploy_preflight`, `deploy_rollback`, `deploy_history`
-
-**Aggregation:** `dashboard_summary`
-
-## Docker Deployment
-
-### Development
-
-```bash
-docker compose up
-```
-
-### Production (with Traefik)
+## Production
 
 ```bash
 docker compose -f docker-compose.prod.yml up --build -d
 ```
 
-Exposes via Traefik at `project-pilot.opentriologue.ai` with automatic HTTPS.
-
-## Pages
-
-| Route | Description |
-|-------|-------------|
-| `/` | Landing page |
-| `/login` | Login / Register |
-| `/dashboard` | Aggregated overview |
-| `/settings` | Service credential management |
-| `/forge` | Project list |
-| `/forge/create` | Create project wizard |
-| `/tasks` | Task board |
-| `/deploys` | Server fleet & deploy management |
+Exposes via Traefik at `project-pilot.opentriologue.ai` with automatic HTTPS. See [docs/configuration.md](docs/configuration.md#production-with-traefik).
 
 ## Roadmap
 
@@ -219,3 +132,7 @@ Exposes via Traefik at `project-pilot.opentriologue.ai` with automatic HTTPS.
 - [ ] Request logging (structured access / error logs)
 - [ ] User profile management (display name, avatar)
 - [ ] Session management (list active sessions, revoke)
+
+## License
+
+MIT.
