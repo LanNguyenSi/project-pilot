@@ -61,7 +61,7 @@ VPS deployment management. List servers and apps, trigger deploys, watch status,
 
 ## MCP server
 
-The MCP server exposes 15 tools (forge, tasks, deploy, plus `dashboard_summary`) over stdio for Claude Code and other MCP clients.
+The MCP server exposes 18 tools (forge, tasks, deploy, plus `dashboard_summary`) over stdio for Claude Code and other MCP clients.
 
 ```json
 {

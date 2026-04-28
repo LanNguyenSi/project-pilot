@@ -11,6 +11,13 @@ The backend exposes a Hono HTTP API at `:3001/api/*`. All inputs are validated w
 - `POST /api/auth/forgot-password` request password reset
 - `POST /api/auth/reset-password` reset password with token
 
+## OAuth
+
+- `GET /api/oauth/github/start` begin GitHub OAuth flow (redirects to GitHub)
+- `GET /api/oauth/github/callback` GitHub OAuth callback (exchanges code for token)
+
+Both routes return `503` unless `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` are set in the backend env (see [configuration.md](configuration.md)).
+
 ## Service credentials
 
 - `GET    /api/credentials` list configured services

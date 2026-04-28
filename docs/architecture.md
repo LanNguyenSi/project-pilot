@@ -15,7 +15,7 @@ project-pilot does not duplicate business logic. It acts as a thin proxy layer i
 
 - **Backend** authenticates users, stores encrypted service credentials, and forwards requests to downstream APIs.
 - **Frontend** provides a unified dark-mode UI across all services.
-- **MCP** exposes 15 tools for AI agent integration over stdio.
+- **MCP** exposes 18 tools for AI agent integration over stdio.
 
 ```
                   ┌──────────────────────┐
@@ -50,11 +50,11 @@ project-pilot does not duplicate business logic. It acts as a thin proxy layer i
 
 ## MCP surface
 
-The MCP server provides 15 tools for Claude Code and other MCP clients, grouped by domain.
+The MCP server provides 18 tools for Claude Code and other MCP clients, grouped by domain.
 
 **Forge:** `forge_list_projects`, `forge_create_project`, `forge_publish_project`
 
-**Tasks:** `tasks_list_projects`, `tasks_list_tasks`, `tasks_claimable`, `tasks_get_instructions`, `tasks_claim`, `tasks_transition`
+**Tasks:** `tasks_list_projects`, `tasks_list_tasks`, `tasks_claimable`, `tasks_get_instructions`, `tasks_claim`, `tasks_transition`, `tasks_create`
 
 **Deploy:** `deploy_list_servers`, `deploy_list_apps`, `deploy_app`, `deploy_status`, `deploy_preflight`, `deploy_rollback`, `deploy_history`
 
@@ -74,3 +74,4 @@ See [configuration.md](configuration.md) for env vars and [api.md](api.md) for t
 | `/forge/create` | Create project wizard |
 | `/tasks` | Task board |
 | `/deploys` | Server fleet & deploy management |
+| `/security` | Depsight CVE / repo health view |
