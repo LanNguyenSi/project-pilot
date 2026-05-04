@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Module-specific bug (project-forge / agent-tasks / deploy-panel)
+    url: https://github.com/LanNguyenSi/project-pilot/blob/main/README.md
+    about: For bugs in the underlying modules, please use that module's repo. See README for links.
+  - name: Security report
+    url: https://github.com/LanNguyenSi/project-pilot/blob/main/SECURITY.md
+    about: Please report vulnerabilities privately, not via public issues.
