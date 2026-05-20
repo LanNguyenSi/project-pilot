@@ -9,6 +9,13 @@ export function isValidService(s: string): s is ServiceName {
   return VALID_SERVICES.includes(s as ServiceName);
 }
 
+export interface CredentialSummary {
+  id: string;
+  service: string;
+  label: string | null;
+  updatedAt: Date;
+}
+
 export async function upsertCredential(userId: string, service: ServiceName, token: string, label?: string) {
   const encrypted = encrypt(token);
 
@@ -29,7 +36,7 @@ export async function getCredential(userId: string, service: ServiceName): Promi
   return decrypt(cred.token);
 }
 
-export async function listCredentials(userId: string) {
+export async function listCredentials(userId: string): Promise<CredentialSummary[]> {
   const creds = await prisma.serviceCredential.findMany({
     where: { userId },
     select: { id: true, service: true, label: true, updatedAt: true },
