@@ -2,6 +2,8 @@
 
 project-pilot is the unified control plane that aggregates three independent services into a single dashboard, single login, and single MCP surface.
 
+It is one part of a wider toolchain. For the system-level view (shared design principles, how the tools connect, integration points), see [ecosystem.md](ecosystem.md).
+
 ```
 project-pilot/
 ├── backend/     Hono API (port 3001)

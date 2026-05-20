@@ -96,6 +96,7 @@ Full tool list and env reference: [docs/architecture.md](docs/architecture.md#mc
 
 | If you want to... | Read |
 |------|------|
+| See how project-pilot fits into the wider tool ecosystem | [docs/ecosystem.md](docs/ecosystem.md) |
 | Understand the aggregation model and MCP surface | [docs/architecture.md](docs/architecture.md) |
 | Configure env vars, credentials, password reset, Docker | [docs/configuration.md](docs/configuration.md) |
 | Browse the HTTP API and Zod input validation | [docs/api.md](docs/api.md) |
