@@ -5,6 +5,9 @@ on:
     branches: [main, develop]
   pull_request:
     branches: [main, develop]
+  # Allow release.yml to invoke this workflow as a reusable workflow so the
+  # release tag-push runs the same lint/build checks as any other merge.
+  workflow_call:
 
 jobs:
   backend:
