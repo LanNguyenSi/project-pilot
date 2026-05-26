@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
+import { config } from "../config/index.js";
 import { requireAuth } from "../middleware/auth.js";
 import { upsertCredential, listCredentials, deleteCredential, getCredential, isValidService } from "../services/credentials.js";
 import type { AppEnv } from "../types/hono.js";
@@ -50,9 +51,9 @@ credentials.delete("/:service", async (c) => {
 
 // POST /credentials/validate — test a service connection
 const SERVICE_TEST_URLS: Record<string, { url: string; auth: (token: string) => string }> = {
-  "project-forge": { url: process.env.PROJECT_FORGE_URL || "https://project-forge.opentriologue.ai", auth: (t) => `Bearer ${t}` },
-  "agent-tasks": { url: "https://agent-tasks.opentriologue.ai", auth: (t) => `Bearer ${t}` },
-  "deploy-panel": { url: process.env.DEPLOY_PANEL_URL || "https://deploy-panel.opentriologue.ai", auth: (t) => `Bearer ${t}` },
+  "project-forge": { url: config.PROJECT_FORGE_URL, auth: (t) => `Bearer ${t}` },
+  "agent-tasks": { url: config.AGENT_TASKS_URL, auth: (t) => `Bearer ${t}` },
+  "deploy-panel": { url: config.DEPLOY_PANEL_URL, auth: (t) => `Bearer ${t}` },
 };
 
 const SERVICE_TEST_PATHS: Record<string, string> = {

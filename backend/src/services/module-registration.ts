@@ -11,12 +11,13 @@
  * Per-module failures do not abort the whole flow — we surface them so the
  * caller (UI) can prompt a retry for the affected module only.
  */
+import { config } from "../config/index.js";
 import { upsertCredential, type ServiceName } from "./credentials.js";
 
 const SERVICE_URLS: Record<ServiceName, string> = {
-  "project-forge": process.env.PROJECT_FORGE_URL || "https://project-forge.opentriologue.ai",
-  "agent-tasks": process.env.AGENT_TASKS_URL || "https://agent-tasks.opentriologue.ai",
-  "deploy-panel": process.env.DEPLOY_PANEL_URL || "https://deploy-panel.opentriologue.ai",
+  "project-forge": config.PROJECT_FORGE_URL,
+  "agent-tasks": config.AGENT_TASKS_URL,
+  "deploy-panel": config.DEPLOY_PANEL_URL,
 };
 
 const REGISTER_PATH = "/api/auth/register-from-project-pilot";

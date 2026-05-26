@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
+import { config } from "../config/index.js";
 import { requireAuth } from "../middleware/auth.js";
 import { getCredential } from "../services/credentials.js";
 import type { AppEnv } from "../types/hono.js";
@@ -41,7 +42,7 @@ const tasks = new Hono<AppEnv>();
 
 tasks.use("*", requireAuth);
 
-const TASKS_URL = process.env.AGENT_TASKS_URL || "https://agent-tasks.opentriologue.ai";
+const TASKS_URL = config.AGENT_TASKS_URL;
 
 async function tasksRequest<T>(userId: string, path: string, options?: RequestInit & { timeoutMs?: number }): Promise<{ ok: true; data: T } | { ok: false; error: string; status: number }> {
   const token = await getCredential(userId, "agent-tasks");
