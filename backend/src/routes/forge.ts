@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
+import { config } from "../config/index.js";
 import { requireAuth } from "../middleware/auth.js";
 import { getCredential } from "../services/credentials.js";
 import type { AppEnv } from "../types/hono.js";
@@ -9,7 +10,7 @@ const forge = new Hono<AppEnv>();
 
 forge.use("*", requireAuth);
 
-const FORGE_URL = process.env.PROJECT_FORGE_URL || "https://project-forge.opentriologue.ai";
+const FORGE_URL = config.PROJECT_FORGE_URL;
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 

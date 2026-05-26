@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
+import { config } from "../config/index.js";
 import { requireAuth } from "../middleware/auth.js";
 import { getCredential } from "../services/credentials.js";
 import type { AppEnv } from "../types/hono.js";
@@ -30,7 +31,7 @@ const deploy = new Hono<AppEnv>();
 
 deploy.use("*", requireAuth);
 
-const DEPLOY_URL = process.env.DEPLOY_PANEL_URL || "https://deploy-panel.opentriologue.ai";
+const DEPLOY_URL = config.DEPLOY_PANEL_URL;
 
 async function deployRequest<T>(userId: string, path: string, options?: RequestInit): Promise<{ ok: true; data: T } | { ok: false; error: string; status: number }> {
   const token = await getCredential(userId, "deploy-panel");

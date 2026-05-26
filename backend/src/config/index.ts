@@ -10,11 +10,20 @@ const configSchema = z.object({
   NODE_ENV: z
     .enum(["development", "production", "test"])
     .default("development"),
-  // GitHub OAuth App — optional so local dev + self-hosted users without an
+  // GitHub OAuth App, optional so local dev + self-hosted users without an
   // OAuth App configured can still run project-pilot on email/password alone.
   // When either is absent, the /api/oauth/github/* routes return 503.
   GITHUB_CLIENT_ID: z.string().optional(),
   GITHUB_CLIENT_SECRET: z.string().optional(),
+  PROJECT_FORGE_URL: z
+    .string()
+    .default("https://project-forge.opentriologue.ai"),
+  AGENT_TASKS_URL: z
+    .string()
+    .default("https://agent-tasks.opentriologue.ai"),
+  DEPLOY_PANEL_URL: z
+    .string()
+    .default("https://deploy-panel.opentriologue.ai"),
 });
 
 const parsed = configSchema.safeParse(process.env);

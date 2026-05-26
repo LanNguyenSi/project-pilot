@@ -1,5 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
+vi.mock("../src/config/index.js", () => ({
+  config: {
+    NODE_ENV: "test",
+    SESSION_SECRET: "test-session-secret-must-be-32chars!!",
+    FRONTEND_URL: "http://localhost:3000",
+    BACKEND_URL: "http://localhost:3001",
+    PROJECT_FORGE_URL: "https://project-forge.opentriologue.ai",
+    AGENT_TASKS_URL: "https://agent-tasks.opentriologue.ai",
+    DEPLOY_PANEL_URL: "https://deploy-panel.opentriologue.ai",
+  },
+  hasGitHubOAuthConfigured: false,
+}));
+
 vi.mock("../src/services/credentials.js", () => ({
   upsertCredential: vi.fn().mockResolvedValue({}),
 }));
