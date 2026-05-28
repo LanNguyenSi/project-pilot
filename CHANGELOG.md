@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
-- **Forge to agent-tasks task migration.** A "Migrate tasks" button on each Forge project card (shown when no agent-tasks project is linked yet). It finds or creates the agent-tasks project bound to the repo, then batch-imports the planforge tasks. `externalRef` is the planforge task id, so a second run imports only genuinely new tasks. Team resolution mirrors agent-tasks: a single team is used silently, multiple teams open a picker, none surfaces a clear error.
+- **Forge to agent-tasks task migration** (#78). A "Migrate tasks" button on each Forge project card (shown when no agent-tasks project is linked yet). It finds or creates the agent-tasks project bound to the repo, then batch-imports the planforge tasks. `externalRef` is the planforge task id, so a second run imports only genuinely new tasks. Team resolution mirrors agent-tasks: a single team is used silently, multiple teams open a picker, none surfaces a clear error.
 - **Task snapshot at generate.** The backend persists `preview.tasks` from `/forge/generate` in a new `ForgeTaskSnapshot` table (keyed at publish by a normalized `owner/repo`), so the tasks survive the stateless forge session and can be migrated later. Snapshot writes are best-effort and never break generate or publish.
 - `POST /api/forge/migrate-tasks` and the shared `agent-tasks-client` extracted from the tasks proxy route.
 - `ApiError` in the frontend API client carries HTTP status + parsed body so the UI can branch on a structured error (e.g. the multiple-teams team picker).
