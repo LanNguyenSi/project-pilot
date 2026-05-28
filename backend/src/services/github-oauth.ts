@@ -33,7 +33,10 @@ export interface OAuthConfig {
 
 // Scopes: read:user / read:org for identity, repo so downstream modules can
 // use the same token for their own GitHub reads (agent-tasks' project sync).
-const OAUTH_SCOPES = "read:user read:org repo";
+// workflow is required on top of repo so the token can push scaffolds that
+// contain .github/workflows/* — GitHub rejects an OAuth App pushing workflow
+// files without it (project-forge publish creates a CI workflow).
+const OAUTH_SCOPES = "read:user read:org repo workflow";
 
 export function buildAuthorizationUrl(cfg: OAuthConfig, state: string): string {
   const params = new URLSearchParams({
