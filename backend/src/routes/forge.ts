@@ -4,6 +4,12 @@ import { z } from "zod";
 import { config } from "../config/index.js";
 import { requireAuth } from "../middleware/auth.js";
 import { getCredential } from "../services/credentials.js";
+import {
+  extractPreviewTasks,
+  linkForgeSnapshotToRepo,
+  saveForgeTaskSnapshot,
+} from "../services/forge-task-snapshot.js";
+import { migrateForgeTasks } from "../services/forge-task-migration.js";
 import type { AppEnv } from "../types/hono.js";
 
 const forge = new Hono<AppEnv>();
@@ -83,6 +89,16 @@ forge.post("/generate", zValidator("json", generateSchema), async (c) => {
   });
 
   if (!result.ok) return c.json({ error: result.error }, result.status as any);
+
+  // Snapshot the preview tasks so they survive the (stateless) forge session
+  // and can later be migrated into agent-tasks by repo. Best-effort: a snapshot
+  // failure must not break the generate response the UI depends on.
+  try {
+    await saveForgeTaskSnapshot(userId, result.data.sessionId, extractPreviewTasks(result.data.preview));
+  } catch (err) {
+    console.warn(`[forge] failed to snapshot preview tasks for session ${result.data.sessionId}: ${err instanceof Error ? err.message : err}`);
+  }
+
   return c.json(result.data);
 });
 
@@ -117,7 +133,34 @@ forge.post("/publish", zValidator("json", publishSchema), async (c) => {
   });
 
   if (!result.ok) return c.json({ error: result.error }, result.status as any);
+
+  // Bind the task snapshot to the repo it was just published to, so the Forge
+  // UI can offer "migrate tasks" keyed by repo. Best-effort.
+  try {
+    await linkForgeSnapshotToRepo(userId, sessionId, result.data.result.repoUrl);
+  } catch (err) {
+    console.warn(`[forge] failed to link snapshot for session ${sessionId}: ${err instanceof Error ? err.message : err}`);
+  }
+
   return c.json(result.data);
+});
+
+const migrateSchema = z.object({
+  repoUrl: z.string().url(),
+  teamId: z.string().uuid().optional(),
+});
+
+// POST /forge/migrate-tasks — create/find the agent-tasks project for a forged
+// repo and import its captured planforge tasks. Idempotent on re-run.
+forge.post("/migrate-tasks", zValidator("json", migrateSchema), async (c) => {
+  const userId = c.get("userId")!;
+  const { repoUrl, teamId } = c.req.valid("json");
+
+  const outcome = await migrateForgeTasks(userId, repoUrl, teamId);
+  if (!outcome.ok) {
+    return c.json({ error: outcome.error, code: outcome.code, teams: outcome.teams }, outcome.status as any);
+  }
+  return c.json(outcome.result);
 });
 
 // ── AI Magic Fill ──────────────────────────────────────────────────────────

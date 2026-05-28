@@ -1,9 +1,8 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { config } from "../config/index.js";
 import { requireAuth } from "../middleware/auth.js";
-import { getCredential } from "../services/credentials.js";
+import { agentTasksRequest } from "../services/agent-tasks-client.js";
 import type { AppEnv } from "../types/hono.js";
 
 const createTaskSchema = z.object({
@@ -42,39 +41,10 @@ const tasks = new Hono<AppEnv>();
 
 tasks.use("*", requireAuth);
 
-const TASKS_URL = config.AGENT_TASKS_URL;
-
-async function tasksRequest<T>(userId: string, path: string, options?: RequestInit & { timeoutMs?: number }): Promise<{ ok: true; data: T } | { ok: false; error: string; status: number }> {
-  const token = await getCredential(userId, "agent-tasks");
-  if (!token) {
-    return { ok: false, error: "Agent Tasks not configured. Add your token in Settings.", status: 400 };
-  }
-
-  const { timeoutMs = 10_000, ...fetchOptions } = options ?? {};
-
-  try {
-    const res = await fetch(`${TASKS_URL}${path}`, {
-      ...fetchOptions,
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-        ...fetchOptions.headers,
-      },
-      signal: AbortSignal.timeout(timeoutMs),
-    });
-
-    const body = await res.json() as T;
-    if (!res.ok) {
-      return { ok: false, error: (body as any).error || (body as any).message || `API error: ${res.status}`, status: res.status };
-    }
-    return { ok: true, data: body };
-  } catch (err) {
-    if (err instanceof DOMException && err.name === "AbortError") {
-      return { ok: false, error: "Agent Tasks timed out", status: 504 };
-    }
-    return { ok: false, error: "Agent Tasks unreachable", status: 502 };
-  }
-}
+// Bearer-authenticated agent-tasks proxy. Extracted to
+// services/agent-tasks-client.ts so the forge→tasks migration service shares
+// the same auth + error handling.
+const tasksRequest = agentTasksRequest;
 
 // GET /tasks/projects — list projects
 tasks.get("/projects", async (c) => {
