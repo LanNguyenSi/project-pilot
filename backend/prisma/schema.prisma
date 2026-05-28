@@ -27,6 +27,7 @@ model User {
   serviceCredentials ServiceCredential[]
   sessions           Session[]
   passwordResets     PasswordReset[]
+  forgeTaskSnapshots ForgeTaskSnapshot[]
 }
 
 model Session {
@@ -66,6 +67,26 @@ model PasswordReset {
 
   @@index([userId])
   @@index([expiresAt])
+}
+
+// Captures the planforge task list from a project-forge `generate` preview so
+// it survives the forge session (forge is stateless and deletes its temp dir
+// after publish). Keyed by the forge sessionId; `repoUrl` is filled in at
+// publish time with the normalized `owner/repo` (see repoKey()) so the Forge UI
+// can later migrate the tasks into agent-tasks by repo, robustly across URL
+// formatting differences. project-forge itself is never modified — pilot-local.
+model ForgeTaskSnapshot {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessionId String
+  repoUrl   String?
+  tasks     Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, sessionId])
+  @@index([userId, repoUrl])
 }
 
 model ServiceCredential {

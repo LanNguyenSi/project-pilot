@@ -2,9 +2,23 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, ApiError } from "@/lib/api";
 import Link from "next/link";
-import { Badge, Button, Card, ConfirmModal, EmptyState, SkeletonBox, useToast } from "@/components/ui";
+import { Badge, Button, Card, ConfirmModal, EmptyState, Modal, Select, SkeletonBox, useToast } from "@/components/ui";
+
+interface MigrateResult {
+  projectId: string;
+  projectCreated: boolean;
+  taskCount: number;
+  created: number;
+  skipped: number;
+  failed: number;
+}
+
+interface Team {
+  id: string;
+  name: string;
+}
 
 interface Project {
   id: string;
@@ -29,6 +43,11 @@ export default function ForgePage() {
   const [error, setError] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<Project | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [migratingRepo, setMigratingRepo] = useState<string | null>(null);
+  // Set when the user belongs to >1 agent-tasks team and must pick one before
+  // we can create the project. Holds the repo being migrated + the team list.
+  const [teamPicker, setTeamPicker] = useState<{ repoUrl: string; teams: Team[] } | null>(null);
+  const [selectedTeamId, setSelectedTeamId] = useState("");
 
   function findTasksProject(repoUrl: string): TasksProject | undefined {
     // Extract owner/repo from GitHub URL
@@ -36,6 +55,48 @@ export default function ForgePage() {
     if (!match) return undefined;
     const ownerRepo = match[1].replace(/\.git$/, "");
     return tasksProjects.find((tp) => tp.githubRepo === ownerRepo);
+  }
+
+  async function refreshTasksProjects() {
+    const data = await apiFetch<{ projects: TasksProject[] }>("/api/tasks/projects").catch(() => ({ projects: [] }));
+    setTasksProjects(data.projects);
+  }
+
+  async function handleMigrate(repoUrl: string, teamId?: string) {
+    setMigratingRepo(repoUrl);
+    try {
+      const result = await apiFetch<MigrateResult>("/api/forge/migrate-tasks", {
+        method: "POST",
+        body: JSON.stringify({ repoUrl, ...(teamId ? { teamId } : {}) }),
+      });
+      setTeamPicker(null);
+      if (result.failed > 0) {
+        toast({
+          title: `${result.created} migrated, ${result.failed} failed — try again to retry the rest`,
+          variant: "error",
+        });
+      } else {
+        const summary =
+          result.created > 0
+            ? `${result.created} task${result.created === 1 ? "" : "s"} migrated` +
+              (result.skipped > 0 ? `, ${result.skipped} already present` : "")
+            : result.taskCount === 0
+              ? "No tasks to migrate"
+              : `All ${result.taskCount} tasks already present`;
+        toast({ title: summary, variant: "success" });
+      }
+      await refreshTasksProjects();
+    } catch (err) {
+      if (err instanceof ApiError && err.body.code === "multiple_teams" && Array.isArray(err.body.teams)) {
+        const teams = err.body.teams as Team[];
+        setTeamPicker({ repoUrl, teams });
+        setSelectedTeamId(teams[0]?.id ?? "");
+        return;
+      }
+      toast({ title: err instanceof Error ? err.message : "Migration failed", variant: "error" });
+    } finally {
+      setMigratingRepo(null);
+    }
   }
 
   async function handleDelete() {
@@ -123,11 +184,22 @@ export default function ForgePage() {
                 <p className="text-xs text-content-tertiary mt-1">
                   {new Date(p.createdAt).toLocaleDateString()}
                 </p>
-                {linkedProject && (
+                {linkedProject ? (
                   <Link href={`/tasks/${linkedProject.id}`} className="inline-flex items-center gap-1 mt-2 text-xs text-accent-blue hover:underline">
                     <Badge variant="info">Tasks</Badge>
                     <span>{linkedProject.name}</span>
                   </Link>
+                ) : (
+                  <div className="mt-2">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      loading={migratingRepo === p.repoUrl}
+                      onClick={() => handleMigrate(p.repoUrl)}
+                    >
+                      Migrate tasks
+                    </Button>
+                  </div>
                 )}
                 <div className="flex gap-2 mt-3">
                   <Button
@@ -164,6 +236,32 @@ export default function ForgePage() {
         variant="danger"
         loading={deleting}
       />
+
+      <Modal open={!!teamPicker} onClose={() => setTeamPicker(null)}>
+        <h2 className="text-section-title text-content-primary mb-1">Choose a team</h2>
+        <p className="text-sm text-content-secondary mb-4">
+          You belong to multiple teams. Pick which one the new tasks project should live in.
+        </p>
+        <Select
+          label="Team"
+          value={selectedTeamId}
+          onChange={setSelectedTeamId}
+          options={(teamPicker?.teams ?? []).map((t) => ({ value: t.id, label: t.name }))}
+        />
+        <div className="flex gap-3 mt-6">
+          <Button variant="secondary" className="flex-1" onClick={() => setTeamPicker(null)}>
+            Cancel
+          </Button>
+          <Button
+            className="flex-1"
+            disabled={!selectedTeamId}
+            loading={migratingRepo === teamPicker?.repoUrl}
+            onClick={() => teamPicker && handleMigrate(teamPicker.repoUrl, selectedTeamId)}
+          >
+            Migrate
+          </Button>
+        </div>
+      </Modal>
     </>
   );
 }
