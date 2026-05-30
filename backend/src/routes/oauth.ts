@@ -17,6 +17,7 @@ import {
   buildAuthorizationUrl,
   exchangeCodeForToken,
   fetchGitHubUser,
+  fetchPrimaryVerifiedEmail,
   generateState,
   type OAuthConfig,
 } from "../services/github-oauth.js";
@@ -100,16 +101,22 @@ oauth.get("/github/callback", async (c) => {
 
   let tokenResponse;
   let githubUser;
+  let verifiedEmail;
   try {
     tokenResponse = await exchangeCodeForToken(cfg, code);
     githubUser = await fetchGitHubUser(tokenResponse.access_token);
+    verifiedEmail = await fetchPrimaryVerifiedEmail(tokenResponse.access_token);
   } catch (err) {
     console.error("OAuth exchange failed:", (err as Error).message);
     return c.redirect(`${config.FRONTEND_URL}/auth/error?reason=oauth_failed`);
   }
 
   const githubId = String(githubUser.id);
-  const email = githubUser.email?.toLowerCase() ?? null;
+  // Use the primary VERIFIED email as the identity merge key. The public
+  // profile email is unverified and attacker-controllable, so it must never
+  // be allowed to match an existing account. If GitHub returns no verified
+  // primary, email is null and the user is handled by the githubId create path.
+  const email = verifiedEmail;
 
   let user = await prisma.user.findUnique({ where: { githubId } });
 
@@ -122,6 +129,16 @@ oauth.get("/github/callback", async (c) => {
   if (!user && email) {
     const byEmail = await prisma.user.findUnique({ where: { email } });
     if (byEmail) {
+      // Never claim a row already linked to a DIFFERENT GitHub identity.
+      // The githubId lookup above missed (this incoming id is new), so a
+      // non-null, mismatching githubId means the email belongs to a distinct
+      // GitHub account — auto-merging would let a second GitHub identity that
+      // happens to share the verified email take over the first one's account.
+      if (byEmail.githubId && byEmail.githubId !== githubId) {
+        return c.redirect(
+          `${config.FRONTEND_URL}/auth/error?reason=email_collision`,
+        );
+      }
       if (byEmail.passwordHash && !byEmail.githubId) {
         return c.redirect(
           `${config.FRONTEND_URL}/auth/error?reason=email_collision`,

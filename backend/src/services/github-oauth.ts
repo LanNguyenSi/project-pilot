@@ -92,6 +92,41 @@ export async function fetchGitHubUser(accessToken: string): Promise<GitHubUser> 
   return response.json() as Promise<GitHubUser>;
 }
 
+interface GitHubEmail {
+  email: string;
+  primary: boolean;
+  verified: boolean;
+}
+
+/**
+ * Fetch the user's primary, verified email address from GitHub.
+ *
+ * The public profile email (`GitHubUser.email`) is unverified and can be set
+ * to an arbitrary address, so it must never be used as an identity merge key.
+ * This reads GET /user/emails (permitted by the existing read:user scope) and
+ * returns only the entry that is BOTH primary and verified, lower-cased. If no
+ * such entry exists, returns null and the caller falls back to the githubId
+ * create path.
+ */
+export async function fetchPrimaryVerifiedEmail(
+  accessToken: string,
+): Promise<string | null> {
+  const response = await fetch("https://api.github.com/user/emails", {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      Accept: "application/vnd.github+json",
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`GitHub email fetch failed: ${response.status}`);
+  }
+
+  const emails = (await response.json()) as GitHubEmail[];
+  const match = emails.find((e) => e.primary && e.verified);
+  return match ? match.email.toLowerCase() : null;
+}
+
 export function generateState(): string {
   return Array.from(crypto.getRandomValues(new Uint8Array(16)))
     .map((b) => b.toString(16).padStart(2, "0"))
