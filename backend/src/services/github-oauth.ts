@@ -31,12 +31,13 @@ export interface OAuthConfig {
   redirectUri: string;
 }
 
-// Scopes: read:user / read:org for identity, repo so downstream modules can
-// use the same token for their own GitHub reads (agent-tasks' project sync).
-// workflow is required on top of repo so the token can push scaffolds that
-// contain .github/workflows/* — GitHub rejects an OAuth App pushing workflow
-// files without it (project-forge publish creates a CI workflow).
-const OAUTH_SCOPES = "read:user read:org repo workflow";
+// Scopes: read:user / read:org for identity; user:email so we can read the
+// user's verified primary email (GET /user/emails) for safe account matching;
+// repo so downstream modules can use the same token for their own GitHub reads
+// (agent-tasks' project sync); workflow on top of repo so the token can push
+// scaffolds containing .github/workflows/* (GitHub rejects an OAuth App pushing
+// workflow files without it; project-forge publish creates a CI workflow).
+const OAUTH_SCOPES = "read:user user:email read:org repo workflow";
 
 export function buildAuthorizationUrl(cfg: OAuthConfig, state: string): string {
   const params = new URLSearchParams({
@@ -90,6 +91,42 @@ export async function fetchGitHubUser(accessToken: string): Promise<GitHubUser> 
   }
 
   return response.json() as Promise<GitHubUser>;
+}
+
+interface GitHubEmail {
+  email: string;
+  primary: boolean;
+  verified: boolean;
+}
+
+/**
+ * Fetch the user's primary, verified email address from GitHub.
+ *
+ * The public profile email (`GitHubUser.email`) is unverified and can be set
+ * to an arbitrary address, so it must never be used as an identity merge key.
+ * This reads GET /user/emails (requires the user:email OAuth scope, which is
+ * included in OAUTH_SCOPES) and returns only the entry that is BOTH primary and
+ * verified, lower-cased. If no
+ * such entry exists, returns null and the caller falls back to the githubId
+ * create path.
+ */
+export async function fetchPrimaryVerifiedEmail(
+  accessToken: string,
+): Promise<string | null> {
+  const response = await fetch("https://api.github.com/user/emails", {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      Accept: "application/vnd.github+json",
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`GitHub email fetch failed: ${response.status}`);
+  }
+
+  const emails = (await response.json()) as GitHubEmail[];
+  const match = emails.find((e) => e.primary && e.verified);
+  return match ? match.email.toLowerCase() : null;
 }
 
 export function generateState(): string {

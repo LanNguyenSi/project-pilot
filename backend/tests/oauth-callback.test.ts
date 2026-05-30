@@ -15,6 +15,7 @@ vi.mock("../src/services/github-oauth.js", async () => {
     ...actual,
     exchangeCodeForToken: vi.fn(),
     fetchGitHubUser: vi.fn(),
+    fetchPrimaryVerifiedEmail: vi.fn(),
   };
 });
 
@@ -38,11 +39,13 @@ import { prisma } from "../src/lib/prisma.js";
 import {
   exchangeCodeForToken,
   fetchGitHubUser,
+  fetchPrimaryVerifiedEmail,
 } from "../src/services/github-oauth.js";
 import { oauth } from "../src/routes/oauth.js";
 
 const mockExchange = vi.mocked(exchangeCodeForToken);
 const mockFetchUser = vi.mocked(fetchGitHubUser);
+const mockFetchEmail = vi.mocked(fetchPrimaryVerifiedEmail);
 const mockUser = prisma.user as unknown as {
   findUnique: ReturnType<typeof vi.fn>;
   update: ReturnType<typeof vi.fn>;
@@ -99,6 +102,7 @@ describe("GET /oauth/github/callback", () => {
       avatar_url: "",
       email: "victim@example.com",
     });
+    mockFetchEmail.mockResolvedValue("victim@example.com");
     // No existing user with this githubId.
     mockUser.findUnique
       .mockResolvedValueOnce(null)
@@ -122,6 +126,47 @@ describe("GET /oauth/github/callback", () => {
     expect(mockUser.create).not.toHaveBeenCalled();
   });
 
+  it("refuses to claim an email already linked to a DIFFERENT github id (takeover guard)", async () => {
+    mockExchange.mockResolvedValue({
+      access_token: "gh-tok",
+      token_type: "bearer",
+      scope: "repo",
+    });
+    // Incoming GitHub identity has id "B" but the SAME verified email as a row
+    // already linked to GitHub identity "A".
+    mockFetchUser.mockResolvedValue({
+      id: 1002, // String(1002) is the incoming githubId; differs from row's "A"
+      login: "attacker",
+      name: "Attacker",
+      avatar_url: "",
+      email: "victim@x.com",
+    });
+    mockFetchEmail.mockResolvedValue("victim@x.com");
+    // No existing user with the incoming githubId.
+    mockUser.findUnique
+      .mockResolvedValueOnce(null)
+      // But the email belongs to a row already linked to a DIFFERENT githubId.
+      .mockResolvedValueOnce({
+        id: "victim-user",
+        githubId: "A",
+        passwordHash: null,
+        email: "victim@x.com",
+      });
+
+    const res = await callback(
+      "/github/callback?code=abc&state=xyz",
+      "oauth_state=xyz",
+    );
+
+    expect(res.status).toBe(302);
+    expect(res.headers.get("Location")).toContain(
+      "/auth/error?reason=email_collision",
+    );
+    // The victim's account MUST NOT be updated — this is the security invariant.
+    expect(mockUser.update).not.toHaveBeenCalled();
+    expect(mockUser.create).not.toHaveBeenCalled();
+  });
+
   it("creates a new user and signs them in on a clean first-login", async () => {
     mockExchange.mockResolvedValue({
       access_token: "gh-tok",
@@ -135,6 +180,7 @@ describe("GET /oauth/github/callback", () => {
       avatar_url: "https://gh/u",
       email: null,
     });
+    mockFetchEmail.mockResolvedValue(null);
     mockUser.findUnique.mockResolvedValue(null);
     mockUser.create.mockResolvedValue({
       id: "new-user",
