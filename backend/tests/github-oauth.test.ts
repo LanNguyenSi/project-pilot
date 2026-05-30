@@ -19,9 +19,10 @@ describe("github-oauth URL building", () => {
     expect(url).toContain("client_id=iv1.abc");
     expect(url).toContain("state=deadbeef");
     expect(url).toContain("redirect_uri=https%3A%2F%2Fpilot.example%2Fapi%2Foauth%2Fgithub%2Fcallback");
-    // repo + workflow are both required: workflow lets the token push
-    // scaffolds containing .github/workflows/* (project-forge publish).
-    expect(url).toContain("scope=read%3Auser+read%3Aorg+repo+workflow");
+    // user:email is required to read the verified primary email via
+    // GET /user/emails; repo + workflow let the token push scaffolds
+    // containing .github/workflows/* (project-forge publish).
+    expect(url).toContain("scope=read%3Auser+user%3Aemail+read%3Aorg+repo+workflow");
   });
 
   it("never leaks the clientSecret into the authorization URL", () => {
