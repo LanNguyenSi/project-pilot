@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import type { Context } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { setCookie, deleteCookie, getCookie } from "hono/cookie";
@@ -12,6 +13,19 @@ import type { AppEnv } from "../types/hono.js";
 const auth = new Hono<AppEnv>();
 
 const SESSION_MAX_AGE = 30 * 24 * 60 * 60; // 30 days in seconds
+
+// Defense-in-depth rate-limit key: scope brute-force limits to the submitted
+// email (normalized) so a single account can't be hammered from rotating IPs.
+// Reads the cached request body, so it does not consume the stream that the
+// downstream zValidator parses. Returns undefined on malformed/absent bodies.
+async function emailKey(c: Context): Promise<string | undefined> {
+  try {
+    const body = (await c.req.json()) as { email?: unknown };
+    return typeof body.email === "string" ? `email:${body.email.toLowerCase().trim()}` : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 const registerSchema = z.object({
   email: z.string().email(),
@@ -61,7 +75,7 @@ auth.post("/register", rateLimit({ max: 5, windowMs: 60_000 }), zValidator("json
 });
 
 // POST /auth/login — 10 attempts per minute
-auth.post("/login", rateLimit({ max: 10, windowMs: 60_000 }), zValidator("json", loginSchema), async (c) => {
+auth.post("/login", rateLimit({ max: 10, windowMs: 60_000, keyGenerator: emailKey }), zValidator("json", loginSchema), async (c) => {
   const { email, password } = c.req.valid("json");
 
   try {
@@ -98,7 +112,7 @@ auth.get("/me", requireAuth, async (c) => {
 // POST /auth/forgot-password
 const forgotSchema = z.object({ email: z.string().email() });
 
-auth.post("/forgot-password", rateLimit({ max: 3, windowMs: 60_000 }), zValidator("json", forgotSchema), async (c) => {
+auth.post("/forgot-password", rateLimit({ max: 3, windowMs: 60_000, keyGenerator: emailKey }), zValidator("json", forgotSchema), async (c) => {
   const { email } = c.req.valid("json");
   const user = await prisma.user.findUnique({ where: { email } });
 
