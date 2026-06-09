@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.2.1] - 2026-06-09
+
+Security release closing the 2026-05-30 audit findings and a CVE sweep. The headline is a HIGH-severity GitHub OAuth account-takeover. No feature changes; the app is versioned at the repo root and deployed from `main`, so this tag is deploy provenance.
+
+### Security
+
+- **HIGH: GitHub OAuth account takeover via githubId overwrite** (PR #81). The OAuth callback merged identities by the attacker-controllable public profile email, without verifying it or checking whether the matched row already belonged to a different GitHub account, so an attacker could register a GitHub account whose profile email matched a victim's, sign in, and silently overwrite the victim's `githubId`, hijacking the account. The merge key now comes from the primary VERIFIED email (new `fetchPrimaryVerifiedEmail` helper reading `GET /user/emails`, which required adding the `user:email` OAuth scope), and a merge onto a row that already carries a different `githubId` is refused.
+- **MEDIUM: brute-force rate limiting bypassable via spoofed `X-Forwarded-For`** (PR #84, finding #15). The limiter trusted the leftmost XFF value, which a client controls. It now takes the rightmost hop (single trusted proxy / Traefik), falls back to the real TCP socket via `getConnInfo` when XFF is absent, and keys the login / forgot-password limiters on the submitted email in addition to the IP.
+- **hono bumped to `^4.12.23`** (4 MEDIUM CVEs: CVE-2026-47673 / 47674 / 47675 / 47676, PR #83). npm audit clean.
+- **vitest bumped to `^4.1.8`** (CVE-2026-47429 / GHSA-5xrq-8626-4rwp, PR #82). vitest < 4.1.0 lets the UI server read and execute arbitrary files. devDependency; lockfile regenerated.
+
 ## [0.2.0] - 2026-05-28
 
 **Headline: Forge projects can hand their planning backlog straight to agent-tasks. After scaffolding a repo in project-forge, one click in the Forge UI creates the matching agent-tasks project and imports the generated planforge tasks, so the plan becomes trackable work without re-typing it.**
