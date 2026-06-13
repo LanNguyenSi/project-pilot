@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef, useId } from "react";
+import { useEffect, useState, useRef, useId } from "react";
 import { apiFetch } from "@/lib/api";
-import { Badge, Card, SkeletonBox } from "@/components/ui";
-import type { BadgeVariant } from "@/components/ui";
+import { Badge, Card, ErrorBanner, Icon, SkeletonBox, useFocusTrap } from "@/components/ui";
+import { statusMap, priorityMap } from "@/lib/task-constants";
 
 interface TemplateData {
   goal?: string;
@@ -56,20 +56,6 @@ interface TaskDetailPanelProps {
   onClose: () => void;
 }
 
-const statusMap: Record<string, { label: string; variant: BadgeVariant }> = {
-  open: { label: "Open", variant: "info" },
-  in_progress: { label: "In Progress", variant: "warning" },
-  review: { label: "Review", variant: "purple" },
-  done: { label: "Done", variant: "success" },
-};
-
-const priorityMap: Record<string, { label: string; color: string }> = {
-  CRITICAL: { label: "Critical", color: "text-accent-red" },
-  HIGH: { label: "High", color: "text-accent-amber" },
-  MEDIUM: { label: "Medium", color: "text-accent-blue" },
-  LOW: { label: "Low", color: "text-content-tertiary" },
-};
-
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="mb-5">
@@ -86,6 +72,9 @@ export function TaskDetailPanel({ taskId, open, onClose }: TaskDetailPanelProps)
   const [instructions, setInstructions] = useState<InstructionsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  // Migrate focus trap from inline handleKey + useEffects to the shared hook
+  useFocusTrap(panelRef, open, onClose);
 
   useEffect(() => {
     if (!open || !taskId) return;
@@ -105,47 +94,6 @@ export function TaskDetailPanel({ taskId, open, onClose }: TaskDetailPanelProps)
       .finally(() => setLoading(false));
   }, [open, taskId]);
 
-  const handleKey = useCallback(
-    (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        onClose();
-        return;
-      }
-      if (e.key === "Tab" && panelRef.current) {
-        const focusable = panelRef.current.querySelectorAll<HTMLElement>(
-          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
-        );
-        if (focusable.length === 0) return;
-        const first = focusable[0];
-        const last = focusable[focusable.length - 1];
-        if (e.shiftKey && document.activeElement === first) {
-          e.preventDefault();
-          last.focus();
-        } else if (!e.shiftKey && document.activeElement === last) {
-          e.preventDefault();
-          first.focus();
-        }
-      }
-    },
-    [onClose],
-  );
-
-  useEffect(() => {
-    if (!open) return;
-    document.addEventListener("keydown", handleKey);
-    document.body.style.overflow = "hidden";
-    requestAnimationFrame(() => {
-      const el = panelRef.current?.querySelector<HTMLElement>(
-        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
-      );
-      el?.focus();
-    });
-    return () => {
-      document.removeEventListener("keydown", handleKey);
-      document.body.style.overflow = "";
-    };
-  }, [open, handleKey]);
-
   if (!open) return null;
 
   const status = task ? statusMap[task.status] || { label: task.status, variant: "neutral" as const } : null;
@@ -158,8 +106,7 @@ export function TaskDetailPanel({ taskId, open, onClose }: TaskDetailPanelProps)
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       <div
         ref={panelRef}
-        className="relative bg-surface-secondary border-l border-stroke-default shadow-2xl w-full max-w-xl overflow-y-auto"
-        style={{ animation: "slideInRight 150ms ease-out" }}
+        className="relative bg-surface-secondary border-l border-stroke-default shadow-elevated w-full max-w-xl overflow-y-auto animate-slide-in-right"
       >
         {/* Header */}
         <div className="sticky top-0 bg-surface-secondary/95 backdrop-blur-sm border-b border-stroke-default px-6 py-4 flex items-start justify-between gap-4 z-10">
@@ -185,21 +132,19 @@ export function TaskDetailPanel({ taskId, open, onClose }: TaskDetailPanelProps)
           </div>
           <button
             onClick={onClose}
-            className="text-content-tertiary hover:text-content-primary transition-colors p-1"
+            className="text-content-tertiary hover:text-content-primary transition-colors duration-fast p-1 rounded-button focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/60"
             aria-label="Close"
           >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <Icon name="x" size={20} />
           </button>
         </div>
 
         {/* Body */}
         <div className="px-6 py-5">
           {error && (
-            <Card className="border-accent-red/50 mb-4">
-              <p className="text-sm text-accent-red">{error}</p>
-            </Card>
+            <div className="mb-4">
+              <ErrorBanner message={error} />
+            </div>
           )}
 
           {loading ? (
@@ -234,7 +179,7 @@ export function TaskDetailPanel({ taskId, open, onClose }: TaskDetailPanelProps)
                       href={task.prUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-sm text-accent-blue hover:underline"
+                      className="text-sm text-brand-300 hover:text-brand-200 hover:underline"
                     >
                       #{task.prNumber}
                     </a>
@@ -294,11 +239,9 @@ export function TaskDetailPanel({ taskId, open, onClose }: TaskDetailPanelProps)
                         href={a.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center gap-2 text-sm text-accent-blue hover:underline"
+                        className="flex items-center gap-2 text-sm text-brand-300 hover:text-brand-200 hover:underline"
                       >
-                        <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13" />
-                        </svg>
+                        <Icon name="paperclip" size={16} className="shrink-0" />
                         {a.name}
                       </a>
                     ))}

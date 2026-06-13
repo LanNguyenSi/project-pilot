@@ -4,7 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { apiFetch } from "@/lib/api";
-import { Button, Card, EmptyState, Input, Modal, SkeletonProjectCard, useToast } from "@/components/ui";
+import { Button, Card, EmptyState, ErrorBanner, Icon, Input, Modal, Select, SkeletonProjectCard, Textarea, useToast } from "@/components/ui";
+import { PageHeader } from "@/components/layout/PageHeader";
 
 interface Project {
   id: string;
@@ -41,6 +42,8 @@ export default function TaskProjectsPage() {
   const [page, setPage] = useState(0);
 
   const [syncingTeamId, setSyncingTeamId] = useState<string | null>(null);
+  // Controlled value for the multi-team sync picker (resets to "" after selection)
+  const [syncTeamValue, setSyncTeamValue] = useState("");
 
   const [createOpen, setCreateOpen] = useState(false);
   const [createSubmitting, setCreateSubmitting] = useState(false);
@@ -170,10 +173,23 @@ export default function TaskProjectsPage() {
 
   return (
     <>
+      <PageHeader
+        title="Tasks"
+        description="Browse projects and track task progress across your teams."
+        actions={
+          canAct ? (
+            <Button size="sm" onClick={openCreateModal}>
+              <Icon name="plus" size={16} className="mr-1" />
+              New Project
+            </Button>
+          ) : undefined
+        }
+      />
+
       {error && (
-        <Card className="border-accent-red/50 mb-6">
-          <p className="text-sm text-accent-red">{error}</p>
-        </Card>
+        <div className="mb-6">
+          <ErrorBanner message={error} />
+        </div>
       )}
 
       {loading ? (
@@ -185,7 +201,7 @@ export default function TaskProjectsPage() {
         </div>
       ) : (
         <>
-          {/* Header actions */}
+          {/* Sync action row */}
           {canAct && (
             <div className="flex items-center justify-end gap-2 mb-4 flex-wrap">
               {hasOneTeam && teams[0] ? (
@@ -199,36 +215,29 @@ export default function TaskProjectsPage() {
                   Sync from GitHub
                 </Button>
               ) : (
-                <select
-                  aria-label="Sync team projects from GitHub"
-                  className="px-2.5 py-1.5 text-xs rounded-button border border-stroke-default bg-surface-primary text-content-primary"
-                  value=""
-                  onChange={(e) => {
-                    if (e.target.value) {
-                      void handleSync(e.target.value);
-                      e.target.value = "";
+                <Select
+                  value={syncTeamValue}
+                  placeholder="Sync from GitHub..."
+                  onChange={(v) => {
+                    if (v) {
+                      setSyncTeamValue("");
+                      void handleSync(v);
                     }
                   }}
+                  options={teams.map((t) => ({
+                    value: t.id,
+                    label: t.name + (syncingTeamId === t.id ? " (syncing...)" : ""),
+                  }))}
                   disabled={syncingTeamId !== null}
-                >
-                  <option value="">Sync from GitHub…</option>
-                  {teams.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name}
-                      {syncingTeamId === t.id ? " (syncing…)" : ""}
-                    </option>
-                  ))}
-                </select>
+                  className="w-48"
+                />
               )}
-              <Button size="sm" onClick={openCreateModal}>
-                + New Project
-              </Button>
             </div>
           )}
 
           {projects.length === 0 ? (
             <EmptyState
-              icon={<FolderIcon />}
+              icon={<Icon name="folder" size={48} />}
               title="No projects found"
               description={
                 canAct
@@ -242,12 +251,12 @@ export default function TaskProjectsPage() {
             <>
               {/* Search + count */}
               <div className="flex items-center gap-3 mb-4">
-                <input
+                <Input
                   type="text"
                   placeholder="Search projects..."
                   value={search}
                   onChange={(e) => { setSearch(e.target.value); setPage(0); }}
-                  className="px-3 py-1.5 text-sm rounded-button border border-stroke-default bg-surface-primary text-content-primary placeholder:text-content-tertiary flex-1 max-w-xs"
+                  className="flex-1 max-w-xs"
                 />
                 <span className="text-xs text-content-tertiary">
                   {filtered.length} project{filtered.length !== 1 ? "s" : ""}
@@ -261,9 +270,13 @@ export default function TaskProjectsPage() {
               ) : (
                 <>
                   <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    {paginated.map((p) => (
+                    {paginated.map((p, i) => (
                       <Link key={p.id} href={`/tasks/${p.id}`}>
-                        <Card variant="interactive" className="h-full">
+                        <Card
+                          variant="interactive"
+                          className="h-full animate-fade-in"
+                          style={{ "--delay": `${i * 30}ms` } as React.CSSProperties}
+                        >
                           <h2 className="font-medium text-sm text-content-primary mb-1">{p.name}</h2>
                           {p.description && (
                             <p className="text-xs text-content-secondary line-clamp-2">{p.description}</p>
@@ -275,7 +288,7 @@ export default function TaskProjectsPage() {
                   {totalPages > 1 && (
                     <div className="flex items-center justify-between pt-4">
                       <span className="text-xs text-content-tertiary">
-                        {page * PROJECTS_PER_PAGE + 1}–{Math.min((page + 1) * PROJECTS_PER_PAGE, filtered.length)} of {filtered.length}
+                        {page * PROJECTS_PER_PAGE + 1}-{Math.min((page + 1) * PROJECTS_PER_PAGE, filtered.length)} of {filtered.length}
                       </span>
                       <div className="flex gap-1">
                         <Button variant="secondary" size="sm" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>
@@ -300,41 +313,17 @@ export default function TaskProjectsPage() {
           if (createSubmitting) return;
           setCreateOpen(false);
         }}
+        title="New Project"
       >
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-semibold text-content-primary">New Project</h2>
-          <button
-            type="button"
-            onClick={() => {
-              if (createSubmitting) return;
-              setCreateOpen(false);
-            }}
-            className="text-content-tertiary hover:text-content-primary p-1"
-            aria-label="Close"
-          >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
         <form onSubmit={handleCreateProject} className="space-y-3">
-          <div>
-            <label className="block text-xs text-content-secondary mb-1">
-              Team <span className="text-accent-red">*</span>
-            </label>
-            <select
-              required
-              value={newTeamId}
-              onChange={(e) => setNewTeamId(e.target.value)}
-              disabled={createSubmitting || teams.length === 0}
-              className="w-full px-3 py-1.5 text-sm rounded-button border border-stroke-default bg-surface-primary text-content-primary"
-            >
-              <option value="">Select a team…</option>
-              {teams.map((t) => (
-                <option key={t.id} value={t.id}>{t.name}</option>
-              ))}
-            </select>
-          </div>
+          <Select
+            label="Team"
+            value={newTeamId}
+            onChange={setNewTeamId}
+            placeholder="Select a team..."
+            options={teams.map((t) => ({ value: t.id, label: t.name }))}
+            disabled={createSubmitting || teams.length === 0}
+          />
           <Input
             label="Name"
             required
@@ -365,18 +354,19 @@ export default function TaskProjectsPage() {
             placeholder="owner/repo"
             disabled={createSubmitting}
           />
-          <div>
-            <label className="block text-xs text-content-secondary mb-1">Description (optional)</label>
-            <textarea
-              value={newDescription}
-              onChange={(e) => setNewDescription(e.target.value)}
-              placeholder="What is this project about?"
-              disabled={createSubmitting}
-              rows={2}
-              className="w-full px-3 py-1.5 text-sm rounded-button border border-stroke-default bg-surface-primary text-content-primary placeholder:text-content-tertiary"
-            />
-          </div>
-          {createError && <p className="text-sm text-accent-red">{createError}</p>}
+          <Textarea
+            label="Description (optional)"
+            value={newDescription}
+            onChange={(e) => setNewDescription(e.target.value)}
+            placeholder="What is this project about?"
+            disabled={createSubmitting}
+            rows={2}
+          />
+          {createError && (
+            <div>
+              <ErrorBanner message={createError} />
+            </div>
+          )}
           <div className="flex gap-2 justify-end pt-1">
             <Button
               type="button"
@@ -393,13 +383,5 @@ export default function TaskProjectsPage() {
         </form>
       </Modal>
     </>
-  );
-}
-
-function FolderIcon() {
-  return (
-    <svg className="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
-    </svg>
   );
 }

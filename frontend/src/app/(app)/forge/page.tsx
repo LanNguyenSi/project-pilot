@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch, ApiError } from "@/lib/api";
 import Link from "next/link";
-import { Badge, Button, Card, ConfirmModal, EmptyState, Modal, Select, SkeletonBox, useToast } from "@/components/ui";
+import { Badge, Button, Card, ConfirmModal, EmptyState, ErrorBanner, Icon, Modal, Select, SkeletonBox, useToast } from "@/components/ui";
+import { PageHeader } from "@/components/layout/PageHeader";
 
 interface MigrateResult {
   projectId: string;
@@ -72,7 +73,7 @@ export default function ForgePage() {
       setTeamPicker(null);
       if (result.failed > 0) {
         toast({
-          title: `${result.created} migrated, ${result.failed} failed — try again to retry the rest`,
+          title: `${result.created} migrated, ${result.failed} failed - try again to retry the rest`,
           variant: "error",
         });
       } else {
@@ -134,7 +135,7 @@ export default function ForgePage() {
     return (
       <div role="status" aria-label="Loading">
         <div className="flex items-center justify-between mb-8">
-          <SkeletonBox className="h-7 w-24" />
+          <SkeletonBox className="h-9 w-28" />
           <SkeletonBox className="h-9 w-28 rounded-button" />
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -152,20 +153,26 @@ export default function ForgePage() {
 
   return (
     <>
-      <div className="flex items-center justify-between mb-8">
-        <p className="text-content-secondary text-sm">Created via Project Forge</p>
-        <Button href="/forge/create">New Project</Button>
-      </div>
+      <PageHeader
+        title="Forge"
+        description="Scaffold and manage GitHub projects, then link them to agent-tasks."
+        actions={
+          <Button href="/forge/create">
+            <Icon name="plus" size={16} className="mr-1" />
+            New Project
+          </Button>
+        }
+      />
 
       {error && (
-        <Card className="border-accent-red/50 mb-6">
-          <p className="text-sm text-accent-red">{error}</p>
-        </Card>
+        <div className="mb-6">
+          <ErrorBanner message={error} />
+        </div>
       )}
 
       {projects.length === 0 && !error ? (
         <EmptyState
-          icon={<HammerIcon />}
+          icon={<Icon name="hammer" size={48} />}
           title="No projects yet"
           description="Create your first project to scaffold a new repository."
           actionLabel="Create your first project"
@@ -173,10 +180,14 @@ export default function ForgePage() {
         />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {projects.map((p) => {
+          {projects.map((p, i) => {
             const linkedProject = findTasksProject(p.repoUrl);
             return (
-              <Card key={p.id} className="group relative">
+              <Card
+                key={p.id}
+                className="group relative animate-fade-in"
+                style={{ "--delay": `${i * 40}ms` } as React.CSSProperties}
+              >
                 <h3 className="font-medium text-sm text-content-primary">{p.projectName}</h3>
                 {p.description && (
                   <p className="text-xs text-content-secondary mt-1 line-clamp-2">{p.description}</p>
@@ -237,8 +248,7 @@ export default function ForgePage() {
         loading={deleting}
       />
 
-      <Modal open={!!teamPicker} onClose={() => setTeamPicker(null)}>
-        <h2 className="text-section-title text-content-primary mb-1">Choose a team</h2>
+      <Modal open={!!teamPicker} onClose={() => setTeamPicker(null)} title="Choose a team">
         <p className="text-sm text-content-secondary mb-4">
           You belong to multiple teams. Pick which one the new tasks project should live in.
         </p>
@@ -263,13 +273,5 @@ export default function ForgePage() {
         </div>
       </Modal>
     </>
-  );
-}
-
-function HammerIcon() {
-  return (
-    <svg className="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1} aria-hidden="true">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17l-5.384 3.073A.75.75 0 015.25 17.7V6.3a.75.75 0 01.786-.543l5.384 3.073m0 0l5.384-3.073A.75.75 0 0118.75 6.3v11.4a.75.75 0 01-.786.543l-5.384-3.073m0 0V3.75m0 11.42V20.25" />
-    </svg>
   );
 }

@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
-import { Badge, Button, Card, ConfirmModal, Input, useToast } from "@/components/ui";
+import { Badge, Button, Card, ConfirmModal, Input, SkeletonBox, useToast } from "@/components/ui";
+import { PageHeader } from "@/components/layout/PageHeader";
 
 interface Credential {
   id: string;
@@ -97,12 +98,12 @@ export default function SettingsPage() {
   if (loading) {
     return (
       <div role="status" aria-label="Loading">
-        <div className="bg-surface-tertiary rounded-md animate-pulse h-7 w-32 mb-8" />
-        <div className="space-y-4">
+        <SkeletonBox className="h-9 w-32 mb-8" />
+        <div className="space-y-4 max-w-2xl">
           {Array.from({ length: 3 }, (_, i) => (
             <Card key={i} className="space-y-3">
-              <div className="bg-surface-tertiary rounded-md animate-pulse h-4 w-28" />
-              <div className="bg-surface-tertiary rounded-md animate-pulse h-9 w-full" />
+              <SkeletonBox className="h-4 w-28" />
+              <SkeletonBox className="h-9 w-full" />
             </Card>
           ))}
         </div>
@@ -113,9 +114,10 @@ export default function SettingsPage() {
 
   return (
     <>
-      <p className="text-sm text-content-secondary mb-8">
-        Connect your downstream services by providing their API tokens. Tokens are stored encrypted.
-      </p>
+      <PageHeader
+        title="Settings"
+        description="Connect your downstream services by providing their API tokens. Tokens are stored encrypted."
+      />
 
       <div className="space-y-4 max-w-2xl">
         {SERVICES.map(({ key, label, hint }) => {

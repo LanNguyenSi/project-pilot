@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
-import { Button, Card, Input, Textarea, Select, Collapsible, useToast } from "@/components/ui";
+import { Button, Card, Collapsible, ErrorBanner, Input, Select, Textarea, useToast } from "@/components/ui";
+import { PageHeader } from "@/components/layout/PageHeader";
 
 interface Project {
   id: string;
@@ -78,14 +79,15 @@ export default function CreateTaskPage() {
 
   return (
     <>
-      {project && (
-        <p className="text-sm text-content-secondary mb-6">{project.name}</p>
-      )}
+      <PageHeader
+        title="New Task"
+        description={project ? `Creating a task in ${project.name}` : undefined}
+      />
 
       {error && (
-        <Card className="border-accent-red/50 mb-6">
-          <p className="text-sm text-accent-red">{error}</p>
-        </Card>
+        <div className="mb-6 max-w-2xl">
+          <ErrorBanner message={error} />
+        </div>
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4 max-w-2xl">

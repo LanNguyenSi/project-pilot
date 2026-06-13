@@ -4,7 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { apiFetch } from "@/lib/api";
-import { Badge, Button, Card, ConfirmModal, Input, Modal, SkeletonBox, useToast } from "@/components/ui";
+import { Badge, Button, Card, ConfirmModal, EmptyState, ErrorBanner, Icon, Input, Modal, Select, SkeletonBox, useToast } from "@/components/ui";
+import { PageHeader } from "@/components/layout/PageHeader";
 import type { BadgeVariant } from "@/components/ui";
 
 interface Server {
@@ -251,10 +252,20 @@ export default function DeploysPage() {
     }
   }
 
+  async function handleCopyLog() {
+    if (!logContent) return;
+    try {
+      await navigator.clipboard.writeText(logContent);
+      toast({ title: "Log copied to clipboard", variant: "success" });
+    } catch {
+      toast({ title: "Failed to copy log", variant: "error" });
+    }
+  }
+
   if (loading) {
     return (
       <div role="status" aria-label="Loading">
-        <SkeletonBox className="h-7 w-36 mb-6" />
+        <SkeletonBox className="h-9 w-36 mb-6" />
         <div className="space-y-2">
           {Array.from({ length: 5 }, (_, i) => (
             <Card key={i} className="flex items-center gap-4">
@@ -275,13 +286,41 @@ export default function DeploysPage() {
     { key: "history", label: "History", count: deployTotal },
   ];
 
+  // Select options derived from loaded data
+  const serverOptions = [
+    { value: "", label: "All servers" },
+    ...servers.map((s) => ({ value: s.id, label: s.name })),
+  ];
+  const appOptions = [
+    { value: "", label: "All apps" },
+    ...apps.map((a) => ({ value: a.id, label: a.name })),
+  ];
+  const statusOptions = [
+    { value: "", label: "All statuses" },
+    { value: "success", label: "Success" },
+    { value: "failed", label: "Failed" },
+    { value: "running", label: "Running" },
+    { value: "deploying", label: "Deploying" },
+    { value: "rolled_back", label: "Rolled back" },
+  ];
+
   return (
     <>
+      <PageHeader
+        title="Deploys"
+        description="Manage servers, applications, and deployment history."
+        actions={
+          <Button size="sm" onClick={() => setAddServerOpen(true)}>
+            <Icon name="plus" size={16} className="mr-1" />
+            Add Server
+          </Button>
+        }
+      />
 
       {error && (
-        <Card className="border-accent-red/50 mb-6">
-          <p className="text-sm text-accent-red">{error}</p>
-        </Card>
+        <div className="mb-6">
+          <ErrorBanner message={error} />
+        </div>
       )}
 
       {/* Tab bar */}
@@ -295,7 +334,7 @@ export default function DeploysPage() {
               onClick={() => setTab(t.key)}
               className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors duration-fast -mb-px ${
                 tab === t.key
-                  ? "text-content-primary border-accent-blue"
+                  ? "text-content-primary border-brand-500"
                   : "text-content-secondary border-transparent hover:text-content-primary"
               }`}
             >
@@ -309,9 +348,6 @@ export default function DeploysPage() {
       {/* Servers tab */}
       {tab === "servers" && (
         <div role="tabpanel" aria-label="Servers">
-          <div className="flex justify-end mb-4">
-            <Button size="sm" onClick={() => setAddServerOpen(true)}>+ Add Server</Button>
-          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {servers.map((s) => (
               <Card key={s.id}>
@@ -333,9 +369,15 @@ export default function DeploysPage() {
               </Card>
             ))}
             {servers.length === 0 && (
-              <p className="col-span-full text-content-secondary text-sm">
-                No servers configured. Click &ldquo;Add Server&rdquo; to connect one.
-              </p>
+              <div className="col-span-full">
+                <EmptyState
+                  icon={<Icon name="rocket" size={40} />}
+                  title="No servers configured"
+                  description='Click "Add Server" to connect your first server.'
+                  actionLabel="Add Server"
+                  onAction={() => setAddServerOpen(true)}
+                />
+              </div>
             )}
           </div>
         </div>
@@ -353,8 +395,9 @@ export default function DeploysPage() {
               <span className="flex-1 text-sm text-content-primary">
                 {a.name}
                 {linkedProject && (
-                  <Link href={`/tasks/${linkedProject.id}`} className="ml-2 text-xs text-accent-blue hover:underline" onClick={(e) => e.stopPropagation()}>
-                    Tasks →
+                  <Link href={`/tasks/${linkedProject.id}`} className="ml-2 text-xs text-brand-300 hover:text-brand-200 hover:underline" onClick={(e) => e.stopPropagation()}>
+                    Tasks
+                    <Icon name="arrow-right" size={12} className="inline ml-0.5" />
                   </Link>
                 )}
               </span>
@@ -374,115 +417,109 @@ export default function DeploysPage() {
       )}
 
       {/* History tab */}
-      {tab === "history" && (<div role="tabpanel" aria-label="History">
-        {/* Filters */}
-        <div className="flex items-center gap-2 mb-4 flex-wrap">
-          <select
-            value={serverFilter}
-            onChange={(e) => { setServerFilter(e.target.value); setDeployPage(0); }}
-            className="px-2.5 py-1.5 text-xs rounded-button border border-stroke-default bg-surface-primary text-content-primary"
-          >
-            <option value="">All servers</option>
-            {servers.map((s) => (
-              <option key={s.id} value={s.id}>{s.name}</option>
-            ))}
-          </select>
-          <select
-            value={appFilter}
-            onChange={(e) => { setAppFilter(e.target.value); setDeployPage(0); }}
-            className="px-2.5 py-1.5 text-xs rounded-button border border-stroke-default bg-surface-primary text-content-primary"
-          >
-            <option value="">All apps</option>
-            {apps.map((a) => (
-              <option key={a.id} value={a.id}>{a.name}</option>
-            ))}
-          </select>
-          <select
-            value={statusFilter}
-            onChange={(e) => { setStatusFilter(e.target.value); setDeployPage(0); }}
-            className="px-2.5 py-1.5 text-xs rounded-button border border-stroke-default bg-surface-primary text-content-primary"
-          >
-            <option value="">All statuses</option>
-            <option value="success">Success</option>
-            <option value="failed">Failed</option>
-            <option value="running">Running</option>
-            <option value="deploying">Deploying</option>
-            <option value="rolled_back">Rolled back</option>
-          </select>
-          {(serverFilter || appFilter || statusFilter) && (
-            <button
-              onClick={() => { setServerFilter(""); setAppFilter(""); setStatusFilter(""); setDeployPage(0); }}
-              className="px-2.5 py-1.5 text-xs text-content-tertiary hover:text-content-primary transition-colors"
-            >
-              Clear filters
-            </button>
+      {tab === "history" && (
+        <div role="tabpanel" aria-label="History">
+          {/* Filters */}
+          <div className="flex items-center gap-2 mb-4 flex-wrap">
+            <Select
+              value={serverFilter}
+              onChange={(v) => { setServerFilter(v); setDeployPage(0); }}
+              options={serverOptions}
+              className="w-36"
+            />
+            <Select
+              value={appFilter}
+              onChange={(v) => { setAppFilter(v); setDeployPage(0); }}
+              options={appOptions}
+              className="w-36"
+            />
+            <Select
+              value={statusFilter}
+              onChange={(v) => { setStatusFilter(v); setDeployPage(0); }}
+              options={statusOptions}
+              className="w-36"
+            />
+            {(serverFilter || appFilter || statusFilter) && (
+              <button
+                onClick={() => { setServerFilter(""); setAppFilter(""); setStatusFilter(""); setDeployPage(0); }}
+                className="px-2.5 py-1.5 text-xs text-content-tertiary hover:text-content-primary transition-colors"
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
+
+          {deploys.length === 0 ? (
+            <EmptyState
+              icon={<Icon name="rocket" size={40} />}
+              title={serverFilter || appFilter || statusFilter ? "No matching deploys" : "No deploys yet"}
+              description={
+                serverFilter || appFilter || statusFilter
+                  ? "Try adjusting the filters above."
+                  : "Trigger a deploy from the Applications tab."
+              }
+            />
+          ) : (
+            <>
+              <div className="space-y-0">
+                {deploys.map((d) => {
+                  const isActive = d.status === "running" || d.status === "deploying";
+                  return (
+                    <div
+                      key={d.id}
+                      onClick={() => void handleViewLogs(d)}
+                      className={`flex items-center gap-4 py-3 border-b border-stroke-default cursor-pointer hover:bg-surface-overlay/50 transition-colors ${
+                        isActive ? "bg-accent-amber/5" : ""
+                      }`}
+                    >
+                      <span className={isActive ? "animate-pulse" : ""}>
+                        <Badge variant={statusBadge[d.status] || "neutral"} dot>{d.status}</Badge>
+                      </span>
+                      <span className="flex-1 text-sm text-content-primary">
+                        {d.app} <span className="text-content-tertiary">on</span> {d.server}
+                      </span>
+                      <span className="text-xs text-content-tertiary font-mono">
+                        {d.commitAfter?.slice(0, 7) || "—"}
+                      </span>
+                      <span className="text-xs text-content-tertiary">
+                        {d.duration ? `${(d.duration / 1000).toFixed(1)}s` : "—"}
+                      </span>
+                      <span className="text-xs text-content-tertiary">
+                        {new Date(d.createdAt).toLocaleString()}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+              {deployTotal > deploysPerPage && (
+                <div className="flex items-center justify-between pt-4">
+                  <span className="text-xs text-content-tertiary">
+                    {deployPage * deploysPerPage + 1}-{Math.min((deployPage + 1) * deploysPerPage, deployTotal)} of {deployTotal}
+                  </span>
+                  <div className="flex gap-1">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      disabled={deployPage === 0}
+                      onClick={() => setDeployPage((p) => p - 1)}
+                    >
+                      Previous
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      disabled={(deployPage + 1) * deploysPerPage >= deployTotal}
+                      onClick={() => setDeployPage((p) => p + 1)}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
-
-        {deploys.length === 0 ? (
-          <p className="text-content-secondary text-sm">
-            {serverFilter || appFilter || statusFilter ? "No matching deploys" : "No deploys yet"}
-          </p>
-        ) : (
-          <>
-            <div className="space-y-0">
-              {deploys.map((d) => {
-                const isActive = d.status === "running" || d.status === "deploying";
-                return (
-                  <div
-                    key={d.id}
-                    onClick={() => void handleViewLogs(d)}
-                    className={`flex items-center gap-4 py-3 border-b border-stroke-default cursor-pointer hover:bg-surface-tertiary/50 transition-colors ${
-                      isActive ? "bg-accent-amber/5" : ""
-                    }`}
-                  >
-                    <span className={isActive ? "animate-pulse" : ""}>
-                      <Badge variant={statusBadge[d.status] || "neutral"} dot>{d.status}</Badge>
-                    </span>
-                    <span className="flex-1 text-sm text-content-primary">
-                      {d.app} <span className="text-content-tertiary">on</span> {d.server}
-                    </span>
-                    <span className="text-xs text-content-tertiary font-mono">
-                      {d.commitAfter?.slice(0, 7) || "—"}
-                    </span>
-                    <span className="text-xs text-content-tertiary">
-                      {d.duration ? `${(d.duration / 1000).toFixed(1)}s` : "—"}
-                    </span>
-                    <span className="text-xs text-content-tertiary">
-                      {new Date(d.createdAt).toLocaleString()}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-            {deployTotal > deploysPerPage && (
-              <div className="flex items-center justify-between pt-4">
-                <span className="text-xs text-content-tertiary">
-                  {deployPage * deploysPerPage + 1}–{Math.min((deployPage + 1) * deploysPerPage, deployTotal)} of {deployTotal}
-                </span>
-                <div className="flex gap-1">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    disabled={deployPage === 0}
-                    onClick={() => setDeployPage((p) => p - 1)}
-                  >
-                    Previous
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    disabled={(deployPage + 1) * deploysPerPage >= deployTotal}
-                    onClick={() => setDeployPage((p) => p + 1)}
-                  >
-                    Next
-                  </Button>
-                </div>
-              </div>
-            )}
-          </>
-        )}
-      </div>)}
+      )}
 
       <ConfirmModal
         open={!!deployTarget}
@@ -512,6 +549,7 @@ export default function DeploysPage() {
         loading={deleteServerSubmitting}
       />
 
+      {/* Add Server modal */}
       <Modal
         open={addServerOpen}
         onClose={() => {
@@ -519,24 +557,8 @@ export default function DeploysPage() {
           setAddServerOpen(false);
           resetAddServerForm();
         }}
+        title="Add Server"
       >
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-semibold text-content-primary">Add Server</h2>
-          <button
-            type="button"
-            onClick={() => {
-              if (addServerSubmitting) return;
-              setAddServerOpen(false);
-              resetAddServerForm();
-            }}
-            className="text-content-tertiary hover:text-content-primary p-1"
-            aria-label="Close"
-          >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
         <form onSubmit={handleAddServer} className="space-y-3">
           <Input
             label="Name"
@@ -575,12 +597,14 @@ export default function DeploysPage() {
             type="password"
             value={newServerRelayToken}
             onChange={(e) => setNewServerRelayToken(e.target.value)}
-            placeholder="••••••••"
+            placeholder="..."
             disabled={addServerSubmitting}
             autoComplete="new-password"
           />
           {addServerError && (
-            <p className="text-sm text-accent-red">{addServerError}</p>
+            <div>
+              <ErrorBanner message={addServerError} />
+            </div>
           )}
           <div className="flex gap-2 justify-end pt-1">
             <Button
@@ -601,24 +625,30 @@ export default function DeploysPage() {
         </form>
       </Modal>
 
-      <Modal open={!!logDeploy} onClose={() => setLogDeploy(null)}>
+      {/* Log viewer modal */}
+      <Modal
+        open={!!logDeploy}
+        onClose={() => setLogDeploy(null)}
+        title={logDeploy ? `${logDeploy.app} on ${logDeploy.server}` : "Deploy Log"}
+      >
         {logDeploy && (
           <>
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h2 className="text-sm font-semibold text-content-primary">
-                  {logDeploy.app} <span className="text-content-tertiary font-normal">on</span> {logDeploy.server}
-                </h2>
-                <div className="flex items-center gap-2 mt-1">
-                  <Badge variant={statusBadge[logDeploy.status] || "neutral"} dot>{logDeploy.status}</Badge>
-                  <span className="text-xs text-content-tertiary">{new Date(logDeploy.createdAt).toLocaleString()}</span>
-                </div>
-              </div>
-              <button onClick={() => setLogDeploy(null)} className="text-content-tertiary hover:text-content-primary p-1" aria-label="Close">
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
+            <div className="flex items-center gap-2 mb-4">
+              <Badge variant={statusBadge[logDeploy.status] || "neutral"} dot>{logDeploy.status}</Badge>
+              <span className="text-xs text-content-tertiary">{new Date(logDeploy.createdAt).toLocaleString()}</span>
+            </div>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs text-content-tertiary font-medium uppercase tracking-wider">Log output</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => void handleCopyLog()}
+                disabled={!logContent || logLoading}
+                className="gap-1 text-content-secondary"
+              >
+                <Icon name="copy" size={14} />
+                Copy
+              </Button>
             </div>
             <div className="bg-surface-primary border border-stroke-default rounded-button p-3 max-h-80 overflow-y-auto">
               {logLoading ? (
