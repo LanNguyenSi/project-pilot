@@ -3,13 +3,13 @@
 import { forwardRef, type ButtonHTMLAttributes, type AnchorHTMLAttributes } from "react";
 
 const base =
-  "inline-flex items-center justify-center gap-2 font-medium transition-colors duration-fast disabled:opacity-50 disabled:pointer-events-none";
+  "inline-flex items-center justify-center gap-2 font-medium transition-colors duration-fast disabled:opacity-50 disabled:pointer-events-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/60 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-primary";
 
 const variants = {
-  primary: "bg-accent-blue text-white hover:bg-accent-blue/90 rounded-button",
-  secondary: "border border-stroke-strong text-content-primary hover:bg-surface-tertiary rounded-button",
-  danger: "bg-accent-red text-white hover:bg-accent-red/90 rounded-button",
-  ghost: "text-content-secondary hover:text-content-primary hover:bg-surface-tertiary rounded-button",
+  primary:   "bg-brand-500 text-white hover:bg-brand-600 rounded-button shadow-sm",
+  secondary: "border border-stroke-strong text-content-primary hover:bg-surface-overlay rounded-button",
+  danger:    "bg-accent-red text-white hover:bg-accent-red/90 rounded-button",
+  ghost:     "text-content-secondary hover:text-content-primary hover:bg-surface-overlay rounded-button",
 } as const;
 
 const sizes = {

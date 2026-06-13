@@ -1,11 +1,13 @@
 import type { HTMLAttributes } from "react";
 
-const base = "bg-surface-secondary border border-stroke-default rounded-card";
+const base = "bg-surface-secondary border border-stroke-default rounded-card shadow-card";
 
 const variantStyles = {
   default: "",
   interactive:
-    "hover:border-stroke-strong hover:bg-surface-tertiary/50 cursor-pointer transition-colors duration-fast",
+    "hover:border-stroke-strong hover:shadow-elevated motion-safe:hover:-translate-y-px cursor-pointer transition-all duration-fast motion-reduce:transition-none",
+  elevated:
+    "shadow-elevated",
 } as const;
 
 interface CardProps extends HTMLAttributes<HTMLDivElement> {

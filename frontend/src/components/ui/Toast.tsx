@@ -12,7 +12,7 @@ import {
 
 export type { ToastVariant };
 
-// ── Types ───────────────────────────────────────────────────────────────────
+// ── Types ────────────────────────────────────────────────────────────────────
 
 type ToastVariant = "success" | "error" | "info";
 
@@ -32,7 +32,7 @@ interface ToastContextValue {
   toast: ToastFn;
 }
 
-// ── Context ─────────────────────────────────────────────────────────────────
+// ── Context ──────────────────────────────────────────────────────────────────
 
 const ToastContext = createContext<ToastContextValue | null>(null);
 
@@ -42,7 +42,7 @@ export function useToast(): ToastContextValue {
   return ctx;
 }
 
-// ── Provider ────────────────────────────────────────────────────────────────
+// ── Provider ─────────────────────────────────────────────────────────────────
 
 const MAX_TOASTS = 3;
 
@@ -80,21 +80,21 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   );
 }
 
-// ── Toast Card ──────────────────────────────────────────────────────────────
+// ── Toast Card ───────────────────────────────────────────────────────────────
 
 const icons: Record<ToastVariant, ReactNode> = {
   success: (
-    <svg className="h-5 w-5 text-accent-green shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <svg className="h-5 w-5 text-accent-green shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
     </svg>
   ),
   error: (
-    <svg className="h-5 w-5 text-accent-red shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <svg className="h-5 w-5 text-accent-red shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
     </svg>
   ),
   info: (
-    <svg className="h-5 w-5 text-accent-blue shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <svg className="h-5 w-5 text-accent-blue shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
       <circle cx="12" cy="12" r="10" />
       <path strokeLinecap="round" d="M12 16v-4M12 8h.01" />
     </svg>
@@ -103,8 +103,8 @@ const icons: Record<ToastVariant, ReactNode> = {
 
 const progressColor: Record<ToastVariant, string> = {
   success: "bg-accent-green",
-  error: "bg-accent-red",
-  info: "bg-accent-blue",
+  error:   "bg-accent-red",
+  info:    "bg-brand-500",
 };
 
 function ToastCard({ item, onDismiss }: { item: ToastItem; onDismiss: (id: number) => void }) {
@@ -129,7 +129,7 @@ function ToastCard({ item, onDismiss }: { item: ToastItem; onDismiss: (id: numbe
 
   return (
     <div
-      className={`pointer-events-auto bg-surface-elevated border border-stroke-strong rounded-card shadow-xl min-w-[320px] max-w-[420px] overflow-hidden transition-all duration-normal ${
+      className={`pointer-events-auto bg-surface-elevated border border-stroke-strong rounded-card shadow-elevated min-w-[320px] max-w-[420px] overflow-hidden transition-all duration-normal motion-reduce:transition-none ${
         exiting ? "opacity-0 translate-x-4" : "opacity-100 translate-x-0"
       }`}
     >
@@ -146,13 +146,13 @@ function ToastCard({ item, onDismiss }: { item: ToastItem; onDismiss: (id: numbe
           className="text-content-tertiary hover:text-content-primary shrink-0 transition-colors duration-fast"
           aria-label="Dismiss notification"
         >
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
       </div>
       {/* Progress bar */}
-      <div className="h-0.5 bg-surface-tertiary">
+      <div className="h-0.5 bg-surface-overlay">
         <div
           className={`h-full ${progressColor[item.variant]}`}
           style={{
