@@ -8,7 +8,7 @@ import { TopBar } from "./TopBar";
 const COLLAPSED_KEY = "sidebar-collapsed";
 
 // Routes that embed an external module via iframe and need the full viewport
-// width/height — the default max-w-6xl + px-6 py-6 wrapper letterboxes them.
+// width/height , the default max-w-6xl + px-6 py-6 wrapper letterboxes them.
 const FULL_BLEED_ROUTES = ["/security"];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -46,7 +46,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       <div className="min-w-0">
         <TopBar onMenuClick={() => setMobileOpen(true)} />
-        <main className={fullBleed ? "" : "max-w-6xl mx-auto px-6 py-6"}>
+        {/* key={pathname} remounts the element on each navigation, re-triggering
+            animate-fade-in. This gives a subtle page-transition entrance without
+            a full animation library. */}
+        <main
+          key={pathname}
+          className={`animate-fade-in${fullBleed ? "" : " max-w-6xl mx-auto px-6 py-6"}`}
+        >
           {children}
         </main>
       </div>

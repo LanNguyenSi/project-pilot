@@ -8,6 +8,7 @@ const labelMap: Record<string, string> = {
   forge: "Forge",
   tasks: "Tasks",
   deploys: "Deploys",
+  security: "Security",
   settings: "Settings",
   create: "Create",
 };
