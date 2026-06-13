@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { apiFetch } from "@/lib/api";
-import { Badge, Card, SkeletonBox } from "@/components/ui";
+import { Badge, Card, Icon, SkeletonBox } from "@/components/ui";
+import { PageHeader } from "@/components/layout/PageHeader";
 
 interface User {
   id: string;
@@ -124,21 +125,29 @@ export default function DashboardPage() {
   ];
 
   const quickActions = [
-    { label: "Create Project", href: "/forge/create", icon: <PlusIcon /> },
-    { label: "View Tasks", href: "/tasks", icon: <TaskIcon /> },
-    { label: "Deployments", href: "/deploys", icon: <RocketIcon /> },
+    { label: "Create Project", href: "/forge/create", icon: <Icon name="plus" size={20} /> },
+    { label: "View Tasks",     href: "/tasks",        icon: <Icon name="tasks" size={20} /> },
+    { label: "Deployments",    href: "/deploys",      icon: <Icon name="rocket" size={20} /> },
   ];
 
   return (
     <>
-      <p className="text-content-secondary text-sm mb-8">
-        {user ? `Welcome, ${user.name || user.email}` : "Welcome"}
-      </p>
+      {/* PageHeader replaces the ad-hoc welcome <p>. */}
+      <PageHeader
+        title="Dashboard"
+        description={user ? `Welcome, ${user.name || user.email}` : "Welcome"}
+      />
 
-      {/* Stat cards */}
+      {/* Stat cards with card-stagger entrance.
+          Card stagger pattern: each wrapper div carries --delay via inline style;
+          animate-fade-in reads animation-delay: var(--delay, 0ms). */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        {stats.map((s) => (
-          <StatCard key={s.label} stat={s} />
+        {stats.map((s, i) => (
+          <StatCard
+            key={s.label}
+            stat={s}
+            index={i}
+          />
         ))}
       </div>
 
@@ -171,7 +180,7 @@ export default function DashboardPage() {
                 <Badge variant="neutral">Not configured</Badge>
               )}
             </div>
-            <p className="text-xs text-content-tertiary mt-2">Scaffolding service — no live health check</p>
+            <p className="text-xs text-content-tertiary mt-2">Scaffolding service - no live health check</p>
           </Card>
         </div>
       </div>
@@ -206,57 +215,39 @@ interface StatItem {
 // bg-accent-blue/5 bg-accent-amber/5 bg-accent-green/5 bg-accent-purple/5
 // text-accent-blue text-accent-amber text-accent-green text-accent-purple
 const accentTint: Record<StatItem["accent"], { bg: string; dot: string }> = {
-  blue: { bg: "bg-accent-blue/5", dot: "text-accent-blue" },
-  amber: { bg: "bg-accent-amber/5", dot: "text-accent-amber" },
-  green: { bg: "bg-accent-green/5", dot: "text-accent-green" },
+  blue:   { bg: "bg-accent-blue/5",   dot: "text-accent-blue" },
+  amber:  { bg: "bg-accent-amber/5",  dot: "text-accent-amber" },
+  green:  { bg: "bg-accent-green/5",  dot: "text-accent-green" },
   purple: { bg: "bg-accent-purple/5", dot: "text-accent-purple" },
 };
 
-function StatCard({ stat: s }: { stat: StatItem }) {
+function StatCard({ stat: s, index }: { stat: StatItem; index: number }) {
   const tint = accentTint[s.accent];
   return (
-    <Card noPadding className={`p-5 ${tint.bg}`}>
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-label text-content-tertiary flex items-center gap-1.5">
-          <span className={`inline-block h-1.5 w-1.5 rounded-full ${tint.dot} bg-current`} />
-          {s.label}
-        </span>
-        {!s.configured ? (
-          <Badge variant="neutral">Not configured</Badge>
-        ) : s.error ? (
-          <Badge variant="error">Error</Badge>
-        ) : (
-          <Badge variant="success">Connected</Badge>
-        )}
-      </div>
-      <p className="text-2xl font-semibold text-content-primary mt-1">
-        {!s.configured ? "—" : s.value ?? "—"}
-      </p>
-      <p className="text-xs text-content-tertiary mt-1">{s.subtitle}</p>
-    </Card>
-  );
-}
-
-function PlusIcon() {
-  return (
-    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-    </svg>
-  );
-}
-
-function TaskIcon() {
-  return (
-    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-    </svg>
-  );
-}
-
-function RocketIcon() {
-  return (
-    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M15.59 14.37a6 6 0 01-5.84 7.38v-4.8m5.84-2.58a14.98 14.98 0 006.16-12.12A14.98 14.98 0 009.631 8.41m5.96 5.96a14.926 14.926 0 01-5.841 2.58m-.119-8.54a6 6 0 00-7.381 5.84h4.8m2.581-5.84a14.927 14.927 0 00-2.58 5.841m2.699 2.7c-.103.021-.207.041-.311.06a15.09 15.09 0 01-2.448-2.448 14.9 14.9 0 01.06-.312m-2.24 2.39a4.493 4.493 0 00-1.757 4.306 4.493 4.493 0 004.306-1.758M16.5 9a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z" />
-    </svg>
+    // animate-fade-in reads --delay via animation-delay: var(--delay, 0ms).
+    <div
+      className="animate-fade-in"
+      style={{ "--delay": `${index * 40}ms` } as React.CSSProperties}
+    >
+      <Card noPadding variant="elevated" className={`p-5 h-full ${tint.bg}`}>
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-label text-content-tertiary flex items-center gap-1.5">
+            <span className={`inline-block h-1.5 w-1.5 rounded-full ${tint.dot} bg-current`} />
+            {s.label}
+          </span>
+          {!s.configured ? (
+            <Badge variant="neutral">Not configured</Badge>
+          ) : s.error ? (
+            <Badge variant="error">Error</Badge>
+          ) : (
+            <Badge variant="success">Connected</Badge>
+          )}
+        </div>
+        <p className="text-2xl font-semibold text-content-primary mt-1">
+          {!s.configured ? "-" : s.value ?? "-"}
+        </p>
+        <p className="text-xs text-content-tertiary mt-1">{s.subtitle}</p>
+      </Card>
+    </div>
   );
 }
