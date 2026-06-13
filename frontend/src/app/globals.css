@@ -2,42 +2,128 @@
 @tailwind components;
 @tailwind utilities;
 
+/* =============================================================================
+   CSS Custom Properties - Refined Dark v1
+   All vars live on :root (dark-only scope, no light split in this release).
+   ============================================================================= */
+
 :root {
-  /* Surface */
-  --surface-primary: #0a0a0a;
-  --surface-secondary: #111827;
-  --surface-tertiary: #1f2937;
-  --surface-elevated: #374151;
+  /* Brand (custom violet-indigo - primary action + focus) */
+  --brand-50:  #ece9ff;
+  --brand-300: #b3a6ff;
+  --brand-400: #9a86ff;
+  --brand-500: #6e56f0;
+  --brand-600: #5b43d6;
+  --brand-700: #4a35b0;
 
-  /* Stroke */
-  --stroke-default: #1f2937;
-  --stroke-strong: #374151;
+  /* Surfaces - warm-neutral charcoal ladder (perceptibly distinct steps) */
+  --surface-base:    #0c0c0f;   /* app background */
+  --surface-raised:  #16161b;   /* cards */
+  --surface-overlay: #1f1f26;   /* hover / inputs / tertiary */
+  --surface-elevated:#292932;   /* modals, menus, popovers */
+  /* Legacy aliases - kept so bg-surface-primary etc. keep compiling */
+  --surface-primary:   #0c0c0f;
+  --surface-secondary: #16161b;
+  --surface-tertiary:  #1f1f26;
 
-  /* Content */
-  --content-primary: #ededed;
-  --content-secondary: #9ca3af;
-  --content-tertiary: #848b98;
+  /* Strokes - border must differ from hover background */
+  --stroke-subtle:  #232329;
+  --stroke-default: #2e2e37;
+  --stroke-strong:  #3b3b46;
 
-  /* Accent */
-  --accent-blue: #3b82f6;
-  --accent-green: #22c55e;
-  --accent-amber: #f59e0b;
-  --accent-red: #ef4444;
-  --accent-purple: #a855f7;
+  /* Content (text) */
+  --content-primary:   #f2f2f5;
+  --content-secondary: #a8a8b3;
+  --content-tertiary:  #71717f;
+
+  /* Semantic accents - status only (blue = info, NOT the CTA) */
+  --accent-blue:   #5b8cff;
+  --accent-green:  #34d399;
+  --accent-amber:  #fbbf24;
+  --accent-red:    #f87171;
+  --accent-purple: #c084fc;
+
+  /* Shadow scale */
+  --shadow-sm:       0 1px 2px rgba(0,0,0,.35);
+  --shadow-card:     0 2px 6px -2px rgba(0,0,0,.45), 0 6px 18px -6px rgba(0,0,0,.35);
+  --shadow-elevated: 0 12px 40px -12px rgba(0,0,0,.6);
+  --shadow-focus:    0 0 0 3px rgba(110,86,240,.22);
 }
+
+/* =============================================================================
+   Base styles
+   ============================================================================= */
 
 body {
   background: var(--surface-primary);
   color: var(--content-primary);
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family: var(--font-sans, system-ui, -apple-system, sans-serif);
+}
+
+/* =============================================================================
+   Motion keyframes (CSS-first, no animation library)
+
+   Usage:
+     animate-fade-in           - fade in + slide up 4px, 200ms ease-out
+     animate-modal-backdrop    - backdrop opacity 0->1, 150ms
+     animate-modal-panel       - panel scale(.98->1) + opacity, 150ms
+     animate-slide-in-right    - task detail panel enter, 200ms
+
+   Card stagger pattern:
+     Wrap grid in a parent, then on each child set:
+       style={{ '--delay': `${i * 40}ms` } as React.CSSProperties}
+     The child receives `animate-fade-in` which reads --delay automatically.
+
+   prefers-reduced-motion: all non-essential animations disabled.
+   ============================================================================= */
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes modal-backdrop {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes modal-panel {
+  from { opacity: 0; transform: scale(0.98); }
+  to   { opacity: 1; transform: scale(1); }
 }
 
 @keyframes slideInRight {
   from { transform: translateX(100%); }
-  to { transform: translateX(0); }
+  to   { transform: translateX(0); }
 }
 
 @keyframes toast-progress {
   from { width: 100%; }
-  to { width: 0%; }
+  to   { width: 0%; }
+}
+
+.animate-fade-in {
+  animation: fade-in 200ms ease-out both;
+  animation-delay: var(--delay, 0ms);
+}
+
+.animate-modal-backdrop {
+  animation: modal-backdrop 150ms ease-out both;
+}
+
+.animate-modal-panel {
+  animation: modal-panel 150ms ease-out both;
+}
+
+.animate-slide-in-right {
+  animation: slideInRight 200ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in,
+  .animate-modal-backdrop,
+  .animate-modal-panel,
+  .animate-slide-in-right {
+    animation: none;
+  }
 }

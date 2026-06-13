@@ -1,10 +1,10 @@
 const variantStyles = {
   success: "bg-accent-green/15 text-accent-green",
   warning: "bg-accent-amber/15 text-accent-amber",
-  error: "bg-accent-red/15 text-accent-red",
-  info: "bg-accent-blue/15 text-accent-blue",
-  purple: "bg-accent-purple/15 text-accent-purple",
-  neutral: "bg-surface-tertiary text-content-secondary",
+  error:   "bg-accent-red/15 text-accent-red",
+  info:    "bg-accent-blue/15 text-accent-blue",
+  purple:  "bg-accent-purple/15 text-accent-purple",
+  neutral: "bg-surface-overlay text-content-secondary",
 } as const;
 
 export type BadgeVariant = keyof typeof variantStyles;

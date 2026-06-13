@@ -9,5 +9,19 @@ export { Badge } from "./Badge";
 export type { BadgeVariant } from "./Badge";
 export { Card } from "./Card";
 export { ToastProvider, useToast } from "./Toast";
-export { SkeletonBox, SkeletonCard, SkeletonRow, SkeletonProjectCard, SkeletonPage, SkeletonDashboard, SkeletonTaskList } from "./Skeleton";
+export type { ToastVariant } from "./Toast";
+export {
+  SkeletonBox,
+  SkeletonCard,
+  SkeletonRow,
+  SkeletonProjectCard,
+  SkeletonPage,
+  SkeletonDashboard,
+  SkeletonTaskList,
+} from "./Skeleton";
 export { EmptyState } from "./EmptyState";
+export { ErrorBanner } from "./ErrorBanner";
+export { FilterBar, PillToggleGroup } from "./FilterBar";
+export { Icon } from "./icons";
+export type { IconName } from "./icons";
+export { useFocusTrap } from "./useFocusTrap";

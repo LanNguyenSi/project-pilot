@@ -9,7 +9,7 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
 }
 
 const inputBase =
-  "w-full bg-surface-primary border rounded-input px-3 h-9 text-sm text-content-primary placeholder:text-content-tertiary focus:outline-none focus:ring-2 transition-colors duration-fast";
+  "w-full bg-surface-overlay border rounded-input px-3 h-9 text-sm text-content-primary placeholder:text-content-tertiary focus:outline-none focus-visible:ring-2 transition-colors duration-fast";
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
   function Input({ label, hint, error, className = "", id, ...rest }, ref) {
@@ -18,13 +18,13 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     const descId = `${inputId}-desc`;
     const hasDesc = !!(error || hint);
     const borderCls = error
-      ? "border-accent-red focus:ring-accent-red/50 focus:border-accent-red"
-      : "border-stroke-strong focus:ring-accent-blue/50 focus:border-accent-blue";
+      ? "border-accent-red focus-visible:ring-accent-red/50 focus-visible:border-accent-red"
+      : "border-stroke-strong focus-visible:ring-brand-500/60 focus-visible:border-brand-500";
 
     return (
       <div>
         {label && (
-          <label htmlFor={inputId} className="block text-label text-content-tertiary mb-1">
+          <label htmlFor={inputId} className="block text-label text-content-secondary mb-1">
             {label}
           </label>
         )}
