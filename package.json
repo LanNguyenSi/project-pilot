@@ -14,6 +14,7 @@
     "concurrently": "^9.1.0"
   },
   "overrides": {
-    "postcss": "^8.5.10"
+    "postcss": "^8.5.10",
+    "shell-quote": "^1.8.4"
   }
 }
