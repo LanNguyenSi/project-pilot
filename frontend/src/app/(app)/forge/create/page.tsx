@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
-import { Button, Card, Input, Textarea, useToast } from "@/components/ui";
+import { Button, Card, ErrorBanner, Icon, Input, Textarea, useToast } from "@/components/ui";
+import { PageHeader } from "@/components/layout/PageHeader";
 
 interface Task {
   id: string;
@@ -147,6 +148,10 @@ export default function CreateProjectPage() {
 
   return (
     <>
+      <PageHeader
+        title="New Project"
+        description="Configure, preview, and publish a new scaffolded project."
+      />
 
       {/* Step indicator */}
       <div className="flex items-center gap-0 mb-8 max-w-md">
@@ -158,14 +163,12 @@ export default function CreateProjectPage() {
                   i < currentStep
                     ? "bg-accent-green text-white"
                     : i === currentStep
-                      ? "bg-accent-purple text-white"
-                      : "bg-surface-tertiary text-content-tertiary"
+                      ? "bg-brand-500 text-white"
+                      : "bg-surface-overlay text-content-tertiary"
                 }`}
               >
                 {i < currentStep ? (
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                  </svg>
+                  <Icon name="check" size={14} />
                 ) : (
                   i + 1
                 )}
@@ -175,16 +178,16 @@ export default function CreateProjectPage() {
               </span>
             </div>
             {i < steps.length - 1 && (
-              <div className={`flex-1 h-px mx-3 ${i < currentStep ? "bg-accent-green" : "bg-surface-tertiary"}`} />
+              <div className={`flex-1 h-px mx-3 ${i < currentStep ? "bg-accent-green" : "bg-surface-overlay"}`} />
             )}
           </div>
         ))}
       </div>
 
       {error && (
-        <Card className="border-accent-red/50 mb-6">
-          <p className="text-sm text-accent-red">{error}</p>
-        </Card>
+        <div className="mb-6 max-w-2xl">
+          <ErrorBanner message={error} />
+        </div>
       )}
 
       {/* Magic Fill (only when AI is configured on the forge side) */}
@@ -221,6 +224,19 @@ export default function CreateProjectPage() {
             >
               Fill Form
             </Button>
+          </div>
+        </Card>
+      )}
+
+      {/* Generating status feedback */}
+      {phase === "generating" && (
+        <Card className="p-4 max-w-2xl mb-4 border-brand-500/20">
+          <div className="flex items-center gap-3">
+            <div
+              className="h-5 w-5 rounded-full border-2 border-brand-500/30 border-t-brand-500 animate-spin shrink-0"
+              aria-hidden="true"
+            />
+            <span className="text-sm text-content-secondary">Generating project plan, this may take a moment...</span>
           </div>
         </Card>
       )}
@@ -285,8 +301,8 @@ export default function CreateProjectPage() {
             <div className="space-y-2">
               {preview.tasks.map((t) => (
                 <div key={t.id} className="flex items-center gap-3 text-sm">
-                  <span className="text-xs bg-surface-tertiary rounded-badge px-2 py-0.5 text-content-secondary">{t.wave}</span>
-                  <span className="text-xs bg-surface-tertiary rounded-badge px-2 py-0.5 text-content-secondary">{t.priority}</span>
+                  <span className="text-xs bg-surface-overlay rounded-badge px-2 py-0.5 text-content-secondary">{t.wave}</span>
+                  <span className="text-xs bg-surface-overlay rounded-badge px-2 py-0.5 text-content-secondary">{t.priority}</span>
                   <span className="text-content-primary">{t.title}</span>
                 </div>
               ))}
@@ -328,9 +344,7 @@ export default function CreateProjectPage() {
       {phase === "done" && (
         <Card className="border-accent-green/50 p-8 text-center max-w-lg mx-auto">
           <div className="text-accent-green mb-3">
-            <svg className="h-10 w-10 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
+            <Icon name="check-circle" size={40} className="mx-auto" />
           </div>
           <h2 className="text-section-title text-content-primary mb-1">Project Created</h2>
           <p className="text-content-secondary text-sm mb-6">{projectName}</p>
@@ -353,8 +367,18 @@ function FileTree({ nodes, depth = 0 }: { nodes: FileTreeNode[]; depth?: number 
     <>
       {nodes.map((node) => (
         <div key={node.path}>
-          <div style={{ paddingLeft: `${depth * 16}px` }}>
-            {node.type === "directory" ? `📁 ${node.name}/` : `  ${node.name}`}
+          <div
+            className="flex items-center gap-1"
+            style={{ paddingLeft: `${depth * 16}px` }}
+          >
+            {node.type === "directory" ? (
+              <>
+                <Icon name="folder" size={13} className="text-content-tertiary shrink-0" />
+                <span>{node.name}/</span>
+              </>
+            ) : (
+              <span className="pl-4">{node.name}</span>
+            )}
           </div>
           {node.children && <FileTree nodes={node.children} depth={depth + 1} />}
         </div>

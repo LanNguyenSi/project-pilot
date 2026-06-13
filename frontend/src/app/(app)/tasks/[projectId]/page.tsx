@@ -3,9 +3,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
-import { Badge, Button, Card, EmptyState, SkeletonRow } from "@/components/ui";
-import type { BadgeVariant } from "@/components/ui";
+import { Badge, Button, Card, EmptyState, ErrorBanner, Icon, Select, SkeletonRow } from "@/components/ui";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { TaskDetailPanel } from "@/components/TaskDetailPanel";
+import { statusMap, priorityMap, priorityBar, PRIORITY_ORDER } from "@/lib/task-constants";
 
 interface Task {
   id: string;
@@ -24,27 +25,6 @@ interface Project {
   description: string;
 }
 
-const statusMap: Record<string, { label: string; variant: BadgeVariant }> = {
-  open: { label: "Open", variant: "info" },
-  in_progress: { label: "In Progress", variant: "warning" },
-  review: { label: "Review", variant: "purple" },
-  done: { label: "Done", variant: "success" },
-};
-
-const priorityBar: Record<string, string> = {
-  CRITICAL: "bg-accent-red",
-  HIGH: "bg-accent-amber",
-  MEDIUM: "bg-accent-blue",
-  LOW: "bg-surface-tertiary",
-};
-
-const priorityLabel: Record<string, string> = {
-  CRITICAL: "Critical",
-  HIGH: "High",
-  MEDIUM: "Medium",
-  LOW: "Low",
-};
-
 type StatusFilter = "all" | "open" | "in_progress" | "review" | "done";
 type ViewMode = "list" | "board";
 type SortField = "createdAt" | "priority" | "title";
@@ -52,8 +32,16 @@ type SortDir = "asc" | "desc";
 
 const STATUSES: StatusFilter[] = ["open", "in_progress", "review", "done"];
 const VIEW_KEY = "project-pilot:task-view";
-const PRIORITY_ORDER: Record<string, number> = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
 const TASKS_PER_PAGE = 20;
+
+const SORT_OPTIONS = [
+  { value: "createdAt-desc", label: "Newest first" },
+  { value: "createdAt-asc",  label: "Oldest first" },
+  { value: "priority-asc",   label: "Priority: High to Low" },
+  { value: "priority-desc",  label: "Priority: Low to High" },
+  { value: "title-asc",      label: "Title: A to Z" },
+  { value: "title-desc",     label: "Title: Z to A" },
+];
 
 export default function ProjectTasksPage() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -115,7 +103,7 @@ export default function ProjectTasksPage() {
   const totalPages = Math.ceil(sorted.length / TASKS_PER_PAGE);
   const paginated = useMemo(() => sorted.slice(page * TASKS_PER_PAGE, (page + 1) * TASKS_PER_PAGE), [sorted, page]);
 
-  const filters: { key: StatusFilter; label: string }[] = [
+  const statusFilters: { key: StatusFilter; label: string }[] = [
     { key: "all", label: "All" },
     { key: "open", label: "Open" },
     { key: "in_progress", label: "In Progress" },
@@ -125,17 +113,21 @@ export default function ProjectTasksPage() {
 
   return (
     <>
-      <div className="flex items-center justify-between mb-6">
-        {project?.description && (
-          <p className="text-sm text-content-secondary">{project.description}</p>
-        )}
-        <Button href={`/tasks/${projectId}/create`}>Create Task</Button>
-      </div>
+      <PageHeader
+        title={project?.name ?? "Project"}
+        description={project?.description || undefined}
+        actions={
+          <Button href={`/tasks/${projectId}/create`}>
+            <Icon name="plus" size={16} className="mr-1" />
+            Create Task
+          </Button>
+        }
+      />
 
       {error && (
-        <Card className="border-accent-red/50 mb-6">
-          <p className="text-sm text-accent-red">{error}</p>
-        </Card>
+        <div className="mb-6">
+          <ErrorBanner message={error} />
+        </div>
       )}
 
       {/* Filter bar + View toggle */}
@@ -144,15 +136,15 @@ export default function ProjectTasksPage() {
           {view === "list" ? (
             <div className="flex items-center gap-3">
               <div className="flex gap-1" role="toolbar" aria-label="Filter by status">
-                {filters.map((f) => (
+                {statusFilters.map((f) => (
                   <button
                     key={f.key}
                     aria-pressed={filter === f.key}
                     onClick={() => { setFilter(f.key); setPage(0); }}
                     className={`px-3 py-1.5 text-xs font-medium rounded-button transition-colors duration-fast ${
                       filter === f.key
-                        ? "bg-accent-blue/10 text-accent-blue"
-                        : "text-content-tertiary hover:text-content-primary hover:bg-surface-tertiary"
+                        ? "bg-brand-500/10 text-brand-300"
+                        : "text-content-tertiary hover:text-content-primary hover:bg-surface-overlay"
                     }`}
                   >
                     {f.label}
@@ -164,23 +156,19 @@ export default function ProjectTasksPage() {
                   </button>
                 ))}
               </div>
-              <select
+              <Select
                 value={`${sortBy}-${sortDir}`}
-                onChange={(e) => {
-                  const [field, dir] = e.target.value.split("-") as [SortField, SortDir];
+                onChange={(v) => {
+                  const dashIdx = v.lastIndexOf("-");
+                  const field = v.slice(0, dashIdx) as SortField;
+                  const dir = v.slice(dashIdx + 1) as SortDir;
                   setSortBy(field);
                   setSortDir(dir);
                   setPage(0);
                 }}
-                className="px-2.5 py-1.5 text-xs rounded-button border border-stroke-default bg-surface-primary text-content-primary"
-              >
-                <option value="createdAt-desc">Newest first</option>
-                <option value="createdAt-asc">Oldest first</option>
-                <option value="priority-asc">Priority: High → Low</option>
-                <option value="priority-desc">Priority: Low → High</option>
-                <option value="title-asc">Title: A → Z</option>
-                <option value="title-desc">Title: Z → A</option>
-              </select>
+                options={SORT_OPTIONS}
+                className="w-44"
+              />
             </div>
           ) : (
             <div />
@@ -188,14 +176,14 @@ export default function ProjectTasksPage() {
           <div className="flex gap-1 border border-stroke-default rounded-button p-0.5">
             <button
               onClick={() => { setView("list"); localStorage.setItem(VIEW_KEY, "list"); }}
-              className={`px-2.5 py-1 text-xs font-medium rounded-button transition-colors ${view === "list" ? "bg-surface-tertiary text-content-primary" : "text-content-tertiary hover:text-content-primary"}`}
+              className={`px-2.5 py-1 text-xs font-medium rounded-button transition-colors ${view === "list" ? "bg-surface-overlay text-content-primary" : "text-content-tertiary hover:text-content-primary"}`}
               aria-label="List view"
             >
               List
             </button>
             <button
               onClick={() => { setView("board"); setFilter("all"); localStorage.setItem(VIEW_KEY, "board"); }}
-              className={`px-2.5 py-1 text-xs font-medium rounded-button transition-colors ${view === "board" ? "bg-surface-tertiary text-content-primary" : "text-content-tertiary hover:text-content-primary"}`}
+              className={`px-2.5 py-1 text-xs font-medium rounded-button transition-colors ${view === "board" ? "bg-surface-overlay text-content-primary" : "text-content-tertiary hover:text-content-primary"}`}
               aria-label="Board view"
             >
               Board
@@ -214,7 +202,7 @@ export default function ProjectTasksPage() {
         </div>
       ) : tasks.length === 0 ? (
         <EmptyState
-          icon={<CheckCircleIcon />}
+          icon={<Icon name="check-circle" size={48} />}
           title="No tasks yet"
           description="Create your first task to start tracking work for this project."
           actionLabel="Create Task"
@@ -234,7 +222,7 @@ export default function ProjectTasksPage() {
                 </div>
                 <div className="space-y-2">
                   {colTasks.map((t) => {
-                    const barColor = priorityBar[t.priority] || "bg-surface-tertiary";
+                    const barColor = priorityBar[t.priority] || "bg-surface-overlay";
                     return (
                       <Card
                         key={t.id}
@@ -247,7 +235,7 @@ export default function ProjectTasksPage() {
                           <div className="p-3 min-w-0 flex-1">
                             <p className="text-sm font-medium text-content-primary truncate mb-1">{t.title}</p>
                             <div className="flex items-center gap-2 text-xs text-content-tertiary">
-                              <span>{priorityLabel[t.priority] || t.priority}</span>
+                              <span>{priorityMap[t.priority]?.label || t.priority}</span>
                               <span className="truncate">{t.claimedByAgent?.name || t.claimedByUser?.email || "—"}</span>
                             </div>
                           </div>
@@ -273,7 +261,7 @@ export default function ProjectTasksPage() {
           <div className="space-y-2">
             {paginated.map((t) => {
               const status = statusMap[t.status] || { label: t.status, variant: "neutral" as const };
-              const barColor = priorityBar[t.priority] || "bg-surface-tertiary";
+              const barColor = priorityBar[t.priority] || "bg-surface-overlay";
               return (
                 <Card key={t.id} noPadding className="overflow-hidden cursor-pointer hover:border-stroke-strong transition-colors" onClick={() => setSelectedTaskId(t.id)}>
                   <div className="flex">
@@ -284,7 +272,7 @@ export default function ProjectTasksPage() {
                           <span className="text-sm font-medium text-content-primary truncate">{t.title}</span>
                         </div>
                         <div className="flex items-center gap-3 text-xs text-content-tertiary">
-                          <span>{priorityLabel[t.priority] || t.priority}</span>
+                          <span>{priorityMap[t.priority]?.label || t.priority}</span>
                           <span>{t.claimedByAgent?.name || t.claimedByUser?.email || "Unassigned"}</span>
                           <span>{new Date(t.createdAt).toLocaleDateString()}</span>
                         </div>
@@ -299,7 +287,7 @@ export default function ProjectTasksPage() {
           {totalPages > 1 && (
             <div className="flex items-center justify-between pt-4">
               <span className="text-xs text-content-tertiary">
-                {page * TASKS_PER_PAGE + 1}–{Math.min((page + 1) * TASKS_PER_PAGE, sorted.length)} of {sorted.length}
+                {page * TASKS_PER_PAGE + 1}-{Math.min((page + 1) * TASKS_PER_PAGE, sorted.length)} of {sorted.length}
               </span>
               <div className="flex gap-1">
                 <Button
@@ -332,13 +320,5 @@ export default function ProjectTasksPage() {
         />
       )}
     </>
-  );
-}
-
-function CheckCircleIcon() {
-  return (
-    <svg className="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-    </svg>
   );
 }
