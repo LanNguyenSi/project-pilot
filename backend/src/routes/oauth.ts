@@ -148,18 +148,38 @@ oauth.get("/github/callback", async (c) => {
     }
   }
 
+  // Resolve a safe email for the write. The collision block above only guards
+  // the create path (!user). When an existing githubId row is matched, writing
+  // a verified email that ANOTHER row already owns would violate the `email`
+  // @unique constraint and surface as a raw 500. Keep the matched row's current
+  // email in that case rather than hijacking the other account or erroring.
+  let resolvedEmail = email ?? user?.email ?? null;
+  if (resolvedEmail && user && resolvedEmail !== user.email) {
+    const emailOwner = await prisma.user.findUnique({ where: { email: resolvedEmail } });
+    if (emailOwner && emailOwner.id !== user.id) {
+      resolvedEmail = user.email ?? null;
+    }
+  }
+
   const userData = {
     githubId,
     githubLogin: githubUser.login,
     avatarUrl: githubUser.avatar_url,
     name: githubUser.name ?? user?.name ?? null,
-    email: email ?? user?.email ?? null,
+    email: resolvedEmail,
   };
 
-  if (user) {
-    user = await prisma.user.update({ where: { id: user.id }, data: userData });
-  } else {
-    user = await prisma.user.create({ data: userData });
+  try {
+    if (user) {
+      user = await prisma.user.update({ where: { id: user.id }, data: userData });
+    } else {
+      user = await prisma.user.create({ data: userData });
+    }
+  } catch (err) {
+    // Defense in depth: never let a DB error (e.g. an unforeseen unique
+    // collision) surface as a raw 500 from the OAuth callback.
+    console.error("OAuth user upsert failed:", err);
+    return c.redirect(`${config.FRONTEND_URL}/auth/error?reason=server_error`);
   }
 
   // Kick off module registration in parallel. We do NOT block on full success
@@ -183,7 +203,13 @@ oauth.get("/github/callback", async (c) => {
     console.error("module registration orchestrator threw:", (err as Error).message);
   }
 
-  const sessionToken = await createSession(user.id);
+  let sessionToken: string;
+  try {
+    sessionToken = await createSession(user.id);
+  } catch (err) {
+    console.error("OAuth session create failed:", err);
+    return c.redirect(`${config.FRONTEND_URL}/auth/error?reason=server_error`);
+  }
   // SameSite=Lax on the OAuth-issued session cookie so the browser sends it
   // on the top-level navigation back to the frontend after this callback's
   // 302 redirect. The email/password flow uses Strict because it's entirely

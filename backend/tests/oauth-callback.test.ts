@@ -167,6 +167,83 @@ describe("GET /oauth/github/callback", () => {
     expect(mockUser.create).not.toHaveBeenCalled();
   });
 
+  it("does not 500 when a githubId-matched user's verified email is owned by another row", async () => {
+    // Regression: an existing githubId row is matched, but the now-verified
+    // GitHub email belongs to a DIFFERENT account. The email must NOT be
+    // overwritten (that would violate the unique constraint and 500); login
+    // still succeeds on the matched row with its email left unchanged.
+    mockExchange.mockResolvedValue({ access_token: "gh-tok", token_type: "bearer", scope: "repo" });
+    mockFetchUser.mockResolvedValue({
+      id: 17721800,
+      login: "LanNguyenSi",
+      name: "Lan",
+      avatar_url: "https://gh/u",
+      email: "victim@example.com",
+    });
+    mockFetchEmail.mockResolvedValue("victim@example.com");
+    mockUser.findUnique
+      // 1) githubId lookup hits the matched row (email currently null).
+      .mockResolvedValueOnce({ id: "github-user", githubId: "17721800", email: null, passwordHash: null })
+      // 2) the new guard looks up the email owner: a DIFFERENT row owns it.
+      .mockResolvedValueOnce({ id: "local-owner", email: "victim@example.com", passwordHash: "h", githubId: null });
+    mockUser.update.mockResolvedValue({ id: "github-user", githubId: "17721800" });
+
+    const res = await callback("/github/callback?code=abc&state=xyz", "oauth_state=xyz");
+
+    expect(res.status).toBe(302);
+    expect(res.headers.get("Location")).toBe("http://localhost:3000/dashboard");
+    expect(mockUser.update).toHaveBeenCalledTimes(1);
+    // The colliding email was NOT written onto the matched row.
+    expect(mockUser.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ email: null }) }),
+    );
+  });
+
+  it("redirects to error instead of 500 when the user upsert throws", async () => {
+    mockExchange.mockResolvedValue({ access_token: "gh-tok", token_type: "bearer", scope: "repo" });
+    mockFetchUser.mockResolvedValue({
+      id: 42,
+      login: "fresh",
+      name: "Fresh",
+      avatar_url: "",
+      email: "same@x.com",
+    });
+    mockFetchEmail.mockResolvedValue("same@x.com");
+    // githubId match whose email already equals the verified one (guard skipped).
+    mockUser.findUnique.mockResolvedValueOnce({ id: "u1", githubId: "42", email: "same@x.com", passwordHash: null });
+    mockUser.update.mockRejectedValue(new Error("unexpected unique constraint"));
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const res = await callback("/github/callback?code=abc&state=xyz", "oauth_state=xyz");
+
+    expect(res.status).toBe(302);
+    expect(res.headers.get("Location")).toContain("/auth/error?reason=server_error");
+    // The failure must be logged, not silently swallowed.
+    expect(errSpy).toHaveBeenCalledWith("OAuth user upsert failed:", expect.any(Error));
+    errSpy.mockRestore();
+  });
+
+  it("persists a legitimately changed verified email for a returning github user", async () => {
+    // Case (c): githubId match, verified email changed to a FREE email -> write it.
+    mockExchange.mockResolvedValue({ access_token: "gh-tok", token_type: "bearer", scope: "repo" });
+    mockFetchUser.mockResolvedValue({ id: 7, login: "ret", name: "Ret", avatar_url: "", email: "new@x.com" });
+    mockFetchEmail.mockResolvedValue("new@x.com");
+    mockUser.findUnique
+      // 1) githubId match carrying an OLD email.
+      .mockResolvedValueOnce({ id: "u7", githubId: "7", email: "old@x.com", passwordHash: null })
+      // 2) guard email-owner lookup: the new email is unowned.
+      .mockResolvedValueOnce(null);
+    mockUser.update.mockResolvedValue({ id: "u7", githubId: "7" });
+
+    const res = await callback("/github/callback?code=abc&state=xyz", "oauth_state=xyz");
+
+    expect(res.status).toBe(302);
+    expect(res.headers.get("Location")).toBe("http://localhost:3000/dashboard");
+    expect(mockUser.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ email: "new@x.com" }) }),
+    );
+  });
+
   it("creates a new user and signs them in on a clean first-login", async () => {
     mockExchange.mockResolvedValue({
       access_token: "gh-tok",
