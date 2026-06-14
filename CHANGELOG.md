@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.3.0] - 2026-06-14
+
+**Headline: the Refined-Dark design system.** The control plane moves onto a new dark-only design foundation and every surface is lifted onto it, plus an OAuth login fix and two dependency security pins. The app is versioned at the repo root and deployed from `main`, so this tag is deploy provenance.
+
+### Added
+
+- **Refined-Dark design foundation** (#86): design tokens, fonts, motion, and UI primitives for the new dark-only system, with a `/styleguide` reference surface.
+- **Shell, navigation, auth, and dashboard on the new system** (#87).
+- **Feature surfaces lifted onto the new system** (#88).
+
+### Fixed
+
+- **GitHub OAuth login no longer 500s on an email collision** (#89). A login whose `githubId` matched an existing account but whose email collided with another row crashed the callback with a 500 on the githubId-update path; that path now handles the email-unique collision.
+
+### Security
+
+- **Pin `shell-quote` to `^1.8.4`** (#90, CVE-2026-9277, critical).
+- **Force `esbuild >= 0.28.1`** (#91; GHSA-gv7w-rqvm-qjhr, GHSA-g7r4-m6w7-qqqr).
+
 ## [0.2.1] - 2026-06-09
 
 Security release closing the 2026-05-30 audit findings and a CVE sweep. The headline is a HIGH-severity GitHub OAuth account-takeover. No feature changes; the app is versioned at the repo root and deployed from `main`, so this tag is deploy provenance.
