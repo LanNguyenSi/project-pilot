@@ -57,7 +57,7 @@ Task management for human-agent collaboration. Browse projects, claim tasks, tra
 
 ### Deploy, deploy-panel
 
-VPS deployment management. List servers and apps, trigger deploys, watch status, run preflight checks, roll back, and filter history by server / app / status / date range from `/deploys`.
+VPS deployment management. List servers and apps, trigger deploys, watch status, run preflight checks, roll back, and filter history by server / app / status from `/deploys`.
 
 ## MCP server
 
@@ -79,6 +79,8 @@ The MCP server exposes 18 tools (forge, tasks, deploy, plus `dashboard_summary`)
 }
 ```
 
+The snippet above runs the server from source with `tsx`. Alternatively, run `npm run build` in `mcp/` and point the client at the compiled `project-pilot-mcp` bin (`mcp/dist/index.js`).
+
 Full tool list and env reference: [docs/architecture.md](docs/architecture.md#mcp-surface).
 
 ## Key features
@@ -86,7 +88,7 @@ Full tool list and env reference: [docs/architecture.md](docs/architecture.md#mc
 - Unified dark-mode dashboard with aggregated stats from all services
 - Encrypted service credential storage with **Test Connection** validation
 - Pagination and search on tasks, deploys, and projects
-- Deploy history filters (by server, app, status, date range)
+- Deploy history filters (by server, app, status)
 - Password reset flow (forgot password / reset with token)
 - Error boundaries for graceful failure handling
 - Zod input validation on all API endpoints

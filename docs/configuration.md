@@ -50,7 +50,7 @@ The auth surface ships a forgot-password / reset-with-token flow via:
 - `POST /api/auth/forgot-password` issues a reset token.
 - `POST /api/auth/reset-password` consumes the token to set a new password.
 
-Email delivery for the reset link is on the roadmap, not yet wired. In the meantime the token is returned for operator-driven recovery.
+Email delivery for the reset link is on the roadmap, not yet wired. In the meantime the reset token is stored hashed in the database (`passwordReset` table) and is never returned in the API response (`POST /api/auth/forgot-password` always responds with `{ "ok": true }`); operator recovery requires reading the token directly from the DB.
 
 ## Security headers
 

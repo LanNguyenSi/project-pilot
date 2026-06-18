@@ -64,7 +64,7 @@ Security release closing the 2026-05-30 audit findings and a CVE sweep. The head
 - `/forge`, `/tasks`, `/deploys`: list, search, and act on resources from each upstream service without leaving project-pilot.
 - `/settings`: paste service credentials (`pf_...` Forge keys, agent-tasks Bearer tokens, `dp_...` Deploy keys), validate via **Test Connection**, store encrypted server-side.
 - Pagination and search on tasks, deploys, and projects.
-- Deploy history filters: by server, app, status, date range.
+- Deploy history filters: by server, app, status.
 - Error boundaries for graceful failure handling.
 
 #### Backend (`backend`, Hono + Prisma + Postgres)

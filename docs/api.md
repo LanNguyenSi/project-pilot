@@ -27,20 +27,30 @@ Both routes return `503` unless `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` ar
 
 ## Dashboard
 
-- `GET /api/dashboard/summary` aggregated stats from all three services
+- `GET /api/dashboard/summary` aggregated service stats
+
+Project and open-task counts come from agent-tasks; server, online-server, and app counts come from deploy-panel. project-forge contributes only a `configured` flag (no live count or health check).
 
 ## Forge proxy (project-forge)
 
-- `GET  /api/forge/projects` list created projects
-- `POST /api/forge/generate` generate preview
-- `GET  /api/forge/preview?sessionId=` get preview data
-- `POST /api/forge/publish` publish to GitHub
+- `GET    /api/forge/projects` list created projects
+- `DELETE /api/forge/projects/:id` delete a created project
+- `POST   /api/forge/generate` generate preview
+- `GET    /api/forge/preview?sessionId=` get preview data
+- `POST   /api/forge/publish` publish to GitHub
+- `POST   /api/forge/migrate-tasks` migrate a generated project's tasks into an agent-tasks team
+- `GET    /api/forge/ai-assist/capabilities` AI magic-fill availability (provider, model, features)
+- `POST   /api/forge/ai-assist/magic-fill` AI-assisted project form fill from a prompt
 
 ## Tasks proxy (agent-tasks)
 
 - `GET  /api/tasks/projects` list projects
+- `POST /api/tasks/projects` create a project in a team
 - `GET  /api/tasks/projects/:id/tasks` list tasks
+- `POST /api/tasks/projects/:projectId/tasks` create a task in a project
 - `GET  /api/tasks/claimable` open tasks
+- `GET  /api/tasks/teams` list teams
+- `POST /api/tasks/teams/:teamId/sync` sync the user's GitHub repos into a team
 - `GET  /api/tasks/:id` task details
 - `GET  /api/tasks/:id/instructions` agent instructions
 - `POST /api/tasks/:id/transition` change status
@@ -49,14 +59,16 @@ Both routes return `503` unless `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` ar
 
 ## Deploy proxy (deploy-panel)
 
-- `GET  /api/deploy/servers` list servers
-- `GET  /api/deploy/apps` list apps
-- `POST /api/deploy/trigger` deploy app
-- `GET  /api/deploy/status/:id` deploy status
-- `GET  /api/deploy/history` deploy history (filterable by server, app, status, date range)
-- `POST /api/deploy/rollback` rollback
-- `POST /api/deploy/preflight` preflight checks
-- `GET  /api/deploy/logs` app logs
+- `GET    /api/deploy/servers` list servers
+- `POST   /api/deploy/servers` add a server
+- `DELETE /api/deploy/servers/:id` remove a server
+- `GET    /api/deploy/apps` list apps
+- `POST   /api/deploy/trigger` deploy app
+- `GET    /api/deploy/status/:id` deploy status
+- `GET    /api/deploy/history` deploy history (filterable by server, app, status)
+- `POST   /api/deploy/rollback` rollback
+- `POST   /api/deploy/preflight` preflight checks
+- `GET    /api/deploy/logs` app logs
 
 ## Health
 
