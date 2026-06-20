@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, useId } from "react";
+import { createPortal } from "react-dom";
 import { apiFetch } from "@/lib/api";
 import { Badge, Card, ErrorBanner, Icon, SkeletonBox, useFocusTrap } from "@/components/ui";
 import { statusMap, priorityMap } from "@/lib/task-constants";
@@ -73,8 +74,16 @@ export function TaskDetailPanel({ taskId, open, onClose }: TaskDetailPanelProps)
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // Migrate focus trap from inline handleKey + useEffects to the shared hook
-  useFocusTrap(panelRef, open, onClose);
+  // Portal to document.body so the drawer's `fixed inset-0` is viewport-relative
+  // rather than scoped to AppShell's <main>, which keeps a persistent transform from
+  // animate-fade-in (fill-mode: both). Inline, that transform trapped the overlay in
+  // <main>'s box: the backdrop did not cover the sidebar and the panel could not
+  // scroll to the bottom. The mounted flag keeps server + first client render null
+  // (no hydration mismatch, no document.body access during prerender).
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
+  useFocusTrap(panelRef, open && mounted, onClose);
 
   useEffect(() => {
     if (!open || !taskId) return;
@@ -94,16 +103,19 @@ export function TaskDetailPanel({ taskId, open, onClose }: TaskDetailPanelProps)
       .finally(() => setLoading(false));
   }, [open, taskId]);
 
-  if (!open) return null;
+  if (!open || !mounted) return null;
 
   const status = task ? statusMap[task.status] || { label: task.status, variant: "neutral" as const } : null;
   const priority = task ? priorityMap[task.priority] || { label: task.priority, color: "text-content-secondary" } : null;
   const confidence = instructions?.confidence;
   const assignee = task?.claimedByAgent?.name || task?.claimedByUser?.login || task?.claimedByUser?.name || null;
 
-  return (
+  return createPortal(
     <div role="dialog" aria-modal="true" aria-labelledby={titleId} className="fixed inset-0 z-50 flex justify-end">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      {/* The panel (not the dialog) is the scroll region: the portaled dialog is
+          exactly viewport-sized, so the panel fills the viewport height and scrolls
+          its own content. Do not move overflow to the dialog as Modal does. */}
       <div
         ref={panelRef}
         className="relative bg-surface-secondary border-l border-stroke-default shadow-elevated w-full max-w-xl overflow-y-auto animate-slide-in-right"
@@ -284,6 +296,7 @@ export function TaskDetailPanel({ taskId, open, onClose }: TaskDetailPanelProps)
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

@@ -9,8 +9,7 @@ const FOCUSABLE_SELECTOR =
  * Traps Tab focus inside `containerRef` and closes on Escape.
  *
  * Extracted from Modal.tsx and TaskDetailPanel.tsx (both had identical logic).
- * Modal now imports this hook; TaskDetailPanel keeps its inline copy for PR1
- * to avoid scope creep - PR3 can migrate it.
+ * Both now import this hook.
  *
  * @param containerRef  Ref to the panel/dialog element
  * @param active        Whether the trap is active (open state)
