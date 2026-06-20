@@ -34,6 +34,30 @@ const installRelayBodySchema = z
     sshPassword: z.string().min(1).optional(),
     sshPrivateKey: z.string().min(1).optional(),
     sshPassphrase: z.string().min(1).optional(),
+    // Optional: base64 SHA-256 host-key fingerprint captured by the pre-install
+    // probe. When provided, the install verifies the host key matches this value
+    // before executing — closing the blind TOFU window between probe and install.
+    // Must be raw base64 (no "SHA256:" prefix); SHA-256 always encodes to exactly
+    // 44 chars (43 base64 chars + 1 padding "=").
+    expectedHostKeySha256: z.string().length(44).regex(/^[A-Za-z0-9+/]{43}=$/).optional(),
+  })
+  .refine(
+    (v) => Boolean(v.sshPassword) !== Boolean(v.sshPrivateKey),
+    { message: "Provide exactly one of sshPassword or sshPrivateKey" },
+  );
+
+// Pre-install probe schema. Like install-relay, exactly one of sshPassword /
+// sshPrivateKey is required (XOR). No `name` field — the probe does not create
+// a server row. SSH credentials live only in the parsed-body variable for the
+// duration of this handler and are NEVER persisted, logged, or echoed in errors.
+const probeVpsBodySchema = z
+  .object({
+    host: z.string().min(1).max(255),
+    sshUser: z.string().min(1).max(64).default("root"),
+    sshPort: z.number().int().min(1).max(65535).default(22),
+    sshPassword: z.string().min(1).optional(),
+    sshPrivateKey: z.string().min(1).optional(),
+    sshPassphrase: z.string().min(1).optional(),
   })
   .refine(
     (v) => Boolean(v.sshPassword) !== Boolean(v.sshPrivateKey),
@@ -58,21 +82,23 @@ deploy.use("*", requireAuth);
 
 const DEPLOY_URL = config.DEPLOY_PANEL_URL;
 
-async function deployRequest<T>(userId: string, path: string, options?: RequestInit): Promise<{ ok: true; data: T } | { ok: false; error: string; status: number }> {
+async function deployRequest<T>(userId: string, path: string, options?: RequestInit & { timeoutMs?: number }): Promise<{ ok: true; data: T } | { ok: false; error: string; status: number }> {
   const token = await getCredential(userId, "deploy-panel");
   if (!token) {
     return { ok: false, error: "Deploy Panel not configured. Add your API key in Settings.", status: 400 };
   }
 
+  const { timeoutMs = 15_000, ...fetchOptions } = options ?? {};
+
   try {
     const res = await fetch(`${DEPLOY_URL}${path}`, {
-      ...options,
+      ...fetchOptions,
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
-        ...options?.headers,
+        ...fetchOptions.headers,
       },
-      signal: AbortSignal.timeout(15_000),
+      signal: AbortSignal.timeout(timeoutMs),
     });
 
     const body = await res.json() as T;
@@ -191,6 +217,36 @@ deploy.post("/preflight", zValidator("json", deployTriggerSchema), async (c) => 
   const result = await deployRequest<unknown>(userId, "/api/v1/preflight", {
     method: "POST",
     body: JSON.stringify(body),
+  });
+  if (!result.ok) return c.json({ error: result.error }, result.status as any);
+  return c.json(result.data);
+});
+
+// POST /deploy/probe-vps — pre-install probe: test SSH reachability + auth
+// and capture the host-key fingerprint. Proxies to deploy-panel
+// POST /api/servers/probe-vps with a 45-second timeout (SSH probes can be
+// slow on distant or heavily-loaded hosts). SSH credentials live only in
+// the parsed-body variable for the duration of this handler and are NEVER
+// persisted, logged, or echoed in error responses.
+deploy.post("/probe-vps", zValidator("json", probeVpsBodySchema), async (c) => {
+  const userId = c.get("userId")!;
+  const body = c.req.valid("json");
+
+  const dpToken = await getCredential(userId, "deploy-panel");
+  if (!dpToken) {
+    return c.json(
+      {
+        error: "deploy_panel_not_connected",
+        message: "Connect deploy-panel first in Settings.",
+      },
+      409,
+    );
+  }
+
+  const result = await deployRequest<unknown>(userId, "/api/servers/probe-vps", {
+    method: "POST",
+    body: JSON.stringify(body),
+    timeoutMs: 45_000,
   });
   if (!result.ok) return c.json({ error: result.error }, result.status as any);
   return c.json(result.data);

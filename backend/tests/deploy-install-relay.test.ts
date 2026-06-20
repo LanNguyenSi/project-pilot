@@ -193,8 +193,10 @@ describe("POST /deploy/install-relay", () => {
     // cancels the long-running install (no orphaned ~10-min SSH process).
     expect(capturedSignal).toBeInstanceOf(AbortSignal);
 
-    // SSH credentials must NOT appear in ANY console output.
-    const allLogs = consoleSpies.flatMap((s) => s.mock.calls.flat()).join(" ");
+    // SSH credentials must NOT appear in ANY console output. JSON.stringify
+    // (not join) so object-form logging — console.log(body) or a structured
+    // logger.info({ body }) — is also caught, not just string concatenation.
+    const allLogs = JSON.stringify(consoleSpies.flatMap((s) => s.mock.calls.flat()));
     expect(allLogs).not.toContain("super-secret-password");
 
     // SSE events must stream through to the caller.
@@ -258,5 +260,48 @@ describe("POST /deploy/install-relay", () => {
     expect(res.status).toBe(400);
     const body = (await res.json()) as { error: string; message: string };
     expect(body.error).toBe("install_relay_failed");
+  });
+
+  // --- expectedHostKeySha256 field -------------------------------------------
+
+  it("accepts a valid expectedHostKeySha256 (44-char base64) and forwards it in the body", async () => {
+    mockGetCredential.mockResolvedValue("dp_test_token");
+    // 43 base64 chars + one padding "=" = 44 chars total (SHA-256 output shape).
+    const validFingerprint = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+
+    let capturedBody: Record<string, unknown> | undefined;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation((_url: string, init?: RequestInit) => {
+        capturedBody = init?.body ? (JSON.parse(init.body as string) as Record<string, unknown>) : undefined;
+        return Promise.resolve(
+          makeSseResponse(
+            200,
+            `event: done\ndata: {"serverId":"s1","name":"my-vps","host":"1.2.3.4","relayUrl":"https://relay.example.com"}\n\n`,
+          ),
+        );
+      }),
+    );
+
+    const res = await installRelay({
+      name: "my-vps",
+      host: "1.2.3.4",
+      sshPassword: "secret",
+      expectedHostKeySha256: validFingerprint,
+    });
+
+    // Validation must pass and the field must be forwarded verbatim.
+    expect(res.status).toBe(200);
+    expect(capturedBody?.["expectedHostKeySha256"]).toBe(validFingerprint);
+  });
+
+  it("returns 400 when expectedHostKeySha256 is not exactly 44 chars", async () => {
+    const res = await installRelay({
+      name: "my-vps",
+      host: "1.2.3.4",
+      sshPassword: "secret",
+      expectedHostKeySha256: "tooshort=",
+    });
+    expect(res.status).toBe(400);
   });
 });

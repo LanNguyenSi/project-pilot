@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Button, ErrorBanner, Input, Modal, Textarea } from "@/components/ui";
+import { apiFetch, ApiError } from "@/lib/api";
 
 // Replicates the base-URL resolution from src/lib/api.ts so the streaming
 // fetch uses the exact same origin without going through apiFetch (which
@@ -22,7 +23,17 @@ interface FormState {
   sshPassphrase: string;
 }
 
-type WizardStep = "form" | "installing" | "error" | "done";
+type WizardStep = "form" | "probing" | "probe-results" | "installing" | "error" | "done";
+
+interface ProbeResponse {
+  probe: {
+    suggestedMode: string;
+    port80: { kind: string };
+    port443: { kind: string };
+    suggestedTraefikNetwork?: string;
+  };
+  hostKeySha256?: string;
+}
 
 interface DonePayload {
   serverId: string;
@@ -55,6 +66,9 @@ export function InstallRelayWizard({ open, onClose, onSuccess }: InstallRelayWiz
   const [logs, setLogs] = useState<string[]>([]);
   const [errorMessage, setErrorMessage] = useState("");
   const [donePayload, setDonePayload] = useState<DonePayload | null>(null);
+  // Probe state — not secret (fingerprint is public), but cleared on close.
+  const [probeResult, setProbeResult] = useState<ProbeResponse | null>(null);
+  const [probedHostKey, setProbedHostKey] = useState<string | undefined>(undefined);
   const logEndRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -67,6 +81,8 @@ export function InstallRelayWizard({ open, onClose, onSuccess }: InstallRelayWiz
       setErrorMessage("");
       setDonePayload(null);
       setFormError("");
+      setProbeResult(null);
+      setProbedHostKey(undefined);
       if (abortRef.current) {
         abortRef.current.abort();
         abortRef.current = null;
@@ -78,6 +94,8 @@ export function InstallRelayWizard({ open, onClose, onSuccess }: InstallRelayWiz
   useEffect(() => {
     return () => {
       setForm((f) => ({ ...f, sshPassword: "", sshPrivateKey: "", sshPassphrase: "" }));
+      setProbeResult(null);
+      setProbedHostKey(undefined);
       if (abortRef.current) {
         abortRef.current.abort();
         abortRef.current = null;
@@ -94,36 +112,109 @@ export function InstallRelayWizard({ open, onClose, onSuccess }: InstallRelayWiz
     setForm((f) => ({ ...f, [key]: value }));
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setFormError("");
-
+  /** Validate the form fields that are required for both probe and install. */
+  function validateForm(): boolean {
     if (!form.name.trim() || !form.host.trim()) {
       setFormError("Server name and host are required.");
-      return;
+      return false;
     }
     if (form.authMethod === "password" && !form.sshPassword) {
       setFormError("SSH password is required.");
-      return;
+      return false;
     }
     if (form.authMethod === "privateKey" && !form.sshPrivateKey.trim()) {
       setFormError("Private key (PEM content) is required.");
-      return;
+      return false;
     }
+    return true;
+  }
 
-    const body: Record<string, unknown> = {
-      name: form.name.trim(),
+  /** Build the SSH credential slice of the request body (shared by probe and install). */
+  function buildSshBody(): Record<string, unknown> {
+    const base: Record<string, unknown> = {
       host: form.host.trim(),
       sshUser: form.sshUser.trim() || "root",
       sshPort: parseInt(form.sshPort, 10) || 22,
     };
     if (form.authMethod === "password") {
-      body.sshPassword = form.sshPassword;
+      base.sshPassword = form.sshPassword;
     } else {
-      body.sshPrivateKey = form.sshPrivateKey.trim();
-      if (form.sshPassphrase) body.sshPassphrase = form.sshPassphrase;
+      base.sshPrivateKey = form.sshPrivateKey.trim();
+      if (form.sshPassphrase) base.sshPassphrase = form.sshPassphrase;
     }
+    return base;
+  }
 
+  /** Build the full install body, optionally pinning the probed host key. */
+  function buildInstallBody(hostKey?: string): Record<string, unknown> {
+    const body: Record<string, unknown> = {
+      name: form.name.trim(),
+      ...buildSshBody(),
+    };
+    if (hostKey) body.expectedHostKeySha256 = hostKey;
+    return body;
+  }
+
+  /** Primary form action: probe SSH connection, capture host key, then offer
+   *  to install with that pinned fingerprint. */
+  async function handleProbe(e: React.FormEvent) {
+    e.preventDefault();
+    setFormError("");
+
+    if (!validateForm()) return;
+
+    const probeBody = buildSshBody();
+
+    setStep("probing");
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    try {
+      const result = await apiFetch<ProbeResponse>("/api/deploy/probe-vps", {
+        method: "POST",
+        body: JSON.stringify(probeBody),
+        signal: controller.signal,
+      });
+      setProbeResult(result);
+      setProbedHostKey(result.hostKeySha256);
+      setStep("probe-results");
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return;
+      let message = "Connection test failed.";
+      if (err instanceof ApiError) {
+        message = err.message;
+      } else if (err instanceof Error) {
+        message = err.message || message;
+      }
+      setFormError(message);
+      setStep("form");
+    } finally {
+      if (abortRef.current === controller) {
+        abortRef.current = null;
+      }
+    }
+  }
+
+  /** Secondary form action: skip the probe and go straight to install without
+   *  host-key pinning (backward-compatible TOFU). */
+  async function handleSkipAndInstall(e: React.MouseEvent) {
+    e.preventDefault();
+    setFormError("");
+
+    if (!validateForm()) return;
+
+    await runInstall(buildInstallBody(undefined));
+  }
+
+  /** Called from the probe-results view: install with the pinned host key. */
+  function handleInstallWithKey() {
+    void runInstall(buildInstallBody(probedHostKey));
+  }
+
+  /** Stream the SSE relay-install from the backend. Sets step to "installing"
+   *  on entry, then transitions to "done" or "error" based on SSE events. */
+  async function runInstall(installBody: Record<string, unknown>) {
     setStep("installing");
     setLogs([]);
 
@@ -139,7 +230,7 @@ export function InstallRelayWizard({ open, onClose, onSuccess }: InstallRelayWiz
           "Content-Type": "application/json",
           "X-Requested-With": "XMLHttpRequest",
         },
-        body: JSON.stringify(body),
+        body: JSON.stringify(installBody),
         signal: controller.signal,
       });
     } catch (err) {
@@ -215,6 +306,8 @@ export function InstallRelayWizard({ open, onClose, onSuccess }: InstallRelayWiz
             }
           } else if (event === "error") {
             // deploy-panel emits: { kind: string, message: string }
+            // host_key_rejected arrives here when the server's host key does
+            // not match the expectedHostKeySha256 pinned during the probe.
             let message = data;
             try {
               const payload = JSON.parse(data) as { message?: string; kind?: string };
@@ -258,12 +351,23 @@ export function InstallRelayWizard({ open, onClose, onSuccess }: InstallRelayWiz
     }
   }
 
+  function handleBackToForm() {
+    // Returning to the form must drop any captured fingerprint so a stale pin
+    // from a previous host can never survive a host/credential change. Keep the
+    // (non-secret) form fields so the operator can re-probe without re-typing.
+    setProbeResult(null);
+    setProbedHostKey(undefined);
+    setStep("form");
+  }
+
   function handleRetry() {
     // Keep non-sensitive fields so the user doesn't have to re-type them;
-    // clear credentials so they must be re-entered intentionally.
+    // clear credentials and probe state so a fresh probe is needed.
     setForm((f) => ({ ...f, sshPassword: "", sshPrivateKey: "", sshPassphrase: "" }));
     setLogs([]);
     setErrorMessage("");
+    setProbeResult(null);
+    setProbedHostKey(undefined);
     setStep("form");
   }
 
@@ -273,7 +377,7 @@ export function InstallRelayWizard({ open, onClose, onSuccess }: InstallRelayWiz
   }
 
   function handleClose() {
-    // Abort an in-progress streaming install when the user closes the modal.
+    // Abort an in-progress probe or streaming install when the user closes the modal.
     if (abortRef.current) {
       abortRef.current.abort();
       abortRef.current = null;
@@ -285,7 +389,7 @@ export function InstallRelayWizard({ open, onClose, onSuccess }: InstallRelayWiz
     <Modal open={open} onClose={handleClose} title="Install relay on new server" size="lg">
       {/* ── Step 1: Form ─────────────────────────────────────────────── */}
       {step === "form" && (
-        <form onSubmit={(e) => void handleSubmit(e)} className="space-y-3">
+        <form onSubmit={(e) => void handleProbe(e)} className="space-y-3">
           <Input
             label="Server name"
             required
@@ -382,13 +486,97 @@ export function InstallRelayWizard({ open, onClose, onSuccess }: InstallRelayWiz
 
           {formError && <ErrorBanner message={formError} />}
 
-          <div className="flex gap-2 justify-end pt-1">
+          <div className="flex flex-wrap gap-2 justify-end pt-1">
             <Button type="button" variant="secondary" onClick={handleClose}>
               Cancel
             </Button>
-            <Button type="submit">Install</Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={(e) => void handleSkipAndInstall(e)}
+            >
+              Skip & install (no host-key pinning)
+            </Button>
+            <Button type="submit">Test connection & continue</Button>
           </div>
         </form>
+      )}
+
+      {/* ── Step 1b: Probing (spinner while testing SSH) ──────────────── */}
+      {step === "probing" && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 text-sm text-content-secondary">
+            <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
+            <span>Testing connection to {form.host}...</span>
+          </div>
+          <p className="text-xs text-content-tertiary">
+            Verifying SSH reachability and capturing the host key fingerprint.
+          </p>
+        </div>
+      )}
+
+      {/* ── Step 1c: Probe results ────────────────────────────────────── */}
+      {step === "probe-results" && probeResult && (
+        <div className="space-y-4">
+          <div className="bg-surface-primary border border-stroke-default rounded-button p-4 space-y-2">
+            <p className="text-sm text-content-primary font-medium">Connection test passed</p>
+            <div className="space-y-1 pt-1">
+              <div className="flex gap-2 text-xs">
+                <span className="text-content-tertiary w-36 shrink-0">Reachable</span>
+                <span className="text-content-primary">Yes</span>
+              </div>
+              <div className="flex gap-2 text-xs">
+                <span className="text-content-tertiary w-36 shrink-0">Auth</span>
+                <span className="text-content-primary">OK</span>
+              </div>
+              <div className="flex gap-2 text-xs">
+                <span className="text-content-tertiary w-36 shrink-0">Suggested mode</span>
+                <span className="font-mono text-content-primary">{probeResult.probe.suggestedMode}</span>
+              </div>
+              {probeResult.probe.suggestedTraefikNetwork && (
+                <div className="flex gap-2 text-xs">
+                  <span className="text-content-tertiary w-36 shrink-0">Traefik network</span>
+                  <span className="font-mono text-content-primary">
+                    {probeResult.probe.suggestedTraefikNetwork}
+                  </span>
+                </div>
+              )}
+              {probedHostKey ? (
+                <div className="flex gap-2 text-xs">
+                  <span className="text-content-tertiary w-36 shrink-0">Host key (SHA-256)</span>
+                  <span className="font-mono text-content-primary break-all">{probedHostKey}</span>
+                </div>
+              ) : (
+                <div className="flex gap-2 text-xs">
+                  <span className="text-content-tertiary w-36 shrink-0">Host key</span>
+                  <span className="text-content-tertiary italic">not captured</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {probedHostKey ? (
+            <p className="text-xs text-content-tertiary">
+              The install will verify this fingerprint before executing, preventing MITM attacks
+              in the window between this probe and the install.
+            </p>
+          ) : (
+            <p className="text-xs text-accent-amber">
+              No host key was captured, so the install cannot pin it and will proceed with
+              trust-on-first-use. Re-run the probe, or continue without pinning.
+            </p>
+          )}
+
+          <div className="flex gap-2 justify-end">
+            <Button type="button" variant="secondary" onClick={handleBackToForm}>
+              Back
+            </Button>
+            <Button type="button" onClick={handleInstallWithKey}>
+              {probedHostKey ? "Install relay" : "Install without pinning"}
+            </Button>
+          </div>
+        </div>
       )}
 
       {/* ── Step 2: Installing (streaming log) ───────────────────────── */}
