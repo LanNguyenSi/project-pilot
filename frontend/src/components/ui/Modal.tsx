@@ -17,9 +17,15 @@ interface ModalProps {
    * button do not render a duplicate. PR3 migrates those to pass `title`.
    */
   showClose?: boolean;
+  /**
+   * Controls the max-width of the modal panel.
+   * 'md' (default) → max-w-md (existing behaviour, no visual change for current callers).
+   * 'lg' → max-w-lg for wider content such as multi-step wizards.
+   */
+  size?: "md" | "lg";
 }
 
-export function Modal({ open, onClose, children, title, showClose }: ModalProps) {
+export function Modal({ open, onClose, children, title, showClose, size = "md" }: ModalProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
   const closeVisible = showClose ?? title != null;
@@ -66,7 +72,7 @@ export function Modal({ open, onClose, children, title, showClose }: ModalProps)
         {/* Panel */}
         <div
           ref={panelRef}
-          className="pointer-events-auto relative bg-surface-elevated border border-stroke-default rounded-card shadow-elevated max-w-md w-full p-6 animate-modal-panel"
+          className={`pointer-events-auto relative bg-surface-elevated border border-stroke-default rounded-card shadow-elevated w-full p-6 animate-modal-panel ${size === "lg" ? "max-w-lg" : "max-w-md"}`}
         >
           {/* Header row: optional title + (gated) close button */}
           {title != null && (

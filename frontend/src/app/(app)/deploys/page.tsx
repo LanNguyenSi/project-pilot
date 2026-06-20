@@ -6,6 +6,7 @@ import Link from "next/link";
 import { apiFetch } from "@/lib/api";
 import { Badge, Button, Card, ConfirmModal, EmptyState, ErrorBanner, Icon, Input, Modal, Select, SkeletonBox, useToast } from "@/components/ui";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { InstallRelayWizard } from "@/components/deploys/InstallRelayWizard";
 import type { BadgeVariant } from "@/components/ui";
 
 interface Server {
@@ -73,6 +74,7 @@ export default function DeploysPage() {
   const [statusFilter, setStatusFilter] = useState("");
 
   const [addServerOpen, setAddServerOpen] = useState(false);
+  const [installRelayOpen, setInstallRelayOpen] = useState(false);
   const [addServerSubmitting, setAddServerSubmitting] = useState(false);
   const [addServerError, setAddServerError] = useState("");
   const [newServerName, setNewServerName] = useState("");
@@ -307,10 +309,16 @@ export default function DeploysPage() {
         title="Deploys"
         description="Manage servers, applications, and deployment history."
         actions={
-          <Button size="sm" onClick={() => setAddServerOpen(true)}>
-            <Icon name="plus" size={16} className="mr-1" />
-            Add Server
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="secondary" onClick={() => setInstallRelayOpen(true)}>
+              <Icon name="rocket" size={16} className="mr-1" />
+              Install relay
+            </Button>
+            <Button size="sm" onClick={() => setAddServerOpen(true)}>
+              <Icon name="plus" size={16} className="mr-1" />
+              Add Server
+            </Button>
+          </div>
         }
       />
 
@@ -544,6 +552,13 @@ export default function DeploysPage() {
         }
         confirmLabel="Delete"
         loading={deleteServerSubmitting}
+      />
+
+      {/* Install Relay wizard */}
+      <InstallRelayWizard
+        open={installRelayOpen}
+        onClose={() => setInstallRelayOpen(false)}
+        onSuccess={() => { void fetchData(); setInstallRelayOpen(false); }}
       />
 
       {/* Add Server modal */}
