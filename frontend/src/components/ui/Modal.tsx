@@ -1,6 +1,7 @@
 "use client";
 
-import { useRef, useId, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { Button } from "./Button";
 import { useFocusTrap } from "./useFocusTrap";
 
@@ -23,11 +24,27 @@ export function Modal({ open, onClose, children, title, showClose }: ModalProps)
   const titleId = useId();
   const closeVisible = showClose ?? title != null;
 
-  useFocusTrap(panelRef, open, onClose);
+  // Only portal after mount so the server render and the first client render agree
+  // (both null). This avoids a hydration mismatch for a modal open on first paint
+  // and, critically, prevents touching document.body during SSR / static prerender
+  // where `document` is undefined.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
-  if (!open) return null;
+  // Gate the focus trap on `mounted` too, so it only activates once the panel
+  // actually exists (a conditionally-mounted `<Modal open .../>` would otherwise try
+  // to trap focus one tick before the panel renders). No-op for always-mounted
+  // consumers, where `mounted` is already true before `open` flips.
+  useFocusTrap(panelRef, open && mounted, onClose);
 
-  return (
+  // Render into document.body so the dialog's `fixed` positioning is relative to
+  // the viewport, not to an ancestor that establishes a containing block. AppShell's
+  // <main> keeps a persistent `transform` from `animate-fade-in` (fill-mode: both),
+  // which would otherwise scope this fixed overlay to <main>'s box and clip a tall
+  // modal (only the centered slice is visible).
+  if (!open || !mounted) return null;
+
+  return createPortal(
     <div
       role="dialog"
       aria-modal="true"
@@ -94,7 +111,8 @@ export function Modal({ open, onClose, children, title, showClose }: ModalProps)
           {children}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
