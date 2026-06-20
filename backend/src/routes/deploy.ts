@@ -17,12 +17,14 @@ const rollbackSchema = z.object({
   app: z.string().min(1),
 });
 
-// Mirrors deploy-panel's createServerSchema in
-// backend/src/routes/servers.ts — keep in sync if that ever changes.
+// Subset of deploy-panel's createServerSchema in backend/src/routes/servers.ts.
+// sshKeyPath is intentionally omitted: deploy-panel stores it but sanitizeServer
+// strips it from every response and no SSH operation ever reads it (dead field),
+// and deploy-panel's own Add Server form no longer collects it. Keep name/host/
+// relay* in sync if that schema changes.
 const createServerSchema = z.object({
   name: z.string().min(1).max(100),
   host: z.string().min(1).max(255),
-  sshKeyPath: z.string().optional(),
   relayUrl: z.string().url().optional(),
   relayToken: z.string().optional(),
 });

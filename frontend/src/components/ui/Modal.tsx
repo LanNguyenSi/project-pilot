@@ -32,60 +32,67 @@ export function Modal({ open, onClose, children, title, showClose }: ModalProps)
       role="dialog"
       aria-modal="true"
       aria-labelledby={titleId}
-      className="fixed inset-0 z-50 flex items-center justify-center"
+      className="fixed inset-0 z-50 overflow-y-auto"
     >
-      {/* Backdrop */}
+      {/* Backdrop: fixed so it always covers the viewport while the dialog scrolls. */}
       <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-modal-backdrop"
+        className="fixed inset-0 bg-black/60 backdrop-blur-sm animate-modal-backdrop"
         onClick={onClose}
       />
 
-      {/* Panel */}
-      <div
-        ref={panelRef}
-        className="relative bg-surface-elevated border border-stroke-default rounded-card shadow-elevated max-w-md w-full mx-4 p-6 animate-modal-panel"
-      >
-        {/* Header row: optional title + (gated) close button */}
-        {title != null && (
-          <div className="flex items-center justify-between mb-4">
-            <h2 id={titleId} className="text-section-title font-display text-content-primary">
-              {title}
-            </h2>
-            {closeVisible && (
-              <button
-                type="button"
-                onClick={onClose}
-                aria-label="Close dialog"
-                className="text-content-tertiary hover:text-content-primary transition-colors duration-fast p-1 -mr-1 rounded-button focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/60"
-              >
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            )}
-          </div>
-        )}
+      {/* Scroll + centering layer. The OUTER dialog scrolls, not the panel, so a tall
+          modal can never clip its title/top fields off-screen AND the panel keeps
+          overflow visible (popovers like the Select dropdown are not clipped).
+          pointer-events-none lets a click on the gutter fall through to the backdrop
+          (close on outside click); the panel re-enables pointer events. */}
+      <div className="flex min-h-full items-center justify-center p-4 pointer-events-none">
+        {/* Panel */}
+        <div
+          ref={panelRef}
+          className="pointer-events-auto relative bg-surface-elevated border border-stroke-default rounded-card shadow-elevated max-w-md w-full p-6 animate-modal-panel"
+        >
+          {/* Header row: optional title + (gated) close button */}
+          {title != null && (
+            <div className="flex items-center justify-between mb-4">
+              <h2 id={titleId} className="text-section-title font-display text-content-primary">
+                {title}
+              </h2>
+              {closeVisible && (
+                <button
+                  type="button"
+                  onClick={onClose}
+                  aria-label="Close dialog"
+                  className="text-content-tertiary hover:text-content-primary transition-colors duration-fast p-1 -mr-1 rounded-button focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/60"
+                >
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+            </div>
+          )}
 
-        {/* No title, but close explicitly requested: floating close top-right.
-            Un-migrated modals that pass neither title nor showClose keep their
-            own hand-rolled close button with no duplicate. */}
-        {title == null && closeVisible && (
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close dialog"
-            className="absolute top-4 right-4 text-content-tertiary hover:text-content-primary transition-colors duration-fast p-1 rounded-button focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/60"
-          >
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        )}
+          {/* No title, but close explicitly requested: floating close top-right.
+              Un-migrated modals that pass neither title nor showClose keep their
+              own hand-rolled close button with no duplicate. */}
+          {title == null && closeVisible && (
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close dialog"
+              className="absolute top-4 right-4 text-content-tertiary hover:text-content-primary transition-colors duration-fast p-1 rounded-button focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/60"
+            >
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
 
-        {/* Hidden title for aria-labelledby when no visible title */}
-        {title == null && <span id={titleId} className="sr-only">Dialog</span>}
+          {/* Hidden title for aria-labelledby when no visible title */}
+          {title == null && <span id={titleId} className="sr-only">Dialog</span>}
 
-        {children}
+          {children}
+        </div>
       </div>
     </div>
   );

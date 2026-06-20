@@ -77,7 +77,6 @@ export default function DeploysPage() {
   const [addServerError, setAddServerError] = useState("");
   const [newServerName, setNewServerName] = useState("");
   const [newServerHost, setNewServerHost] = useState("");
-  const [newServerSshKeyPath, setNewServerSshKeyPath] = useState("");
   const [newServerRelayUrl, setNewServerRelayUrl] = useState("");
   const [newServerRelayToken, setNewServerRelayToken] = useState("");
   const [deleteServerTarget, setDeleteServerTarget] = useState<Server | null>(null);
@@ -174,7 +173,6 @@ export default function DeploysPage() {
   function resetAddServerForm() {
     setNewServerName("");
     setNewServerHost("");
-    setNewServerSshKeyPath("");
     setNewServerRelayUrl("");
     setNewServerRelayToken("");
     setAddServerError("");
@@ -194,7 +192,6 @@ export default function DeploysPage() {
         body: JSON.stringify({
           name: newServerName.trim(),
           host: newServerHost.trim(),
-          sshKeyPath: newServerSshKeyPath.trim() || undefined,
           relayUrl: newServerRelayUrl.trim() || undefined,
           relayToken: newServerRelayToken.trim() || undefined,
         }),
@@ -575,14 +572,6 @@ export default function DeploysPage() {
             onChange={(e) => setNewServerHost(e.target.value)}
             placeholder="1.2.3.4 or example.com"
             disabled={addServerSubmitting}
-          />
-          <Input
-            label="SSH Key Path (optional)"
-            value={newServerSshKeyPath}
-            onChange={(e) => setNewServerSshKeyPath(e.target.value)}
-            placeholder="/root/.ssh/id_ed25519"
-            disabled={addServerSubmitting}
-            hint="Path on the deploy-panel host, not your local machine."
           />
           <Input
             label="Relay URL (optional)"
