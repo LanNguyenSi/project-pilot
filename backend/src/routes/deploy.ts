@@ -17,6 +17,29 @@ const rollbackSchema = z.object({
   app: z.string().min(1),
 });
 
+// Mirror of deploy-panel's sshAuthSchema (servers.ts) + core identity fields
+// from installRelaySchema. Like deploy-panel, exactly one of sshPassword /
+// sshPrivateKey is required (XOR) so "both provided" is rejected here with a
+// clear local 400 instead of a confusing late 400 from deploy-panel. Advanced
+// relay fields (relayDomain / traefikEmail / relayMode / etc.) are intentionally
+// omitted — deploy-panel applies its own defaults. SSH credentials live only in
+// the parsed-body variable for the duration of the handler and are never
+// persisted or logged.
+const installRelayBodySchema = z
+  .object({
+    name: z.string().min(1).max(100),
+    host: z.string().min(1).max(255),
+    sshUser: z.string().min(1).max(64).default("root"),
+    sshPort: z.number().int().min(1).max(65535).default(22),
+    sshPassword: z.string().min(1).optional(),
+    sshPrivateKey: z.string().min(1).optional(),
+    sshPassphrase: z.string().min(1).optional(),
+  })
+  .refine(
+    (v) => Boolean(v.sshPassword) !== Boolean(v.sshPrivateKey),
+    { message: "Provide exactly one of sshPassword or sshPrivateKey" },
+  );
+
 // Subset of deploy-panel's createServerSchema in backend/src/routes/servers.ts.
 // sshKeyPath is intentionally omitted: deploy-panel stores it but sanitizeServer
 // strips it from every response and no SSH operation ever reads it (dead field),
@@ -172,6 +195,80 @@ deploy.post("/preflight", zValidator("json", deployTriggerSchema), async (c) => 
   if (!result.ok) return c.json({ error: result.error }, result.status as any);
   return c.json(result.data);
 });
+
+// POST /deploy/install-relay — stream SSE relay-install progress from
+// deploy-panel. SSH credentials (sshPassword / sshPrivateKey / sshPassphrase)
+// are forwarded in the proxied request body and are NEVER written to the DB,
+// written to any log, or included in error responses. They exist only in the
+// `body` variable for the lifetime of this handler.
+deploy.post(
+  "/install-relay",
+  zValidator("json", installRelayBodySchema),
+  async (c) => {
+    const userId = c.get("userId")!;
+    const body = c.req.valid("json");
+
+    const dpToken = await getCredential(userId, "deploy-panel");
+    if (!dpToken) {
+      return c.json(
+        {
+          error: "deploy_panel_not_connected",
+          message: "Connect deploy-panel first in Settings.",
+        },
+        409,
+      );
+    }
+
+    // No AbortSignal.timeout — the relay install can run up to ~10 min.
+    // Client disconnect is handled by wiring the incoming request signal so
+    // fetch is cancelled automatically when the browser closes the connection.
+    let upstream: Response;
+    try {
+      upstream = await fetch(`${DEPLOY_URL}/api/servers/install-relay`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${dpToken}`,
+          "Content-Type": "application/json",
+          Accept: "text/event-stream",
+        },
+        body: JSON.stringify(body),
+        signal: c.req.raw.signal,
+      });
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") {
+        return c.json({ error: "aborted", message: "Request aborted" }, 499 as any);
+      }
+      return c.json(
+        { error: "deploy_panel_unreachable", message: "deploy-panel is unreachable" },
+        502,
+      );
+    }
+
+    if (!upstream.ok) {
+      let message: string;
+      try {
+        const errBody = (await upstream.json()) as { error?: string; message?: string };
+        message = errBody.message || errBody.error || `upstream error ${upstream.status}`;
+      } catch {
+        message = `upstream error ${upstream.status}`;
+      }
+      return c.json({ error: "install_relay_failed", message }, upstream.status as any);
+    }
+
+    // Pass through the deploy-panel SSE stream verbatim. @hono/node-server
+    // streams a ReadableStream body without buffering. X-Accel-Buffering: no
+    // disables nginx proxy buffering so the browser receives events
+    // incrementally rather than in a single flush at stream end.
+    return new Response(upstream.body, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+        "X-Accel-Buffering": "no",
+      },
+    });
+  },
+);
 
 // GET /deploy/logs — app logs
 deploy.get("/logs", async (c) => {
