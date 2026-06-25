@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.4.0] - 2026-06-25
+
+**Headline: the relay-install wizard.** project-pilot can now onboard a fresh VPS end-to-end with a guided relay-install wizard, backed by a pre-install probe and SSH host-key pinning, plus modal/drawer portaling fixes and a dependency security pass. The app is versioned at the repo root and deployed from `main`, so this tag is deploy provenance.
+
+### Added
+
+- **Relay-install wizard to onboard a fresh VPS end-to-end** (#97): a guided flow that installs and wires up the deploy relay on a brand-new server.
+- **Pre-install probe and SSH host-key pinning for the relay wizard** (#99): the wizard probes the target host before installing and pins its SSH host key, so the onboarding connection is verified rather than blindly trusted.
+
+### Fixed
+
+- **Add Server modal is scrollable and drops the dead `sshKeyPath` field** (#94): the modal no longer overflows on small viewports, and an unused field was removed.
+- **Modal portals to `document.body`** (#95): the fixed overlay now escapes `<main>`'s CSS transform, so it is no longer clipped to the content area.
+- **TaskDetailPanel drawer portals to `document.body`** (#96): the same transform-escape fix for the task drawer.
+
+### Security
+
+- **Cleared runtime `hono` and dev-only `js-yaml` advisories** (#98) via `npm audit fix`.
+
+### Docs
+
+- **README and docs reconciled with the code** (#93).
+
 ## [0.3.0] - 2026-06-14
 
 **Headline: the Refined-Dark design system.** The control plane moves onto a new dark-only design foundation and every surface is lifted onto it, plus an OAuth login fix and two dependency security pins. The app is versioned at the repo root and deployed from `main`, so this tag is deploy provenance.
