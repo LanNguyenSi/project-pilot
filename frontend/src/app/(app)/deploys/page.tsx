@@ -595,6 +595,7 @@ export default function DeploysPage() {
             onChange={(e) => setNewServerRelayUrl(e.target.value)}
             placeholder="https://relay.example.com"
             disabled={addServerSubmitting}
+            hint="Without a relay URL this server can't run deployments yet; you can add one later via Install Relay."
           />
           <Input
             label="Relay Token (optional)"
