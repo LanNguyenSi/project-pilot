@@ -22,6 +22,24 @@ jobs:
       - run: npm run lint --workspace=backend
       - run: npm run build --workspace=backend
 
+  backend-test:
+    # Runs the backend vitest suite (8 files: OAuth URL build + callback,
+    # deploy-panel proxy routes, rate limiting, module registration, forge
+    # task migration). These tests existed but never ran in CI, so a PR
+    # could break auth or proxy logic and still merge green.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      # The suite imports the generated Prisma client; generate it first
+      # (mirrors the backend job) so the run does not fail on a missing
+      # @prisma/client.
+      - run: cd backend && npx prisma generate
+      - run: npm run test --workspace=backend
+
   frontend:
     runs-on: ubuntu-latest
     steps:
