@@ -23,10 +23,10 @@ jobs:
       - run: npm run build --workspace=backend
 
   backend-test:
-    # Runs the backend vitest suite (8 files: OAuth URL build + callback,
-    # deploy-panel proxy routes, rate limiting, module registration, forge
-    # task migration). These tests existed but never ran in CI, so a PR
-    # could break auth or proxy logic and still merge green.
+    # Runs the backend vitest suite with v8 coverage. The coverage gate
+    # enforces per-file thresholds for the three HIGH-gap security files
+    # (middleware/csrf.ts, routes/credentials.ts, services/credentials.ts,
+    # routes/tasks.ts) — see backend/vitest.config.ts for exact values.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -38,7 +38,7 @@ jobs:
       # (mirrors the backend job) so the run does not fail on a missing
       # @prisma/client.
       - run: cd backend && npx prisma generate
-      - run: npm run test --workspace=backend
+      - run: npm run test:coverage --workspace=backend
 
   frontend:
     runs-on: ubuntu-latest
