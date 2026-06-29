@@ -177,9 +177,13 @@ describe("GET /projects/:projectId/tasks — list tasks for a project", () => {
   it("URL-encodes special characters in projectId", async () => {
     await makeRequest("/projects/my%20project/tasks");
 
-    // Hono decodes path params; encodeURIComponent re-encodes for upstream
-    const call = mockTasksRequest.mock.calls[0];
-    expect(call![1]).toMatch(/\/api\/projects\/.+\/tasks/);
+    // Hono decodes %20 to a space in the path param; encodeURIComponent must
+    // re-encode it for the upstream path. Asserting the EXACT encoded path
+    // kills the mutation (dropping encodeURIComponent yields a raw space).
+    expect(mockTasksRequest).toHaveBeenCalledWith(
+      "user-a",
+      "/api/projects/my%20project/tasks",
+    );
   });
 });
 

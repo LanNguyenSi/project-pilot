@@ -10,7 +10,7 @@ export default defineConfig({
       // testable logic) and test files themselves.
       include: ["src/**/*.ts"],
       exclude: ["src/server.ts", "**/*.test.ts"],
-      // Per-file thresholds for the three HIGH-gap files we added tests for.
+      // Per-file thresholds for the four HIGH-gap files we added tests for.
       // Thresholds are set a few points below the measured baseline so a
       // single line removal (mutation) still breaks CI, while normal test
       // churn doesn't cause false failures.
