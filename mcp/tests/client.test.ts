@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { Config } from "../src/config.js";
 import { PilotClient } from "../src/client.js";
 
@@ -52,6 +52,12 @@ function makeErrorResponse(opts: {
       : async () => opts.body ?? {},
   } as unknown as Response;
 }
+
+// Per-file hygiene: undo the global fetch stub after each test so it does not
+// leak past this file.
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe("PilotClient — auth header routing", () => {
   let fetchMock: ReturnType<typeof vi.fn>;
@@ -239,6 +245,14 @@ describe("PilotClient — AbortSignal.timeout", () => {
     fetchMock.mockRejectedValue(abortErr);
 
     await expect(client.listProjects()).rejects.toThrow("The operation was aborted.");
+  });
+
+  it("passes an AbortSignal in the fetch init (timeout wiring)", async () => {
+    fetchMock.mockResolvedValue(makeOkResponse({ ok: true, projects: [] }));
+    await client.listProjects();
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(init.signal).toBeInstanceOf(AbortSignal);
   });
 });
 

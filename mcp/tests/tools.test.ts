@@ -114,6 +114,16 @@ describe("registerTools — forge tools", () => {
     expect((parseText(result) as { error: string }).error).toBe("nope");
   });
 
+  it("error() stringifies a non-Error rejection (tools.ts:10 String(e) branch)", async () => {
+    // A thrown non-Error value (a bare string) takes the `: String(e)` branch of error().
+    (client.listProjects as ReturnType<typeof vi.fn>).mockRejectedValue("bare string failure");
+
+    const result = await captured["forge_list_projects"]!({});
+
+    expect(isErrorResult(result)).toBe(true);
+    expect((parseText(result) as { error: string }).error).toBe("bare string failure");
+  });
+
   it("forge_create_project — calls client.generateProject with correct args", async () => {
     (client.generateProject as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, sessionId: "s1", preview: {} });
 
@@ -511,5 +521,18 @@ describe("registerTools — dashboard_summary (Guard G: Promise.allSettled degra
 
     const data = parseText(result) as { recentDeploys: unknown[] };
     expect(data.recentDeploys).toHaveLength(5);
+  });
+
+  it("returns error() when a fulfilled client payload is malformed (outer catch, tools.ts:260)", async () => {
+    // listProjects resolves but WITHOUT a `projects` array, so `projects.value.projects.length`
+    // throws a TypeError while building the summary object — exercising the outer try/catch.
+    (client.listProjects as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true });
+    (client.claimableTask as ReturnType<typeof vi.fn>).mockResolvedValue({ tasks: [] });
+    (client.listServers as ReturnType<typeof vi.fn>).mockResolvedValue({ servers: [] });
+    (client.deployHistory as ReturnType<typeof vi.fn>).mockResolvedValue({ deploys: [] });
+
+    const result = await captured["dashboard_summary"]!({});
+
+    expect(isErrorResult(result)).toBe(true);
   });
 });

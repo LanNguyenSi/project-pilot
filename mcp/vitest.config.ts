@@ -11,18 +11,11 @@ export default defineConfig({
       include: ["src/client.ts", "src/tools.ts"],
       exclude: ["**/*.test.ts"],
       // Per-file thresholds. Set ~3 points below the measured baseline so a
-      // single line removal (mutation) still breaks CI, while normal test
-      // churn doesn't cause false failures.
+      // single line/branch removal (mutation) still breaks CI, while normal
+      // test churn doesn't cause false failures.
       //
-      // Measured baseline (2026-06-30):
-      //   src/client.ts  → 100% stmts / 100% branch / 100% funcs / 100% lines
-      //   src/tools.ts   → 98.7% stmts / 90% branch / 100% funcs / 98.33% lines
-      //
-      // tools.ts branch coverage is 90% because line 260 (the outer catch of
-      // dashboard_summary) is structurally unreachable: Promise.allSettled
-      // never throws, so the outer try/catch path cannot be triggered.
-      // The threshold is set ~3 points below 90% to accept this known gap
-      // without silently allowing real regressions.
+      // Measured baseline (2026-06-30): src/client.ts and src/tools.ts are
+      // both 100% statements / branches / functions / lines.
       thresholds: {
         "src/client.ts": {
           statements: 97,
@@ -31,10 +24,10 @@ export default defineConfig({
           lines: 97,
         },
         "src/tools.ts": {
-          statements: 95,
-          branches: 87,
+          statements: 97,
+          branches: 97,
           functions: 97,
-          lines: 95,
+          lines: 97,
         },
       },
     },
