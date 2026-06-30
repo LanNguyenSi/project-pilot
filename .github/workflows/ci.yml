@@ -40,6 +40,19 @@ jobs:
       - run: cd backend && npx prisma generate
       - run: npm run test:coverage --workspace=backend
 
+  mcp-test:
+    # Runs the mcp vitest suite with v8 coverage. The coverage gate enforces
+    # per-file thresholds for src/client.ts and src/tools.ts — see
+    # mcp/vitest.config.ts for exact values.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npm run test:coverage --workspace=mcp
+
   frontend:
     runs-on: ubuntu-latest
     steps:
