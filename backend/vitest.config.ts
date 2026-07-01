@@ -20,6 +20,7 @@ export default defineConfig({
       //   routes/credentials.ts       → 95.3% stmts / 100% branch / 71.4% funcs / 95.3% lines
       //   services/credentials.ts     → 100% stmts / 100% branch / 100% funcs
       //   routes/tasks.ts             → 67.8% stmts / 37.5% branch / 66.7% funcs / 76.9% lines
+      //   routes/forge.ts             → 100% stmts / 100% branch / 100% funcs / 100% lines (2026-07-01)
       //
       // Global threshold is intentionally absent: the other 73 backend files
       // are not yet covered and would push the aggregate near 0.
@@ -47,6 +48,12 @@ export default defineConfig({
           branches: 32,
           functions: 62,
           lines: 72,
+        },
+        "src/routes/forge.ts": {
+          statements: 99,
+          branches: 97,
+          functions: 95,
+          lines: 99,
         },
       },
     },
