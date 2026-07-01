@@ -62,3 +62,16 @@ jobs:
           node-version: 22
       - run: npm ci
       - run: npm run build --workspace=frontend
+
+  frontend-test:
+    # Runs the frontend vitest suite with v8 coverage. The coverage gate
+    # enforces a per-file threshold for src/lib/api.ts — see
+    # frontend/vitest.config.ts for exact values.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npm run test:coverage --workspace=frontend
