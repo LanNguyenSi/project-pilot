@@ -23,12 +23,15 @@ export async function apiFetch<T>(
 ): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     credentials: "include",
+    ...options,
+    // Merge headers last so caller options.headers layer ON TOP of the
+    // defaults rather than replacing the whole headers key. A caller can
+    // still intentionally override Content-Type by passing it in headers.
     headers: {
       "Content-Type": "application/json",
       "X-Requested-With": "XMLHttpRequest",
       ...options?.headers,
     },
-    ...options,
   });
 
   if (!res.ok) {
