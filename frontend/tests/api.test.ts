@@ -40,6 +40,28 @@ describe("apiFetch", () => {
     );
   });
 
+  it("merges caller headers on top of the defaults instead of replacing them", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({}),
+    });
+
+    await apiFetch("/x", { method: "POST", headers: { Authorization: "Bearer z" } });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${BASE_URL}/x`,
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          "Content-Type": "application/json",
+          "X-Requested-With": "XMLHttpRequest",
+          Authorization: "Bearer z",
+        }),
+      })
+    );
+  });
+
   it("rejects with an ApiError using body.error when present", async () => {
     const body = { error: "bad request" };
     fetchMock.mockResolvedValueOnce({
