@@ -40,6 +40,32 @@ jobs:
       - run: cd backend && npx prisma generate
       - run: npm run test:coverage --workspace=backend
 
+  mcp:
+    # Typechecks/builds the mcp workspace. Guards against a duplicate zod
+    # install (e.g. a nested zod resolved under
+    # node_modules/@modelcontextprotocol/sdk/node_modules) forcing tsc to
+    # structurally compare our zod schemas against a second, physically
+    # distinct zod's types — that blows past the default V8 heap (tsc exits
+    # 134). See mcp/src/tools.ts and root package.json for context.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - name: Assert single zod resolution
+        # Fails in ~1s with a clear message on a duplicate-zod relapse,
+        # instead of the mcp build step dying after a ~60s heap crash.
+        run: |
+          count=$(node -e "console.log(Object.keys(require('./package-lock.json').packages).filter(k => k.split('node_modules/').pop() === 'zod').length)")
+          if [ "$count" -ne 1 ]; then
+            echo "expected exactly 1 zod resolution in package-lock.json, found $count"
+            node -e "Object.keys(require('./package-lock.json').packages).filter(k => k.split('node_modules/').pop() === 'zod').forEach(k => console.log('  ' + k))"
+            exit 1
+          fi
+      - run: npm run build --workspace=mcp
+
   mcp-test:
     # Runs the mcp vitest suite with v8 coverage. The coverage gate enforces
     # per-file thresholds for src/client.ts and src/tools.ts — see
