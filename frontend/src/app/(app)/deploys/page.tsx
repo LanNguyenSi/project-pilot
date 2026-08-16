@@ -49,6 +49,7 @@ const statusBadge: Record<string, BadgeVariant> = {
   deploying: "warning",
   rolled_back: "purple",
   unknown: "neutral",
+  "no-relay": "warning",
 };
 
 export default function DeploysPage() {
@@ -83,6 +84,7 @@ export default function DeploysPage() {
   const [newServerRelayToken, setNewServerRelayToken] = useState("");
   const [deleteServerTarget, setDeleteServerTarget] = useState<Server | null>(null);
   const [deleteServerSubmitting, setDeleteServerSubmitting] = useState(false);
+  const [testingServerId, setTestingServerId] = useState<string | null>(null);
 
   const buildHistoryParams = useCallback((page: number, server: string, app: string, status: string) => {
     const params = new URLSearchParams();
@@ -226,6 +228,43 @@ export default function DeploysPage() {
     }
   }
 
+  async function handleTestServer(s: Server) {
+    setTestingServerId(s.id);
+    try {
+      const data = await apiFetch<{ status: string; message?: string }>(
+        `/api/deploy/servers/${encodeURIComponent(s.id)}/test`,
+        { method: "POST" },
+      );
+      if (data.status === "online") {
+        toast({ title: `${s.name} is reachable`, variant: "success" });
+      } else if (data.status === "no-relay") {
+        // Not a reachability failure: the server simply has no relay configured
+        // yet, so there's nothing to probe. Surfacing this as "unreachable"
+        // would be misleading. "warning" isn't a ToastVariant here, so "info"
+        // is the closest non-alarming existing variant.
+        toast({
+          title: `${s.name} has no relay configured${data.message ? `: ${data.message}` : ""}`,
+          variant: "info",
+        });
+      } else {
+        toast({
+          title: `${s.name} is unreachable${data.message ? `: ${data.message}` : ""}`,
+          variant: "error",
+        });
+      }
+      // The panel persists the probed status server-side; refetch to pick up
+      // the authoritative row (also covers no-relay / offline reason changes).
+      await fetchData();
+    } catch (err) {
+      toast({ title: err instanceof Error ? err.message : `Failed to test ${s.name}`, variant: "error" });
+    } finally {
+      // Only clear the spinner if this request still owns it — a slower
+      // in-flight test for another server must not steal this row's reset
+      // (and vice versa), since testingServerId is a single-slot id.
+      setTestingServerId((prev) => (prev === s.id ? null : prev));
+    }
+  }
+
   async function handleViewLogs(d: Deploy) {
     setLogDeploy(d);
     setLogContent(null);
@@ -363,13 +402,27 @@ export default function DeploysPage() {
                 <p className="text-xs text-content-tertiary font-mono truncate" title={s.host}>{s.host}</p>
                 <div className="flex items-center justify-between mt-1">
                   <p className="text-xs text-content-tertiary">{s.appCount} app{s.appCount !== 1 ? "s" : ""}</p>
-                  <button
-                    onClick={() => setDeleteServerTarget(s)}
-                    className="text-xs text-content-tertiary hover:text-accent-red transition-colors"
-                    aria-label={`Delete ${s.name}`}
-                  >
-                    Delete
-                  </button>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => void handleTestServer(s)}
+                      disabled={testingServerId === s.id}
+                      className="inline-flex items-center gap-1 text-xs text-content-tertiary hover:text-content-primary transition-colors disabled:opacity-50"
+                      aria-label={`Test connection to ${s.name}`}
+                      aria-busy={testingServerId === s.id || undefined}
+                    >
+                      {testingServerId === s.id && (
+                        <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" aria-hidden="true" />
+                      )}
+                      {testingServerId === s.id ? "Testing…" : "Test"}
+                    </button>
+                    <button
+                      onClick={() => setDeleteServerTarget(s)}
+                      className="text-xs text-content-tertiary hover:text-accent-red transition-colors"
+                      aria-label={`Delete ${s.name}`}
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </div>
               </Card>
             ))}
