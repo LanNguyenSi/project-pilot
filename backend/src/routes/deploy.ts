@@ -147,6 +147,21 @@ deploy.delete("/servers/:id", async (c) => {
   return c.json(result.data);
 });
 
+// POST /deploy/servers/:id/test — trigger deploy-panel's relay connectivity
+// check for one server. Proxies to deploy-panel POST /api/servers/:id/test,
+// which pings the server's stored relayUrl (with its relayToken, if any) and
+// persists the resulting status; no SSH credentials are involved. Response
+// body is `{ status: "online" | "offline" | "no-relay", message?, relay? }`.
+deploy.post("/servers/:id/test", async (c) => {
+  const userId = c.get("userId")!;
+  const id = c.req.param("id");
+  const result = await deployRequest<unknown>(userId, `/api/servers/${encodeURIComponent(id)}/test`, {
+    method: "POST",
+  });
+  if (!result.ok) return c.json({ error: result.error }, result.status as any);
+  return c.json(result.data);
+});
+
 // GET /deploy/apps?server_id=
 deploy.get("/apps", async (c) => {
   const userId = c.get("userId")!;

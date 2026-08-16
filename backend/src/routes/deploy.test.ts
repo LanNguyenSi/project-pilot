@@ -108,3 +108,76 @@ describe("POST /deploy/servers proxy schema", () => {
     expect(body).toEqual({ name: "web-1", host: "1.2.3.4" });
   });
 });
+
+describe("POST /deploy/servers/:id/test proxy", () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  function postTest(id: string) {
+    return deploy.request(`/servers/${encodeURIComponent(id)}/test`, { method: "POST" });
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.clearAllMocks();
+  });
+
+  it("proxies to POST /api/servers/:id/test with the Bearer dp_ token and returns an online result", async () => {
+    fetchMock = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ status: "online", relay: { version: "1.2.3" } }),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const res = await postTest("srv-1");
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ status: "online", relay: { version: "1.2.3" } });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("http://deploy-panel.test/api/servers/srv-1/test");
+    expect(init.method).toBe("POST");
+    expect((init.headers as Record<string, string>).Authorization).toBe("Bearer dp-token");
+  });
+
+  it("passes through an offline result as a normal 200 response (reachability failure is data, not an HTTP error)", async () => {
+    fetchMock = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ status: "offline", message: "Connection failed" }),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const res = await postTest("srv-1");
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ status: "offline", message: "Connection failed" });
+  });
+
+  it("returns a JSON error (not a throw) when deploy-panel rejects with 404 (unknown/foreign server id)", async () => {
+    fetchMock = vi.fn(async () => ({
+      ok: false,
+      status: 404,
+      json: async () => ({ error: "not_found" }),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const res = await postTest("does-not-exist");
+
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "not_found" });
+  });
+
+  it("returns 502 when deploy-panel is unreachable", async () => {
+    fetchMock = vi.fn(async () => {
+      throw new Error("network down");
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const res = await postTest("srv-1");
+
+    expect(res.status).toBe(502);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toBe("Deploy Panel unreachable");
+  });
+});
