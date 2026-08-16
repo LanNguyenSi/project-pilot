@@ -154,6 +154,20 @@ describe("POST /deploy/servers/:id/test proxy", () => {
     expect(await res.json()).toEqual({ status: "offline", message: "Connection failed" });
   });
 
+  it("passes through a no-relay result as a normal 200 response (no relay configured is data, not an HTTP error)", async () => {
+    fetchMock = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ status: "no-relay", message: "No relay configured for this server" }),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const res = await postTest("srv-1");
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ status: "no-relay", message: "No relay configured for this server" });
+  });
+
   it("returns a JSON error (not a throw) when deploy-panel rejects with 404 (unknown/foreign server id)", async () => {
     fetchMock = vi.fn(async () => ({
       ok: false,

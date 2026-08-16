@@ -49,6 +49,7 @@ const statusBadge: Record<string, BadgeVariant> = {
   deploying: "warning",
   rolled_back: "purple",
   unknown: "neutral",
+  "no-relay": "warning",
 };
 
 export default function DeploysPage() {
@@ -234,20 +235,33 @@ export default function DeploysPage() {
         `/api/deploy/servers/${encodeURIComponent(s.id)}/test`,
         { method: "POST" },
       );
-      const reachable = data.status === "online";
-      toast({
-        title: reachable
-          ? `${s.name} is reachable`
-          : `${s.name} is unreachable${data.message ? `: ${data.message}` : ""}`,
-        variant: reachable ? "success" : "error",
-      });
+      if (data.status === "online") {
+        toast({ title: `${s.name} is reachable`, variant: "success" });
+      } else if (data.status === "no-relay") {
+        // Not a reachability failure: the server simply has no relay configured
+        // yet, so there's nothing to probe. Surfacing this as "unreachable"
+        // would be misleading. "warning" isn't a ToastVariant here, so "info"
+        // is the closest non-alarming existing variant.
+        toast({
+          title: `${s.name} has no relay configured${data.message ? `: ${data.message}` : ""}`,
+          variant: "info",
+        });
+      } else {
+        toast({
+          title: `${s.name} is unreachable${data.message ? `: ${data.message}` : ""}`,
+          variant: "error",
+        });
+      }
       // The panel persists the probed status server-side; refetch to pick up
       // the authoritative row (also covers no-relay / offline reason changes).
       await fetchData();
     } catch (err) {
       toast({ title: err instanceof Error ? err.message : `Failed to test ${s.name}`, variant: "error" });
     } finally {
-      setTestingServerId(null);
+      // Only clear the spinner if this request still owns it — a slower
+      // in-flight test for another server must not steal this row's reset
+      // (and vice versa), since testingServerId is a single-slot id.
+      setTestingServerId((prev) => (prev === s.id ? null : prev));
     }
   }
 
