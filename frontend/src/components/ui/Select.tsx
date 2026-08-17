@@ -136,7 +136,7 @@ export function Select({
         onKeyDown={handleKeyDown}
         className={triggerCls}
       >
-        <span className="flex-1 min-w-0 truncate text-left">{selected ? selected.label : placeholder}</span>
+        <span className="flex-1 min-w-0 truncate text-left" title={selected ? selected.label : undefined}>{selected ? selected.label : placeholder}</span>
         <svg
           className={`h-4 w-4 shrink-0 text-content-tertiary transition-transform duration-fast ${open ? "rotate-180" : ""}`}
           fill="none"

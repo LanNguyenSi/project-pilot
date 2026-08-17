@@ -31,7 +31,7 @@ export default function DashboardPage() {
   // Shared with the rest of the (app) shell via AuthContext (see AppShell),
   // instead of fetching /api/auth/me here independently on every mount and
   // again on every 30s refresh below.
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -58,7 +58,7 @@ export default function DashboardPage() {
     return () => { cancelled = true; clearInterval(interval); };
   }, [router]);
 
-  if (loading) {
+  if (loading || authLoading) {
     return (
       <div role="status" aria-label="Loading">
         <SkeletonBox className="h-7 w-40 mb-2" />
