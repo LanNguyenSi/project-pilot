@@ -194,4 +194,18 @@ describe("POST /deploy/servers/:id/test proxy", () => {
     const body = (await res.json()) as { error: string };
     expect(body.error).toBe("Deploy Panel unreachable");
   });
+
+  it("returns 504 when the upstream fetch times out (AbortSignal.timeout() rejects with a TimeoutError DOMException)", async () => {
+    fetchMock = vi.fn(async () => {
+      // Real Node 26 message for an AbortSignal.timeout() rejection.
+      throw new DOMException("The operation was aborted due to timeout", "TimeoutError");
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const res = await postTest("srv-1");
+
+    expect(res.status).toBe(504);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toBe("Deploy Panel timed out");
+  });
 });
