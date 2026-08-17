@@ -159,7 +159,10 @@ forge.post("/migrate-tasks", zValidator("json", migrateSchema), async (c) => {
 
   const outcome = await migrateForgeTasks(userId, repoUrl, teamId);
   if (!outcome.ok) {
-    return c.json({ error: outcome.error, code: outcome.code, teams: outcome.teams }, outcome.status as any);
+    return c.json(
+      { error: outcome.error, code: outcome.code, teams: outcome.teams, cycle: outcome.cycle },
+      outcome.status as any,
+    );
   }
   return c.json(outcome.result);
 });
