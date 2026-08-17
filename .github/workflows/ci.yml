@@ -91,7 +91,8 @@ jobs:
 
   frontend-test:
     # Runs the frontend vitest suite with v8 coverage. The coverage gate
-    # enforces a per-file threshold for src/lib/api.ts — see
+    # enforces per-file thresholds for src/lib/api.ts and
+    # src/components/deploys/InstallRelayWizard.tsx — see
     # frontend/vitest.config.ts for exact values.
     runs-on: ubuntu-latest
     steps:
