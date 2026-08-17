@@ -20,6 +20,7 @@ jobs:
       - run: npm ci
       - run: cd backend && npx prisma generate
       - run: npm run lint --workspace=backend
+      - run: npm run lint:test --workspace=backend
       - run: npm run build --workspace=backend
 
   backend-test:
@@ -64,6 +65,7 @@ jobs:
             node -e "Object.keys(require('./package-lock.json').packages).filter(k => k.split('node_modules/').pop() === 'zod').forEach(k => console.log('  ' + k))"
             exit 1
           fi
+      - run: npm run typecheck:test --workspace=mcp
       - run: npm run build --workspace=mcp
 
   mcp-test:
@@ -87,6 +89,7 @@ jobs:
         with:
           node-version: 22
       - run: npm ci
+      - run: npm run typecheck:test --workspace=frontend
       - run: npm run build --workspace=frontend
 
   frontend-test:
