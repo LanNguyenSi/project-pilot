@@ -6,6 +6,22 @@ import { prisma } from "../lib/prisma.js";
  * (`preview.tasks[]`). Mirrors the frontend `Task` interface in
  * forge/create/page.tsx. All fields beyond `id`/`title` are best-effort: forge
  * is an external service and older planforge versions may omit them.
+ *
+ * `dependsOn` mirrors `tasks[].dependsOn` in planforge's structured
+ * `plan-output.json` (agent-planforge/models/planning-output.schema.json):
+ * planforge task ids (i.e. other entries' `id`, same id-space as this
+ * task's own `id`/`externalRef`) that must be imported before this task.
+ * It is a forward-compatible extension point, NOT wired to a live data
+ * source today: project-forge's `/api/v1/generate` and `/api/v1/preview`
+ * responses build `preview.tasks[]` by regex-parsing `tasks/*.md` (see
+ * project-forge/lib/v1-shared.ts `parseTasks`), which carries no dependency
+ * data, and `plan-output.json` itself (which does have it) lives under
+ * `planning/`, a directory project-forge deliberately excludes from the
+ * published repo (project-forge/lib/planforge-output.ts
+ * `PLANFORGE_PUBLISH_EXCLUDES`) — so it can't be read back from the pushed
+ * repo either. Until project-forge is changed to surface it, `dependsOn`
+ * stays absent on every task and the migration in forge-task-migration.ts
+ * takes its unchanged v1 flat-import path.
  */
 export interface ForgePreviewTask {
   id: string;
@@ -13,6 +29,7 @@ export interface ForgePreviewTask {
   wave?: string;
   priority?: string;
   summary?: string;
+  dependsOn?: string[];
 }
 
 /**
@@ -28,6 +45,27 @@ export function repoKey(repoUrl: string): string {
 }
 
 /**
+ * Normalize a single task's `dependsOn` defensively: anything other than an
+ * array of strings is stripped rather than passed through — never left as a
+ * non-array value a `for...of` could choke or silently iterate characters
+ * on. Shared by `extractPreviewTasks` (parsing a fresh forge preview) and
+ * `forge-task-migration.ts` (re-reading a previously-stored snapshot, which
+ * may have been captured by an older/looser code path than the one reading
+ * it back), so both entry points feed the topo-sort the same guarantee: a
+ * present `dependsOn` is always `string[]`, never absent-but-empty (`[]` is
+ * normalized away to no key at all).
+ */
+export function normalizeTaskDependsOn(task: ForgePreviewTask): ForgePreviewTask {
+  const rawDependsOn = (task as { dependsOn?: unknown }).dependsOn;
+  if (rawDependsOn === undefined) return task;
+  const dependsOn = Array.isArray(rawDependsOn)
+    ? rawDependsOn.filter((d): d is string => typeof d === "string")
+    : [];
+  const { dependsOn: _ignored, ...rest } = task as ForgePreviewTask & { dependsOn?: unknown };
+  return dependsOn.length > 0 ? { ...rest, dependsOn } : (rest as ForgePreviewTask);
+}
+
+/**
  * Pull the task array out of a forge preview payload defensively. Returns an
  * empty array for anything that doesn't look like `{ tasks: [...] }` so a
  * shape change upstream degrades to "nothing to migrate" rather than throwing
@@ -37,10 +75,15 @@ export function extractPreviewTasks(preview: unknown): ForgePreviewTask[] {
   if (!preview || typeof preview !== "object") return [];
   const tasks = (preview as { tasks?: unknown }).tasks;
   if (!Array.isArray(tasks)) return [];
-  return tasks.filter(
-    (t): t is ForgePreviewTask =>
-      !!t && typeof t === "object" && typeof (t as ForgePreviewTask).id === "string" && typeof (t as ForgePreviewTask).title === "string",
-  );
+  return tasks
+    .filter(
+      (t): t is ForgePreviewTask =>
+        !!t && typeof t === "object" && typeof (t as ForgePreviewTask).id === "string" && typeof (t as ForgePreviewTask).title === "string",
+    )
+    // dependsOn isn't emitted by any known forge response today (see the doc
+    // comment on ForgePreviewTask); normalized defensively here so a future
+    // upstream change that adds it needs no change on this side.
+    .map(normalizeTaskDependsOn);
 }
 
 /**
