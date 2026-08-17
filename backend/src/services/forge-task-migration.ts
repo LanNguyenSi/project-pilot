@@ -168,11 +168,7 @@ function findCycle(remainingIds: Set<string>, dependsOnById: Map<string, string[
   for (const id of remainingIds) color.set(id, WHITE);
 
   for (const start of remainingIds) {
-    // Also provably unreachable given the invariant above (a later root
-    // already colored by an earlier root's traversal would mean that
-    // earlier traversal backtracked without finding a cycle, which — see
-    // the loop body below — can't happen either): kept as ordinary DFS
-    // bookkeeping, not relied on to be exercised.
+    // Unreachable given the Kahn invariant; kept as defensive DFS bookkeeping.
     if (color.get(start) !== WHITE) continue;
 
     // `path` is the current DFS path (root..top), used to slice out the
@@ -188,12 +184,7 @@ function findCycle(remainingIds: Set<string>, dependsOnById: Map<string, string[
     while (frames.length > 0) {
       const frame = frames[frames.length - 1]!;
       if (frame.i >= frame.deps.length) {
-        // Every edge of this node has been walked with no cycle found
-        // through it (only reachable via a node whose dependsOn is itself
-        // provably acyclic within `remainingIds` after earlier BLACK edges
-        // were skipped below — see the loop's short-circuit return, which
-        // exits the whole function the instant any node's edge closes a
-        // cycle). Ordinary backtracking bookkeeping either way.
+        // Unreachable given the Kahn invariant; kept as defensive DFS bookkeeping.
         color.set(frame.id, BLACK);
         path.pop();
         frames.pop();
@@ -216,10 +207,7 @@ function findCycle(remainingIds: Set<string>, dependsOnById: Map<string, string[
       // through this edge, move on to the next one.
     }
   }
-  // Unreachable: order.length !== tasks.length guarantees remainingIds is
-  // non-empty and every node in it has an unresolved in-edge within the
-  // subgraph, so a cycle must exist and the loop above always returns before
-  // every root is exhausted.
+  // Unreachable given the Kahn invariant; kept as defensive DFS bookkeeping.
   return [...remainingIds];
 }
 
@@ -254,14 +242,18 @@ export function topoSortForgeTasks(tasks: ForgePreviewTask[]): TopoSortResult {
   const dependsOnById = new Map<string, string[]>();
 
   for (const task of tasks) {
-    const filtered: string[] = [];
+    const rawFiltered: string[] = [];
     for (const dep of task.dependsOn ?? []) {
       if (ids.has(dep)) {
-        filtered.push(dep);
+        rawFiltered.push(dep);
       } else {
         warnings.push(`Task "${task.id}" depends on unknown planforge id "${dep}" (dropped)`);
       }
     }
+    // A duplicate id within one task's own dependsOn (e.g. a regenerated
+    // plan listing the same dependency twice) must not double-count against
+    // MAX_DEPENDS_ON, nor reach the create payload as a repeated uuid.
+    const filtered = [...new Set(rawFiltered)];
     if (filtered.length > MAX_DEPENDS_ON) {
       throw new TooManyDependenciesError(task.id, filtered.length);
     }
@@ -451,10 +443,17 @@ export async function migrateForgeTasks(
   let failed = 0;
   let warnings: string[] = [];
   // Set only on the v2 (dependency-aware) path, to `sort.order.length` — the
-  // total number of tasks that path needed to end up created. Used below to
-  // gate the snapshot delete: on v1 `undefined` here just falls back to the
-  // original `failed === 0` check.
+  // deduped total number of tasks that path ordered (and needed to end up
+  // created). Reported as `taskCount` on the v2 path (v1 keeps
+  // `snapshot.length`) and used, together with `v2SkippedOwnDependsOn`
+  // below, to gate the snapshot delete.
   let v2TotalOrdered: number | undefined;
+  // Set only on the v2 path: true when at least one 409-skipped (already
+  // existed) task itself carried its own dependsOn edges that therefore
+  // were never applied. A skip whose task had NO dependsOn of its own loses
+  // no dependency data — such a skip alone must not block the snapshot
+  // delete or trigger the "dependsOn edges were NOT applied" warning.
+  let v2SkippedOwnDependsOn = false;
 
   const hasDependencies = snapshot.some((t) => (t.dependsOn?.length ?? 0) > 0);
 
@@ -528,6 +527,9 @@ export async function migrateForgeTasks(
     // planforge task id -> agent-tasks task uuid, filled in as tasks are
     // created (or found to already exist — see the 409 branch below).
     const createdIds = new Map<string, string>();
+    // planforge ids resolved via the 409 lookup (already existed) rather
+    // than freshly created here — see the skipped-tasks gate below.
+    const skippedIds: string[] = [];
 
     for (const externalId of sort.order) {
       const task = byId.get(externalId)!;
@@ -591,6 +593,7 @@ export async function migrateForgeTasks(
           };
         }
         skipped += 1;
+        skippedIds.push(externalId);
         createdIds.set(externalId, match.id);
         continue;
       }
@@ -598,7 +601,12 @@ export async function migrateForgeTasks(
       return { ok: false, status: res.status, error: res.error };
     }
 
-    if (skipped > 0) {
+    // Only a skip whose own dependsOn was non-empty actually lost dependency
+    // data (that edge set was never applied — see the create-time-only note
+    // above); a skip on a task with no dependsOn of its own has nothing to
+    // lose, so it must not trigger a false warning or block the delete below.
+    v2SkippedOwnDependsOn = skippedIds.some((id) => (sort.dependsOnById.get(id)?.length ?? 0) > 0);
+    if (v2SkippedOwnDependsOn) {
       warnings = [
         ...warnings,
         `${skipped} task${skipped === 1 ? "" : "s"} already existed; their dependsOn edges were NOT applied - dependsOn is create-time only`,
@@ -609,12 +617,13 @@ export async function migrateForgeTasks(
   // Tasks are now in agent-tasks (the source of truth); drop the pilot-local
   // snapshot. Re-migrating later relies on agent-tasks' own externalRef dedupe
   // (v1 path) or the 409-lookup fallback above (v2 path). On the v2 path,
-  // deleting is only safe once every task was actually created here (not
-  // 409-resolved): a skip means that task's dependsOn edges were never
-  // applied (create-time only — see the warning above), so the snapshot is
-  // the only remaining copy of that dependency data and must survive for
-  // operator action.
-  const migrationComplete = failed === 0 && (v2TotalOrdered === undefined || created === v2TotalOrdered);
+  // deleting is only safe when no 409-skipped task actually lost dependency
+  // data (`v2SkippedOwnDependsOn` — see above): a skip on a task with its
+  // own dependsOn means those edges were never applied (create-time only),
+  // so the snapshot is the only remaining copy of that data and must survive
+  // for operator action. A skip on a task with no dependsOn of its own loses
+  // nothing, so it does not block the delete.
+  const migrationComplete = failed === 0 && !v2SkippedOwnDependsOn;
   if (migrationComplete) {
     await deleteForgeSnapshotByRepo(userId, repoUrl);
   }
@@ -624,7 +633,10 @@ export async function migrateForgeTasks(
     result: {
       projectId,
       projectCreated,
-      taskCount: snapshot.length,
+      // v2 path: the deduped task count the topo-sort actually ordered
+      // (duplicate planforge ids collapse to one). v1 keeps the raw
+      // snapshot length since it doesn't dedupe.
+      taskCount: v2TotalOrdered ?? snapshot.length,
       created,
       skipped,
       failed,

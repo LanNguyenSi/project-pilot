@@ -261,6 +261,26 @@ describe("topoSortForgeTasks", () => {
     expect(result.warnings).toEqual([]);
   });
 
+  it("dedupes a duplicate id WITHIN a single task's own dependsOn", () => {
+    const tasks = [task("a"), task("b"), task("c", ["a", "a", "b"])];
+
+    const result = topoSortForgeTasks(tasks);
+
+    expect(result.dependsOnById.get("c")).toEqual(["a", "b"]);
+    expect(result.order).toEqual(["a", "b", "c"]);
+  });
+
+  it("does not double-count repeated dependsOn entries against the 50-entry cap (26 unique + 25 repeats)", () => {
+    const uniqueIds = Array.from({ length: 26 }, (_, i) => `d${i}`);
+    const withRepeats = [...uniqueIds, ...uniqueIds.slice(0, 25)]; // 51 raw entries, 26 unique
+    const tasks = [...uniqueIds.map((id) => task(id)), task("big", withRepeats)];
+
+    const result = topoSortForgeTasks(tasks);
+
+    expect(result.dependsOnById.get("big")).toHaveLength(26);
+    expect(result.order.at(-1)).toBe("big");
+  });
+
   it("throws TooManyDependenciesError when a task's (non-dangling) dependsOn exceeds the 50-entry cap", () => {
     const depIds = Array.from({ length: 51 }, (_, i) => `d${i}`);
     const tasks = [...depIds.map((id) => task(id)), task("big", depIds)];
@@ -612,6 +632,103 @@ describe("migrateForgeTasks", () => {
       expect(deleteSnapshot).toHaveBeenCalledWith("u1", REPO_URL);
     });
 
+    // MED finding: a duplicate id WITHIN a single task's own dependsOn must
+    // not reach the create payload as a repeated uuid.
+    it("dedupes duplicate dependsOn entries within a task before wiring the create payload", async () => {
+      getSnapshot.mockResolvedValue([
+        { id: "a", title: "A" },
+        { id: "b", title: "B" },
+        { id: "c", title: "C", dependsOn: ["a", "a", "b"] },
+      ]);
+      mockFetch({
+        available: { status: 200, body: { projects: [{ id: "proj-x", githubRepo: OWNER_REPO, teamId: "team-1" }] } },
+        createTaskSequence: [
+          { status: 201, body: { task: { id: "u1" } } },
+          { status: 201, body: { task: { id: "u2" } } },
+          { status: 201, body: { task: { id: "u3" } } },
+        ],
+      });
+
+      const outcome = await migrateForgeTasks("u1", REPO_URL);
+
+      expect(outcome.ok).toBe(true);
+      expect(captured.createTask[2]).toMatchObject({ externalRef: "c", dependsOn: ["u1", "u2"] });
+    });
+
+    // LOW finding 5: taskCount on the v2 path reports the deduped count the
+    // topo-sort actually ordered, not the raw (possibly duplicate-carrying)
+    // snapshot length.
+    it("reports a deduped taskCount on the v2 path when the snapshot has a duplicate planforge task id", async () => {
+      getSnapshot.mockResolvedValue([
+        { id: "a", title: "A" },
+        { id: "a", title: "A duplicate" },
+        { id: "b", title: "B", dependsOn: ["a"] },
+      ]);
+      mockFetch({
+        available: { status: 200, body: { projects: [{ id: "proj-x", githubRepo: OWNER_REPO, teamId: "team-1" }] } },
+        createTaskSequence: [
+          { status: 201, body: { task: { id: "u1" } } },
+          { status: 201, body: { task: { id: "u2" } } },
+        ],
+      });
+
+      const outcome = await migrateForgeTasks("u1", REPO_URL);
+
+      expect(outcome.ok).toBe(true);
+      if (outcome.ok) {
+        expect(outcome.result.taskCount).toBe(2);
+        expect(outcome.result.created + outcome.result.skipped).toBe(outcome.result.taskCount);
+      }
+    });
+
+    // MED finding: the create payload and the 409-lookup key must use the
+    // SAME 255-char truncated externalRef (adopted from reviewer probe).
+    it("uses the same 255-char truncated key for the create payload and the 409 lookup", async () => {
+      const longId = "L".repeat(300);
+      const truncated = longId.slice(0, 255);
+      getSnapshot.mockResolvedValue([
+        { id: longId, title: "Long id task" },
+        { id: "t2", title: "Dependent", dependsOn: [longId] },
+      ]);
+      const createBodies: any[] = [];
+      const lookupUrls: string[] = [];
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
+          const method = init?.method ?? "GET";
+          if (url.includes("/api/projects/available")) {
+            return json(200, { projects: [{ id: "proj-x", githubRepo: OWNER_REPO, teamId: "team-1" }] });
+          }
+          if (method === "GET" && /\/tasks\?externalRef=/.test(url)) {
+            lookupUrls.push(url);
+            const ref = decodeURIComponent(url.match(/externalRef=([^&]+)/)![1]);
+            return json(200, { tasks: [{ id: "existing-long", externalRef: ref }] });
+          }
+          if (method === "POST" && /\/api\/projects\/[^/]+\/tasks$/.test(url)) {
+            const body = JSON.parse(init!.body as string);
+            createBodies.push(body);
+            if (createBodies.length === 1) return json(409, { error: "conflict" });
+            return json(201, { task: { id: "uuid-2" } });
+          }
+          throw new Error(`unmatched URL: ${method} ${url}`);
+        }),
+      );
+
+      const outcome = await migrateForgeTasks("u1", REPO_URL);
+
+      expect(createBodies[0].externalRef).toBe(truncated);
+      expect(createBodies[0].externalRef).toHaveLength(255);
+      const lookedUp = decodeURIComponent(lookupUrls[0]!.match(/externalRef=([^&]+)/)![1]);
+      expect(lookedUp).toBe(truncated);
+      expect(outcome.ok).toBe(true);
+      if (outcome.ok) {
+        expect(outcome.result.created).toBe(1);
+        expect(outcome.result.skipped).toBe(1);
+      }
+      // downstream edge wired to the looked-up uuid.
+      expect(createBodies[1]).toMatchObject({ externalRef: "t2", dependsOn: ["existing-long"] });
+    });
+
     it("is idempotent on re-run: a 409 on an already-imported task resolves via lookup and keeps downstream dependsOn correct", async () => {
       getSnapshot.mockResolvedValue([
         { id: "t1", title: "Already imported" },
@@ -637,21 +754,19 @@ describe("migrateForgeTasks", () => {
         expect(outcome.result.created).toBe(1);
         expect(outcome.result.skipped).toBe(1);
         expect(outcome.result.failed).toBe(0);
-        // Finding 1: a skip means dependsOn was NOT applied to the skipped
-        // task itself — surfaced as a warning even though the migration
-        // otherwise succeeds.
-        expect(outcome.result.warnings).toEqual([
-          "1 task already existed; their dependsOn edges were NOT applied - dependsOn is create-time only",
-        ]);
+        // LOW finding 4: the skipped task (t1) carries no dependsOn of its
+        // own, so nothing was actually lost by not re-applying it — no
+        // warning, unlike the all-409-with-edges case below where the
+        // skipped task itself has a dependsOn.
+        expect(outcome.result.warnings).toBeUndefined();
       }
       // t2 depends on the *looked-up* uuid for the pre-existing t1, not a
       // freshly-created one.
       expect(captured.createTask[1]).toMatchObject({ externalRef: "t2", dependsOn: ["existing-uuid-1"] });
-      // Finding 1: any skip keeps the snapshot (created !== sort.order.length),
-      // even though the overall outcome is `ok: true` — the skipped task's
-      // dependsOn edges were never applied, so the snapshot is the only
-      // remaining copy of that data.
-      expect(deleteSnapshot).not.toHaveBeenCalled();
+      // LOW finding 4: t1's skip lost no dependency data (it had none of its
+      // own), so the snapshot is safe to delete even though one task in
+      // this run was skip-resolved rather than freshly created.
+      expect(deleteSnapshot).toHaveBeenCalledWith("u1", REPO_URL);
     });
 
     it("hard-fails the migration when a 409 conflict cannot be resolved via lookup", async () => {
@@ -983,13 +1098,18 @@ describe("migrateForgeTasks", () => {
       if (run2.ok) {
         expect(run2.result.created).toBe(2);
         expect(run2.result.skipped).toBe(1);
+        // LOW finding 4: t1 (the skip-resolved task) carries no dependsOn of
+        // its own, so nothing was actually lost by not re-applying it — the
+        // final graph above is fully correct, so no false warning fires.
+        expect(run2.result.warnings).toBeUndefined();
       }
       expect(captured.createTask[0]).toMatchObject({ externalRef: "t1" });
       expect(captured.createTask[1]).toMatchObject({ externalRef: "t2", dependsOn: ["uuid-1"] });
       expect(captured.createTask[2]).toMatchObject({ externalRef: "t3", dependsOn: ["uuid-1", "uuid-2"] });
-      // t1 was skip-resolved (not created) in run 2, so the conservative
-      // gate keeps the snapshot even though the overall result is ok:true.
-      expect(deleteSnapshot).not.toHaveBeenCalled();
+      // LOW finding 4: t1's skip lost no dependency data (it had none of its
+      // own to lose), so the snapshot is safe to delete even though it was
+      // skip-resolved rather than freshly created in this run.
+      expect(deleteSnapshot).toHaveBeenCalledWith("u1", REPO_URL);
     });
   });
 });

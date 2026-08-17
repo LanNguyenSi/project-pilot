@@ -72,10 +72,12 @@ export default function ForgePage() {
         body: JSON.stringify({ repoUrl, ...(teamId ? { teamId } : {}) }),
       });
       setTeamPicker(null);
-      // Notices from the dependency-aware import path (dropped dangling
-      // dependsOn edges, or a note that 409-skipped tasks kept their old
-      // dependsOn wiring) — surfaced as a short secondary line, not folded
-      // into the title.
+      // Notices from the dependency-aware import path — genuinely dropped
+      // dangling dependsOn edges, or 409-skipped tasks whose OWN dependsOn
+      // edges were never applied (create-time only). Either means the final
+      // dependency graph is missing edges the operator may need to know
+      // about, so this uses the stronger error variant (longer, non-grey)
+      // rather than a quiet subline on an otherwise-success toast.
       const description = result.warnings && result.warnings.length > 0 ? result.warnings.join("; ") : undefined;
       if (result.failed > 0) {
         toast({
@@ -91,7 +93,7 @@ export default function ForgePage() {
             : result.taskCount === 0
               ? "No tasks to migrate"
               : `All ${result.taskCount} tasks already present`;
-        toast({ title: summary, description, variant: "success" });
+        toast({ title: summary, description, variant: description ? "error" : "success" });
       }
       await refreshTasksProjects();
     } catch (err) {

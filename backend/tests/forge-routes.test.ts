@@ -504,6 +504,42 @@ describe("forge routes", () => {
       expect(body.code).toBe("multiple_teams");
       expect(body.teams).toEqual([{ id: "a", name: "A" }, { id: "b", name: "B" }]);
     });
+
+    // LOW finding 3: too_many_dependencies passes both `code` and `taskId`
+    // through to the response body unchanged.
+    it("passes through code and taskId on a too_many_dependencies outcome", async () => {
+      mockMigrateForgeTasks.mockResolvedValue({
+        ok: false,
+        status: 400,
+        code: "too_many_dependencies",
+        error: 'Task "big" has 51 dependsOn entries (max 50)',
+        taskId: "big",
+      });
+
+      const res = await postJson("/migrate-tasks", { repoUrl: "https://github.com/lan/my-app" });
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as { error: string; code: string; taskId: string };
+      expect(body.code).toBe("too_many_dependencies");
+      expect(body.taskId).toBe("big");
+    });
+
+    // LOW finding 3: cyclic_dependencies passes both `code` and `cycle`
+    // through to the response body unchanged.
+    it("passes through code and cycle on a cyclic_dependencies outcome", async () => {
+      mockMigrateForgeTasks.mockResolvedValue({
+        ok: false,
+        status: 409,
+        code: "cyclic_dependencies",
+        error: "Dependency cycle detected among planforge tasks: a -> b -> a",
+        cycle: ["a", "b", "a"],
+      });
+
+      const res = await postJson("/migrate-tasks", { repoUrl: "https://github.com/lan/my-app" });
+      expect(res.status).toBe(409);
+      const body = (await res.json()) as { error: string; code: string; cycle: string[] };
+      expect(body.code).toBe("cyclic_dependencies");
+      expect(body.cycle).toEqual(["a", "b", "a"]);
+    });
   });
 
   // ==========================================================================
