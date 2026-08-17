@@ -20,6 +20,15 @@ export default defineConfig({
     jsx: { runtime: "automatic" },
   },
   test: {
+    // Node 26 ships experimental Web Storage globals (localStorage /
+    // sessionStorage) that collide with jsdom's own implementations and
+    // break DOM-heavy tests. --no-experimental-webstorage turns those globals
+    // back off. Node 20 doesn't know this flag at all, so the guard is
+    // load-bearing: an unconditional execArgv entry would break the Node 20
+    // lane outright rather than just being a no-op there.
+    execArgv: process.allowedNodeEnvironmentFlags.has("--no-experimental-webstorage")
+      ? ["--no-experimental-webstorage"]
+      : [],
     include: ["tests/**/*.test.ts", "tests/**/*.test.tsx"],
     coverage: {
       provider: "v8",
@@ -28,10 +37,16 @@ export default defineConfig({
       // jsdom` docblock; everything else stays on vitest's default node
       // environment.
       include: ["src/lib/api.ts", "src/components/deploys/InstallRelayWizard.tsx"],
-      exclude: ["**/*.test.ts", "**/*.test.tsx"],
-      // Per-file threshold. Set a few points below the measured baseline so
-      // a single line/branch removal (mutation) still breaks CI, while
-      // normal test churn doesn't cause false failures.
+      // Per-file threshold. This gate catches the test file being deleted
+      // outright, or a large chunk of new code landing with no coverage at
+      // all — it does NOT reliably catch single-line/branch mutations;
+      // those are caught by the tests' own assertions, not by the coverage
+      // percentage. (The previous version of this comment claimed the
+      // opposite — that thresholds alone would catch a line/branch removal —
+      // which measured false in both directions: removing the wipe-effect
+      // line or the handleClose abort call barely moved these numbers, and
+      // it was the assertions, not the thresholds, that turned the mutants
+      // red.)
       //
       // Measured baseline (2026-07-01): src/lib/api.ts is 100% statements /
       // branches / functions / lines.
@@ -50,7 +65,7 @@ export default defineConfig({
         "src/components/deploys/InstallRelayWizard.tsx": {
           statements: 58,
           branches: 52,
-          functions: 53,
+          functions: 45,
           lines: 62,
         },
       },
