@@ -368,6 +368,7 @@ export default function StyleguidePage() {
 
           {/* ── EmptyState ── */}
           <Section title="EmptyState">
+            {/* Convention: a single missing/absent value (not a whole empty list) renders as the middle dot "·" (U+00B7), not an em-dash or hyphen. */}
             <div className="border border-stroke-default rounded-card">
               <EmptyState
                 icon={<Icon name="folder" size={48} />}

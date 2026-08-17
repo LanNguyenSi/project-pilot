@@ -537,10 +537,10 @@ export default function DeploysPage() {
                         {d.app} <span className="text-content-tertiary">on</span> {d.server}
                       </span>
                       <span className="text-xs text-content-tertiary font-mono">
-                        {d.commitAfter?.slice(0, 7) || "—"}
+                        {d.commitAfter?.slice(0, 7) || "·"}
                       </span>
                       <span className="text-xs text-content-tertiary">
-                        {d.duration ? `${(d.duration / 1000).toFixed(1)}s` : "—"}
+                        {d.duration ? `${(d.duration / 1000).toFixed(1)}s` : "·"}
                       </span>
                       <span className="text-xs text-content-tertiary">
                         {new Date(d.createdAt).toLocaleString()}

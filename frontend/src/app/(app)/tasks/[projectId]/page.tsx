@@ -236,7 +236,7 @@ export default function ProjectTasksPage() {
                             <p className="text-sm font-medium text-content-primary truncate mb-1">{t.title}</p>
                             <div className="flex items-center gap-2 text-xs text-content-tertiary">
                               <span>{priorityMap[t.priority]?.label || t.priority}</span>
-                              <span className="truncate">{t.claimedByAgent?.name || t.claimedByUser?.email || "—"}</span>
+                              <span className="truncate">{t.claimedByAgent?.name || t.claimedByUser?.email || "·"}</span>
                             </div>
                           </div>
                         </div>
@@ -244,7 +244,7 @@ export default function ProjectTasksPage() {
                     );
                   })}
                   {colTasks.length === 0 && (
-                    <p className="text-xs text-content-tertiary text-center py-4">—</p>
+                    <p className="text-xs text-content-tertiary text-center py-4">·</p>
                   )}
                 </div>
               </div>
