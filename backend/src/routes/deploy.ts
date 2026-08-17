@@ -108,9 +108,12 @@ async function deployRequest<T>(userId: string, path: string, options?: RequestI
     return { ok: true, data: body };
   } catch (err) {
     // Node's AbortSignal.timeout() rejects with a DOMException named
-    // "TimeoutError" (not "AbortError" — that name is reserved for an
-    // explicit abort() call on an AbortController). Match both so a slow
-    // upstream reports 504 instead of falling through to the generic 502.
+    // "TimeoutError" (not "AbortError", which is reserved for an explicit
+    // abort() call on an AbortController). Match both so a slow upstream
+    // reports 504 instead of falling through to the generic 502. The
+    // AbortError arm is defensive only: deployRequest always overwrites
+    // fetchOptions.signal with AbortSignal.timeout(), so callers cannot
+    // inject an AbortController today.
     if (err instanceof DOMException && (err.name === "TimeoutError" || err.name === "AbortError")) {
       return { ok: false, error: "Deploy Panel timed out", status: 504 };
     }

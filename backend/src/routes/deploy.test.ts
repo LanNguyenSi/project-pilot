@@ -197,7 +197,8 @@ describe("POST /deploy/servers/:id/test proxy", () => {
 
   it("returns 504 when the upstream fetch times out (AbortSignal.timeout() rejects with a TimeoutError DOMException)", async () => {
     fetchMock = vi.fn(async () => {
-      throw new DOMException("The operation timed out", "TimeoutError");
+      // Real Node 26 message for an AbortSignal.timeout() rejection.
+      throw new DOMException("The operation was aborted due to timeout", "TimeoutError");
     });
     vi.stubGlobal("fetch", fetchMock);
 
