@@ -4,6 +4,7 @@ import { z } from "zod";
 import { config } from "../config/index.js";
 import { requireAuth } from "../middleware/auth.js";
 import { getCredential } from "../services/credentials.js";
+import { isUpstreamTimeout } from "../lib/upstream-timeout.js";
 import type { AppEnv } from "../types/hono.js";
 
 const deployTriggerSchema = z.object({
@@ -107,14 +108,12 @@ async function deployRequest<T>(userId: string, path: string, options?: RequestI
     }
     return { ok: true, data: body };
   } catch (err) {
-    // Node's AbortSignal.timeout() rejects with a DOMException named
-    // "TimeoutError" (not "AbortError", which is reserved for an explicit
-    // abort() call on an AbortController). Match both so a slow upstream
-    // reports 504 instead of falling through to the generic 502. The
-    // AbortError arm is defensive only: deployRequest always overwrites
-    // fetchOptions.signal with AbortSignal.timeout(), so callers cannot
-    // inject an AbortController today.
-    if (err instanceof DOMException && (err.name === "TimeoutError" || err.name === "AbortError")) {
+    // See isUpstreamTimeout: AbortSignal.timeout() rejects with a
+    // "TimeoutError" DOMException, matched so a slow upstream reports 504
+    // instead of falling through to the generic 502. deployRequest always
+    // overwrites fetchOptions.signal with AbortSignal.timeout(), so callers
+    // cannot inject their own AbortController today.
+    if (isUpstreamTimeout(err)) {
       return { ok: false, error: "Deploy Panel timed out", status: 504 };
     }
     return { ok: false, error: "Deploy Panel unreachable", status: 502 };

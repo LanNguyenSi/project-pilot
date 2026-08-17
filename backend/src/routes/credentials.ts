@@ -4,6 +4,7 @@ import { z } from "zod";
 import { config } from "../config/index.js";
 import { requireAuth } from "../middleware/auth.js";
 import { upsertCredential, listCredentials, deleteCredential, getCredential, isValidService } from "../services/credentials.js";
+import { isUpstreamTimeout } from "../lib/upstream-timeout.js";
 import type { AppEnv } from "../types/hono.js";
 
 const credentials = new Hono<AppEnv>();
@@ -88,7 +89,7 @@ credentials.post("/validate", zValidator("json", validateSchema), async (c) => {
     }
     return c.json({ valid: false, error: res.status === 401 || res.status === 403 ? "Invalid token" : "Service rejected the request" });
   } catch (err) {
-    if (err instanceof DOMException && err.name === "AbortError") {
+    if (isUpstreamTimeout(err)) {
       return c.json({ valid: false, error: "Service timed out" });
     }
     return c.json({ valid: false, error: "Service unreachable" });
