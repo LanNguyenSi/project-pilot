@@ -6,12 +6,7 @@ import Link from "next/link";
 import { apiFetch } from "@/lib/api";
 import { Badge, Card, Icon, SkeletonBox } from "@/components/ui";
 import { PageHeader } from "@/components/layout/PageHeader";
-
-interface User {
-  id: string;
-  email: string;
-  name: string | null;
-}
+import { useAuth } from "@/lib/auth-context";
 
 interface ServiceStatus {
   configured: boolean;
@@ -33,7 +28,10 @@ interface DashboardData {
 
 export default function DashboardPage() {
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
+  // Shared with the rest of the (app) shell via AuthContext (see AppShell),
+  // instead of fetching /api/auth/me here independently on every mount and
+  // again on every 30s refresh below.
+  const { user } = useAuth();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -42,12 +40,8 @@ export default function DashboardPage() {
 
     async function fetchDashboard() {
       try {
-        const [userData, dashData] = await Promise.all([
-          apiFetch<{ user: User }>("/api/auth/me"),
-          apiFetch<DashboardData>("/api/dashboard/summary"),
-        ]);
+        const dashData = await apiFetch<DashboardData>("/api/dashboard/summary");
         if (!cancelled) {
-          setUser(userData.user);
           setData(dashData);
         }
       } catch (err) {
@@ -244,7 +238,7 @@ function StatCard({ stat: s, index }: { stat: StatItem; index: number }) {
           )}
         </div>
         <p className="text-2xl font-semibold text-content-primary mt-1">
-          {!s.configured ? "-" : s.value ?? "-"}
+          {!s.configured ? "·" : s.value ?? "·"}
         </p>
         <p className="text-xs text-content-tertiary mt-1">{s.subtitle}</p>
       </Card>

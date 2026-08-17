@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
+import { AuthProvider } from "@/lib/auth-context";
 
 const COLLAPSED_KEY = "sidebar-collapsed";
 
@@ -33,29 +34,34 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div
-      className="min-h-screen lg:grid transition-[grid-template-columns] duration-normal"
-      style={{ gridTemplateColumns: collapsed ? "4rem 1fr" : "15rem 1fr" }}
-    >
-      <Sidebar
-        collapsed={collapsed}
-        onToggle={toggleCollapsed}
-        mobileOpen={mobileOpen}
-        onMobileClose={() => setMobileOpen(false)}
-      />
+    // AuthProvider fetches /api/auth/me once per shell mount and shares it
+    // with TopBar and any page below (e.g. Dashboard), instead of each
+    // fetching it independently.
+    <AuthProvider>
+      <div
+        className="min-h-screen lg:grid transition-[grid-template-columns] duration-normal"
+        style={{ gridTemplateColumns: collapsed ? "4rem 1fr" : "15rem 1fr" }}
+      >
+        <Sidebar
+          collapsed={collapsed}
+          onToggle={toggleCollapsed}
+          mobileOpen={mobileOpen}
+          onMobileClose={() => setMobileOpen(false)}
+        />
 
-      <div className="min-w-0">
-        <TopBar onMenuClick={() => setMobileOpen(true)} />
-        {/* key={pathname} remounts the element on each navigation, re-triggering
-            animate-fade-in. This gives a subtle page-transition entrance without
-            a full animation library. */}
-        <main
-          key={pathname}
-          className={`animate-fade-in${fullBleed ? "" : " max-w-6xl mx-auto px-6 py-6"}`}
-        >
-          {children}
-        </main>
+        <div className="min-w-0">
+          <TopBar onMenuClick={() => setMobileOpen(true)} />
+          {/* key={pathname} remounts the element on each navigation, re-triggering
+              animate-fade-in. This gives a subtle page-transition entrance without
+              a full animation library. */}
+          <main
+            key={pathname}
+            className={`animate-fade-in${fullBleed ? "" : " max-w-6xl mx-auto px-6 py-6"}`}
+          >
+            {children}
+          </main>
+        </div>
       </div>
-    </div>
+    </AuthProvider>
   );
 }

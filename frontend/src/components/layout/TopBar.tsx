@@ -5,15 +5,10 @@ import { useRouter } from "next/navigation";
 import { Breadcrumbs } from "./Breadcrumbs";
 import { Icon } from "@/components/ui/icons";
 import { apiFetch } from "@/lib/api";
+import { useAuth, type User } from "@/lib/auth-context";
 
 interface TopBarProps {
   onMenuClick: () => void;
-}
-
-interface User {
-  id: string;
-  email: string;
-  name: string | null;
 }
 
 /** Returns up to 2 uppercase initials from a user's name, or the email. */
@@ -31,21 +26,14 @@ function getInitials(user: User): string {
 
 export function TopBar({ onMenuClick }: TopBarProps) {
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
+  // Shared with the rest of the (app) shell via AuthContext (see AppShell),
+  // instead of fetching /api/auth/me here independently. Errors there are
+  // swallowed (a transient failure or a 401): the menu still renders with a
+  // fallback identity, so the logout action is never hidden. Each page
+  // handles its own auth redirect; the shell does not.
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-
-  // Fetch the authenticated user once on mount. Errors are swallowed (a
-  // transient failure or a 401): the menu still renders with a fallback
-  // identity, so the logout action is never hidden. Each page handles its own
-  // auth redirect; the shell does not.
-  useEffect(() => {
-    let cancelled = false;
-    apiFetch<{ user: User }>("/api/auth/me")
-      .then((d) => { if (!cancelled) setUser(d.user); })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, []);
 
   // Close dropdown on Escape.
   const handleKey = useCallback((e: KeyboardEvent) => {
