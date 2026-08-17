@@ -45,6 +45,27 @@ export function repoKey(repoUrl: string): string {
 }
 
 /**
+ * Normalize a single task's `dependsOn` defensively: anything other than an
+ * array of strings is stripped rather than passed through — never left as a
+ * non-array value a `for...of` could choke or silently iterate characters
+ * on. Shared by `extractPreviewTasks` (parsing a fresh forge preview) and
+ * `forge-task-migration.ts` (re-reading a previously-stored snapshot, which
+ * may have been captured by an older/looser code path than the one reading
+ * it back), so both entry points feed the topo-sort the same guarantee: a
+ * present `dependsOn` is always `string[]`, never absent-but-empty (`[]` is
+ * normalized away to no key at all).
+ */
+export function normalizeTaskDependsOn(task: ForgePreviewTask): ForgePreviewTask {
+  const rawDependsOn = (task as { dependsOn?: unknown }).dependsOn;
+  if (rawDependsOn === undefined) return task;
+  const dependsOn = Array.isArray(rawDependsOn)
+    ? rawDependsOn.filter((d): d is string => typeof d === "string")
+    : [];
+  const { dependsOn: _ignored, ...rest } = task as ForgePreviewTask & { dependsOn?: unknown };
+  return dependsOn.length > 0 ? { ...rest, dependsOn } : (rest as ForgePreviewTask);
+}
+
+/**
  * Pull the task array out of a forge preview payload defensively. Returns an
  * empty array for anything that doesn't look like `{ tasks: [...] }` so a
  * shape change upstream degrades to "nothing to migrate" rather than throwing
@@ -59,23 +80,10 @@ export function extractPreviewTasks(preview: unknown): ForgePreviewTask[] {
       (t): t is ForgePreviewTask =>
         !!t && typeof t === "object" && typeof (t as ForgePreviewTask).id === "string" && typeof (t as ForgePreviewTask).title === "string",
     )
-    .map((t) => {
-      // dependsOn isn't emitted by any known forge response today (see the
-      // doc comment on ForgePreviewTask); parsed defensively here so a future
-      // upstream change that adds it needs no change on this side. Unlike the
-      // other best-effort fields (wave/priority/summary, passed through as-is
-      // for display), dependsOn feeds the topo-sort's graph traversal
-      // downstream, so a malformed value is stripped rather than passed
-      // through — never left as a non-array `dependsOn` a `for...of` could
-      // choke or silently iterate characters on.
-      const rawDependsOn = (t as { dependsOn?: unknown }).dependsOn;
-      if (rawDependsOn === undefined) return t;
-      const dependsOn = Array.isArray(rawDependsOn)
-        ? rawDependsOn.filter((d): d is string => typeof d === "string")
-        : [];
-      const { dependsOn: _ignored, ...rest } = t as ForgePreviewTask & { dependsOn?: unknown };
-      return dependsOn.length > 0 ? { ...rest, dependsOn } : (rest as ForgePreviewTask);
-    });
+    // dependsOn isn't emitted by any known forge response today (see the doc
+    // comment on ForgePreviewTask); normalized defensively here so a future
+    // upstream change that adds it needs no change on this side.
+    .map(normalizeTaskDependsOn);
 }
 
 /**

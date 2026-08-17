@@ -14,6 +14,7 @@ interface MigrateResult {
   created: number;
   skipped: number;
   failed: number;
+  warnings?: string[];
 }
 
 interface Team {
@@ -71,9 +72,15 @@ export default function ForgePage() {
         body: JSON.stringify({ repoUrl, ...(teamId ? { teamId } : {}) }),
       });
       setTeamPicker(null);
+      // Notices from the dependency-aware import path (dropped dangling
+      // dependsOn edges, or a note that 409-skipped tasks kept their old
+      // dependsOn wiring) — surfaced as a short secondary line, not folded
+      // into the title.
+      const description = result.warnings && result.warnings.length > 0 ? result.warnings.join("; ") : undefined;
       if (result.failed > 0) {
         toast({
           title: `${result.created} migrated, ${result.failed} failed - try again to retry the rest`,
+          description,
           variant: "error",
         });
       } else {
@@ -84,7 +91,7 @@ export default function ForgePage() {
             : result.taskCount === 0
               ? "No tasks to migrate"
               : `All ${result.taskCount} tasks already present`;
-        toast({ title: summary, variant: "success" });
+        toast({ title: summary, description, variant: "success" });
       }
       await refreshTasksProjects();
     } catch (err) {

@@ -2,8 +2,12 @@ import { agentTasksRequest } from "./agent-tasks-client.js";
 import {
   deleteForgeSnapshotByRepo,
   getForgeSnapshotByRepo,
+  normalizeTaskDependsOn,
   type ForgePreviewTask,
 } from "./forge-task-snapshot.js";
+
+/** Create-route `dependsOn` cap (agent-tasks: `dependsOn: uuid[]`, maxItems 50). */
+const MAX_DEPENDS_ON = 50;
 
 const VALID_PRIORITIES = ["LOW", "MEDIUM", "HIGH", "CRITICAL"] as const;
 type Priority = (typeof VALID_PRIORITIES)[number];
@@ -44,9 +48,11 @@ export interface MigrateResult {
   created: number;
   skipped: number;
   failed: number;
+  // Human-readable notices from the dependency-aware (v2) import path only:
   // dependsOn edges dropped because they pointed at a planforge id missing
-  // from the snapshot. Only present (and non-empty) on the dependency-aware
-  // (v2) import path.
+  // from the snapshot, and/or a note that some tasks were 409-skipped as
+  // already existing (whose dependsOn edges are therefore NOT applied,
+  // create-time only). Only present (and non-empty) on the v2 path.
   warnings?: string[];
 }
 
@@ -56,11 +62,20 @@ export type MigrateOutcome =
       ok: false;
       status: number;
       error: string;
-      code?: "no_snapshot" | "no_team" | "multiple_teams" | "invalid_repo" | "cyclic_dependencies";
+      code?:
+        | "no_snapshot"
+        | "no_team"
+        | "multiple_teams"
+        | "invalid_repo"
+        | "cyclic_dependencies"
+        | "too_many_dependencies";
       teams?: AgentTasksTeam[];
       // Present only for code: "cyclic_dependencies" — the planforge ids
       // forming the cycle, e.g. ["a", "b", "c", "a"].
       cycle?: string[];
+      // Present only for code: "too_many_dependencies" — the planforge id of
+      // the offending task (the one whose dependsOn exceeds MAX_DEPENDS_ON).
+      taskId?: string;
     };
 
 /** `https://github.com/owner/repo(.git)` -> `owner/repo`. */
@@ -120,10 +135,30 @@ export class CycleError extends Error {
 }
 
 /**
- * DFS cycle finder restricted to `remainingIds` (the nodes Kahn's algorithm
+ * Thrown by topoSortForgeTasks when a task's (dangling-filtered) dependsOn
+ * exceeds the agent-tasks create-route cap (MAX_DEPENDS_ON).
+ */
+export class TooManyDependenciesError extends Error {
+  constructor(
+    public readonly taskId: string,
+    public readonly count: number,
+  ) {
+    super(`Task "${taskId}" has ${count} dependsOn entries (max ${MAX_DEPENDS_ON})`);
+    this.name = "TooManyDependenciesError";
+  }
+}
+
+/**
+ * Cycle finder restricted to `remainingIds` (the nodes Kahn's algorithm
  * couldn't order), following `dependsOnById` edges. Standard white/gray/black
- * coloring: a gray node revisited while still on the DFS stack closes a
+ * coloring: a gray node revisited while still on the current path closes a
  * cycle. `remainingIds` being non-empty guarantees one exists.
+ *
+ * Iterative (explicit stack), not recursive: a genuinely cyclic chain can be
+ * thousands of tasks long (a real forge plan, or an adversarial snapshot),
+ * and a recursive DFS one call-frame per node blows the JS call stack well
+ * before that — turning a 400-worthy "your plan has a cycle" into an
+ * unhandled 500. The explicit `frames` stack has no such limit.
  */
 function findCycle(remainingIds: Set<string>, dependsOnById: Map<string, string[]>): string[] {
   const WHITE = 0;
@@ -131,37 +166,60 @@ function findCycle(remainingIds: Set<string>, dependsOnById: Map<string, string[
   const BLACK = 2;
   const color = new Map<string, number>();
   for (const id of remainingIds) color.set(id, WHITE);
-  const stack: string[] = [];
 
-  function visit(id: string): string[] | null {
-    color.set(id, GRAY);
-    stack.push(id);
-    for (const dep of dependsOnById.get(id) ?? []) {
+  for (const start of remainingIds) {
+    // Also provably unreachable given the invariant above (a later root
+    // already colored by an earlier root's traversal would mean that
+    // earlier traversal backtracked without finding a cycle, which — see
+    // the loop body below — can't happen either): kept as ordinary DFS
+    // bookkeeping, not relied on to be exercised.
+    if (color.get(start) !== WHITE) continue;
+
+    // `path` is the current DFS path (root..top), used to slice out the
+    // cycle once a GRAY revisit is found. `frames` mirrors it 1:1, each
+    // entry tracking how far that node's dependsOn list has been walked so
+    // the loop can resume a parent instead of recursing into a child.
+    const path: string[] = [start];
+    const frames: { id: string; deps: string[]; i: number }[] = [
+      { id: start, deps: dependsOnById.get(start) ?? [], i: 0 },
+    ];
+    color.set(start, GRAY);
+
+    while (frames.length > 0) {
+      const frame = frames[frames.length - 1]!;
+      if (frame.i >= frame.deps.length) {
+        // Every edge of this node has been walked with no cycle found
+        // through it (only reachable via a node whose dependsOn is itself
+        // provably acyclic within `remainingIds` after earlier BLACK edges
+        // were skipped below — see the loop's short-circuit return, which
+        // exits the whole function the instant any node's edge closes a
+        // cycle). Ordinary backtracking bookkeeping either way.
+        color.set(frame.id, BLACK);
+        path.pop();
+        frames.pop();
+        continue;
+      }
+      const dep = frame.deps[frame.i]!;
+      frame.i += 1;
       if (!remainingIds.has(dep)) continue;
       const depColor = color.get(dep);
       if (depColor === GRAY) {
-        const idx = stack.indexOf(dep);
-        return [...stack.slice(idx), dep];
+        const idx = path.indexOf(dep);
+        return [...path.slice(idx), dep];
       }
       if (depColor === WHITE) {
-        const found = visit(dep);
-        if (found) return found;
+        color.set(dep, GRAY);
+        path.push(dep);
+        frames.push({ id: dep, deps: dependsOnById.get(dep) ?? [], i: 0 });
       }
-    }
-    stack.pop();
-    color.set(id, BLACK);
-    return null;
-  }
-
-  for (const id of remainingIds) {
-    if (color.get(id) === WHITE) {
-      const found = visit(id);
-      if (found) return found;
+      // BLACK: already fully explored via an earlier branch — no cycle
+      // through this edge, move on to the next one.
     }
   }
   // Unreachable: order.length !== tasks.length guarantees remainingIds is
   // non-empty and every node in it has an unresolved in-edge within the
-  // subgraph, so a cycle must exist.
+  // subgraph, so a cycle must exist and the loop above always returns before
+  // every root is exhausted.
   return [...remainingIds];
 }
 
@@ -176,9 +234,22 @@ function findCycle(remainingIds: Set<string>, dependsOnById: Map<string, string[
  * A `dependsOn` id absent from this snapshot (e.g. it referenced a task
  * outside the current plan) is dropped and reported via `warnings` instead
  * of failing the sort.
+ *
+ * A duplicate task id in the snapshot is deduped, keeping the first
+ * occurrence — a malformed/regenerated snapshot shouldn't double-count a
+ * task's in-degree or double-create it.
  */
 export function topoSortForgeTasks(tasks: ForgePreviewTask[]): TopoSortResult {
-  const ids = new Set(tasks.map((t) => t.id));
+  const seenIds = new Set<string>();
+  const deduped: ForgePreviewTask[] = [];
+  for (const task of tasks) {
+    if (seenIds.has(task.id)) continue;
+    seenIds.add(task.id);
+    deduped.push(task);
+  }
+  tasks = deduped;
+
+  const ids = seenIds;
   const warnings: string[] = [];
   const dependsOnById = new Map<string, string[]>();
 
@@ -190,6 +261,9 @@ export function topoSortForgeTasks(tasks: ForgePreviewTask[]): TopoSortResult {
       } else {
         warnings.push(`Task "${task.id}" depends on unknown planforge id "${dep}" (dropped)`);
       }
+    }
+    if (filtered.length > MAX_DEPENDS_ON) {
+      throw new TooManyDependenciesError(task.id, filtered.length);
     }
     dependsOnById.set(task.id, filtered);
   }
@@ -303,8 +377,8 @@ export async function migrateForgeTasks(
     return { ok: false, status: 400, code: "invalid_repo", error: "Could not parse owner/repo from the repo URL." };
   }
 
-  const snapshot = await getForgeSnapshotByRepo(userId, repoUrl);
-  if (!snapshot) {
+  const rawSnapshot = await getForgeSnapshotByRepo(userId, repoUrl);
+  if (!rawSnapshot) {
     return {
       ok: false,
       status: 404,
@@ -313,6 +387,12 @@ export async function migrateForgeTasks(
         "No captured tasks for this repo. The project was generated before task migration shipped, or its session has expired.",
     };
   }
+  // Re-normalize dependsOn on the way out of storage, not just on the way
+  // in: a snapshot may have been captured by an older/looser code path (or
+  // the stored JSON hand-edited), so a malformed row here — e.g.
+  // `dependsOn: "t0"` instead of `["t0"]` — must not reach the topo-sort's
+  // graph traversal. Same normalization extractPreviewTasks applies on write.
+  const snapshot = rawSnapshot.map(normalizeTaskDependsOn);
 
   // Find an agent-tasks project already bound to this repo. The
   // `/projects/available` endpoint resolves the actor's team; for a human in
@@ -370,6 +450,11 @@ export async function migrateForgeTasks(
   let skipped = 0;
   let failed = 0;
   let warnings: string[] = [];
+  // Set only on the v2 (dependency-aware) path, to `sort.order.length` — the
+  // total number of tasks that path needed to end up created. Used below to
+  // gate the snapshot delete: on v1 `undefined` here just falls back to the
+  // original `failed === 0` check.
+  let v2TotalOrdered: number | undefined;
 
   const hasDependencies = snapshot.some((t) => (t.dependsOn?.length ?? 0) > 0);
 
@@ -398,9 +483,15 @@ export async function migrateForgeTasks(
     // (agent-tasks' own comment on importTaskSchema), so dependency-aware
     // import creates tasks one at a time via the single-task create route
     // instead, in topological order, wiring `dependsOn` at create time.
-    // Verified against the live agent-tasks OpenAPI spec: POST
-    // /api/projects/:projectId/tasks accepts `dependsOn: uuid[]` (max 50,
-    // "Create-time only").
+    //
+    // Only the create-time half of this is contract-backed: POST
+    // /api/projects/:projectId/tasks accepting `dependsOn: uuid[]` (max 50,
+    // "Create-time only") is verified against the live agent-tasks OpenAPI
+    // spec. The 409-resolution lookup below (`GET .../tasks?externalRef=`)
+    // is verified against agent-tasks SOURCE only — the externalRef query
+    // filter exists in the route handler but is not documented in the
+    // published OpenAPI spec. An upstream OpenAPI-documentation follow-up
+    // for that gap is being filed separately.
     let sort: TopoSortResult;
     try {
       sort = topoSortForgeTasks(snapshot);
@@ -414,9 +505,24 @@ export async function migrateForgeTasks(
           cycle: err.cycle,
         };
       }
+      if (err instanceof TooManyDependenciesError) {
+        return {
+          ok: false,
+          status: 400,
+          code: "too_many_dependencies",
+          error: err.message,
+          taskId: err.taskId,
+        };
+      }
+      // Defensive: topoSortForgeTasks only ever throws CycleError or
+      // TooManyDependenciesError (see its doc comment) — this rethrow is a
+      // safety net against a future third error type reaching here silently
+      // as an unhandled rejection rather than surfacing as a 500. Not
+      // expected to trigger today.
       throw err;
     }
     warnings = sort.warnings;
+    v2TotalOrdered = sort.order.length;
 
     const byId = new Map(snapshot.map((t) => [t.id, t] as const));
     // planforge task id -> agent-tasks task uuid, filled in as tasks are
@@ -431,6 +537,11 @@ export async function migrateForgeTasks(
       const dependsOnUuids = deps.map((dep) => createdIds.get(dep)).filter((id): id is string => !!id);
 
       const payload = toImportTask(task);
+      // Same truncated key drives both the create call and, on a 409, the
+      // lookup below — the create route silently truncates externalRef to
+      // 255 chars, so looking up with the untruncated planforge id would
+      // (for ids >255 chars) query a value that was never actually stored.
+      const externalRefKey = payload.externalRef;
       const res = await agentTasksRequest<{ task: { id: string } }>(
         userId,
         `/api/projects/${projectId}/tasks`,
@@ -453,31 +564,58 @@ export async function migrateForgeTasks(
         // Idempotent re-run: this externalRef was already imported by an
         // earlier run. Look up its agent-tasks id so any later task in this
         // run that depends on it still gets a correct dependsOn edge.
-        const lookup = await agentTasksRequest<{ tasks: { id: string }[] }>(
+        const lookup = await agentTasksRequest<{ tasks: { id: string; externalRef?: string }[] }>(
           userId,
-          `/api/projects/${projectId}/tasks?externalRef=${encodeURIComponent(externalId)}`,
+          `/api/projects/${projectId}/tasks?externalRef=${encodeURIComponent(externalRefKey)}`,
         );
-        const existingId = lookup.ok ? lookup.data.tasks[0]?.id : undefined;
-        if (!existingId) {
+        if (!lookup.ok) {
+          // Transport-level failure (timeout, upstream unreachable, 5xx) —
+          // propagate the real status/error instead of misreporting it as a
+          // 409 "already exists but could not be looked up".
+          return { ok: false, status: lookup.status, error: lookup.error };
+        }
+        // Trust the lookup only when it unambiguously identifies the one
+        // task the 409 was about: agent-tasks silently drops the
+        // externalRef filter for values >255 chars (while this code
+        // truncates only the create-side key), so an unfiltered response
+        // can come back with zero, one non-matching, or many rows. Any of
+        // those must fail loudly rather than wire an unrelated uuid in as a
+        // dependency.
+        const rows = lookup.data.tasks ?? [];
+        const match = rows.length === 1 && rows[0]!.externalRef === externalRefKey ? rows[0] : undefined;
+        if (!match) {
           return {
             ok: false,
             status: 409,
-            error: `Task with externalRef "${externalId}" already exists but could not be looked up for its id`,
+            error: `Task with externalRef "${externalRefKey}" already exists but its id could not be verified (lookup returned ${rows.length} matching row(s))`,
           };
         }
         skipped += 1;
-        createdIds.set(externalId, existingId);
+        createdIds.set(externalId, match.id);
         continue;
       }
 
       return { ok: false, status: res.status, error: res.error };
     }
+
+    if (skipped > 0) {
+      warnings = [
+        ...warnings,
+        `${skipped} task${skipped === 1 ? "" : "s"} already existed; their dependsOn edges were NOT applied - dependsOn is create-time only`,
+      ];
+    }
   }
 
   // Tasks are now in agent-tasks (the source of truth); drop the pilot-local
   // snapshot. Re-migrating later relies on agent-tasks' own externalRef dedupe
-  // (v1 path) or the 409-lookup fallback above (v2 path).
-  if (failed === 0) {
+  // (v1 path) or the 409-lookup fallback above (v2 path). On the v2 path,
+  // deleting is only safe once every task was actually created here (not
+  // 409-resolved): a skip means that task's dependsOn edges were never
+  // applied (create-time only — see the warning above), so the snapshot is
+  // the only remaining copy of that dependency data and must survive for
+  // operator action.
+  const migrationComplete = failed === 0 && (v2TotalOrdered === undefined || created === v2TotalOrdered);
+  if (migrationComplete) {
     await deleteForgeSnapshotByRepo(userId, repoUrl);
   }
 
