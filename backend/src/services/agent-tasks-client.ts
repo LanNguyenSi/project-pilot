@@ -1,5 +1,6 @@
 import { config } from "../config/index.js";
 import { getCredential } from "./credentials.js";
+import { isUpstreamTimeout } from "../lib/upstream-timeout.js";
 
 export type AgentTasksResult<T> =
   | { ok: true; data: T }
@@ -45,7 +46,7 @@ export async function agentTasksRequest<T>(
     }
     return { ok: true, data: body };
   } catch (err) {
-    if (err instanceof DOMException && err.name === "AbortError") {
+    if (isUpstreamTimeout(err)) {
       return { ok: false, error: "Agent Tasks timed out", status: 504 };
     }
     return { ok: false, error: "Agent Tasks unreachable", status: 502 };

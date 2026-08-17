@@ -501,6 +501,24 @@ describe("POST /credentials/validate — downstream connection check", () => {
     fetchSpy.mockRestore();
   });
 
+  it("returns {valid:false, error:'Service timed out'} when AbortSignal.timeout() rejects with a TimeoutError DOMException", async () => {
+    const { encrypt } = await import("../src/lib/crypto.js");
+    mockSC.findUnique.mockResolvedValue({ token: encrypt("tok") });
+
+    // Real Node 26 message for an AbortSignal.timeout() rejection.
+    const timeoutErr = new DOMException("The operation was aborted due to timeout", "TimeoutError");
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockRejectedValueOnce(timeoutErr);
+
+    const res = await postValidate({ service: "agent-tasks" });
+    const body = (await res.json()) as { valid: boolean; error: string };
+    expect(body.valid).toBe(false);
+    expect(body.error).toBe("Service timed out");
+
+    fetchSpy.mockRestore();
+  });
+
   it("returns {valid:false, error:'Service unreachable'} on generic network error", async () => {
     const { encrypt } = await import("../src/lib/crypto.js");
     mockSC.findUnique.mockResolvedValue({ token: encrypt("tok") });

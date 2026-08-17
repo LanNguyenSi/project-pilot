@@ -372,6 +372,19 @@ describe("forge routes", () => {
       expect(body.error).toBe("Generation timed out. Please try again.");
     });
 
+    it("returns 504 when AbortSignal.timeout() rejects with a TimeoutError DOMException", async () => {
+      vi.stubGlobal(
+        "fetch",
+        // Real Node 26 message for an AbortSignal.timeout() rejection.
+        vi.fn().mockRejectedValue(new DOMException("The operation was aborted due to timeout", "TimeoutError")),
+      );
+
+      const res = await postJson("/generate", validBody);
+      expect(res.status).toBe(504);
+      const body = (await res.json()) as { error: string };
+      expect(body.error).toBe("Generation timed out. Please try again.");
+    });
+
     it("warns with the raw thrown value when the snapshot rejection is not an Error instance", async () => {
       vi.stubGlobal(
         "fetch",
@@ -621,6 +634,19 @@ describe("forge routes", () => {
       vi.stubGlobal(
         "fetch",
         vi.fn().mockRejectedValue(new DOMException("Aborted", "AbortError")),
+      );
+
+      const res = await postJson("/ai-assist/magic-fill", validBody);
+      expect(res.status).toBe(504);
+      const body = (await res.json()) as { error: string };
+      expect(body.error).toBe("AI request timed out. Please try again.");
+    });
+
+    it("returns 504 when AbortSignal.timeout() rejects with a TimeoutError DOMException", async () => {
+      vi.stubGlobal(
+        "fetch",
+        // Real Node 26 message for an AbortSignal.timeout() rejection.
+        vi.fn().mockRejectedValue(new DOMException("The operation was aborted due to timeout", "TimeoutError")),
       );
 
       const res = await postJson("/ai-assist/magic-fill", validBody);

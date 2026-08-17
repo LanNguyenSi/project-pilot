@@ -10,6 +10,7 @@ import {
   saveForgeTaskSnapshot,
 } from "../services/forge-task-snapshot.js";
 import { migrateForgeTasks } from "../services/forge-task-migration.js";
+import { isUpstreamTimeout } from "../lib/upstream-timeout.js";
 import type { AppEnv } from "../types/hono.js";
 
 const forge = new Hono<AppEnv>();
@@ -45,7 +46,7 @@ async function forgeRequest<T>(userId: string, path: string, options?: RequestIn
 
     return { ok: true, data: body };
   } catch (err) {
-    if (err instanceof DOMException && err.name === "AbortError") {
+    if (isUpstreamTimeout(err)) {
       return { ok: false, error: "Generation timed out. Please try again.", status: 504 };
     }
     return { ok: false, error: "Project Forge unreachable", status: 502 };
@@ -190,7 +191,7 @@ async function forgeAiRequest<T>(
     }
     return { ok: true, data: body };
   } catch (err) {
-    if (err instanceof DOMException && err.name === "AbortError") {
+    if (isUpstreamTimeout(err)) {
       return { ok: false, error: "AI request timed out. Please try again.", status: 504 };
     }
     return { ok: false, error: "Project Forge unreachable", status: 502 };
