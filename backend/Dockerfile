@@ -2,6 +2,9 @@ FROM node:22-alpine AS builder
 
 WORKDIR /app
 COPY package.json ./
+# node 22's bundled npm 10 crashes resolving @vitest/coverage-v8's exact vitest
+# peer pin ("Cannot read properties of null (reading 'edgesOut')"); npm >= 11 resolves it.
+RUN npm install -g npm@11
 RUN npm install
 COPY prisma ./prisma
 RUN npx prisma generate
