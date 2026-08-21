@@ -53,7 +53,7 @@ AI-powered project scaffolding. List existing projects, generate previews, and p
 
 ### Develop, agent-tasks
 
-Task management for human-agent collaboration. Browse projects, claim tasks, transition status, and read agent instructions from `/tasks`. Signals inbox for agent-driven workflows.
+Task management for human-agent collaboration. Browse projects and tasks, create tasks, and read agent instructions from `/tasks`; claiming, transitions, and the agent signals inbox go through the agent-tasks API/MCP, not this UI.
 
 ### Deploy, deploy-panel
 
