@@ -19,7 +19,10 @@ export default defineConfig({
       //   middleware/csrf.ts          → 100% stmts / 100% branch / 100% funcs
       //   routes/credentials.ts       → 95.3% stmts / 100% branch / 71.4% funcs / 95.3% lines
       //   services/credentials.ts     → 100% stmts / 100% branch / 100% funcs
-      //   routes/tasks.ts             → 67.8% stmts / 37.5% branch / 66.7% funcs / 76.9% lines
+      //   routes/tasks.ts             → 64% stmts / 35% branch / 60% funcs / 72.3% lines
+      //                                 (re-measured 2026-08-22 after removing the
+      //                                 unused /claimable and /:taskId/transition
+      //                                 proxy routes, task 88ed5b2f)
       //   routes/forge.ts             → 100% stmts / 100% branch / 100% funcs / 100% lines (2026-07-01)
       //
       // Global threshold is intentionally absent: the other 73 backend files
@@ -44,10 +47,10 @@ export default defineConfig({
           lines: 95,
         },
         "src/routes/tasks.ts": {
-          statements: 63,
-          branches: 32,
-          functions: 62,
-          lines: 72,
+          statements: 59,
+          branches: 30,
+          functions: 55,
+          lines: 67,
         },
         "src/routes/forge.ts": {
           statements: 99,

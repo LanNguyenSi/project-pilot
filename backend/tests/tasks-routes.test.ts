@@ -187,25 +187,6 @@ describe("GET /projects/:projectId/tasks — list tasks for a project", () => {
   });
 });
 
-// ─── GET /claimable ──────────────────────────────────────────────────────────
-
-describe("GET /claimable — open/claimable tasks", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockRequireAuth.mockImplementation(async (c: any, next: any) => {
-      c.set?.("userId", "user-a");
-      await next();
-    });
-    mockTasksRequest.mockResolvedValue(OK_RESULT);
-  });
-
-  it("calls agentTasksRequest with correct path (Guard H)", async () => {
-    await makeRequest("/claimable");
-
-    expect(mockTasksRequest).toHaveBeenCalledWith("user-a", "/api/tasks/claimable");
-  });
-});
-
 // ─── POST /projects — create project (Guard G + H: body + method) ────────────
 
 describe("POST /projects — create a project", () => {
@@ -317,53 +298,6 @@ describe("POST /projects/:projectId/tasks — create a task in a project", () =>
     });
     expect(res.status).toBe(400);
     expect(mockTasksRequest).not.toHaveBeenCalled();
-  });
-});
-
-// ─── POST /:taskId/transition — change task status ──────────────────────────
-
-describe("POST /:taskId/transition — change task status", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockRequireAuth.mockImplementation(async (c: any, next: any) => {
-      c.set?.("userId", "user-a");
-      await next();
-    });
-    mockTasksRequest.mockResolvedValue({ ok: true, data: { ok: true } });
-  });
-
-  it("calls agentTasksRequest with POST, correct path, and status body (Guard H)", async () => {
-    await makeRequest("/task-abc/transition", "POST", { status: "in_progress" });
-
-    expect(mockTasksRequest).toHaveBeenCalledWith(
-      "user-a",
-      "/api/tasks/task-abc/transition",
-      expect.objectContaining({
-        method: "POST",
-        body: JSON.stringify({ status: "in_progress" }),
-      }),
-    );
-  });
-
-  it("passes caller userId (Guard G)", async () => {
-    await makeRequest("/task-abc/transition", "POST", { status: "done" });
-    expect(mockTasksRequest.mock.calls[0]![0]).toBe("user-a");
-  });
-
-  it("rejects invalid status enum → 400", async () => {
-    const res = await makeRequest("/task-abc/transition", "POST", {
-      status: "INVALID",
-    });
-    expect(res.status).toBe(400);
-    expect(mockTasksRequest).not.toHaveBeenCalled();
-  });
-
-  it("validates all allowed status values", async () => {
-    for (const status of ["open", "in_progress", "review", "done"]) {
-      mockTasksRequest.mockResolvedValueOnce({ ok: true, data: {} });
-      const res = await makeRequest("/task-abc/transition", "POST", { status });
-      expect(res.status).toBe(200);
-    }
   });
 });
 
