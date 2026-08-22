@@ -12,10 +12,6 @@ const createTaskSchema = z.object({
   labels: z.array(z.string()).optional(),
 });
 
-const transitionSchema = z.object({
-  status: z.enum(["open", "in_progress", "review", "done"]),
-});
-
 const commentSchema = z.object({
   content: z.string().min(1).max(5000),
 });
@@ -59,14 +55,6 @@ tasks.get("/projects/:projectId/tasks", async (c) => {
   const userId = c.get("userId")!;
   const projectId = c.req.param("projectId");
   const result = await tasksRequest<unknown>(userId, `/api/projects/${encodeURIComponent(projectId)}/tasks`);
-  if (!result.ok) return c.json({ error: result.error }, result.status as any);
-  return c.json(result.data);
-});
-
-// GET /tasks/claimable — open tasks
-tasks.get("/claimable", async (c) => {
-  const userId = c.get("userId")!;
-  const result = await tasksRequest<unknown>(userId, "/api/tasks/claimable");
   if (!result.ok) return c.json({ error: result.error }, result.status as any);
   return c.json(result.data);
 });
@@ -140,19 +128,6 @@ tasks.post("/projects/:projectId/tasks", zValidator("json", createTaskSchema), a
   const projectId = c.req.param("projectId");
   const body = c.req.valid("json");
   const result = await tasksRequest<unknown>(userId, `/api/projects/${encodeURIComponent(projectId)}/tasks`, {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
-  if (!result.ok) return c.json({ error: result.error }, result.status as any);
-  return c.json(result.data);
-});
-
-// POST /tasks/:taskId/transition — change task status
-tasks.post("/:taskId/transition", zValidator("json", transitionSchema), async (c) => {
-  const userId = c.get("userId")!;
-  const taskId = c.req.param("taskId");
-  const body = c.req.valid("json");
-  const result = await tasksRequest<unknown>(userId, `/api/tasks/${encodeURIComponent(taskId)}/transition`, {
     method: "POST",
     body: JSON.stringify(body),
   });

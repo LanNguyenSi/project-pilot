@@ -48,12 +48,10 @@ Project and open-task counts come from agent-tasks; server, online-server, and a
 - `POST /api/tasks/projects` create a project in a team
 - `GET  /api/tasks/projects/:id/tasks` list tasks
 - `POST /api/tasks/projects/:projectId/tasks` create a task in a project
-- `GET  /api/tasks/claimable` open tasks
 - `GET  /api/tasks/teams` list teams
 - `POST /api/tasks/teams/:teamId/sync` sync the user's GitHub repos into a team
 - `GET  /api/tasks/:id` task details
 - `GET  /api/tasks/:id/instructions` agent instructions
-- `POST /api/tasks/:id/transition` change status
 - `POST /api/tasks/:id/comments` add comment
 - `GET  /api/tasks/signals/inbox` agent signals
 
