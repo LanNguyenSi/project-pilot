@@ -69,6 +69,9 @@ Project and open-task counts come from agent-tasks; server, online-server, and a
 - `POST   /api/deploy/rollback` rollback
 - `POST   /api/deploy/preflight` preflight checks
 - `GET    /api/deploy/logs` app logs
+- `POST   /api/deploy/servers/:id/test` relay connectivity check for a server
+- `POST   /api/deploy/probe-vps` pre-install probe (SSH reachability, host-key fingerprint)
+- `POST   /api/deploy/install-relay` stream SSE relay-install progress
 
 ## Health
 
@@ -76,4 +79,4 @@ Project and open-task counts come from agent-tasks; server, online-server, and a
 
 ## Validation surface
 
-All `POST` / `PUT` bodies and query params with non-trivial shape go through Zod schemas defined alongside the route handlers in `backend/src/routes/`. Pagination and search params on `tasks`, `deploys`, and `projects` are similarly validated.
+All `POST` / `PUT` JSON bodies go through Zod schemas defined alongside the route handlers in `backend/src/routes/`, via `@hono/zod-validator`. Query params are not Zod-validated: deploy history's `limit`/`offset`/filters are parsed manually with ad-hoc clamping (`backend/src/routes/deploy.ts`). Tasks and projects list routes take no query params; pagination and search there are purely client-side in the frontend.

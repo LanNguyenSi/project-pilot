@@ -54,7 +54,7 @@ Email delivery for the reset link is on the roadmap, not yet wired. In the meant
 
 ## Security headers
 
-In production (`NODE_ENV=production`) the backend emits CSP and HSTS headers on every response.
+The backend always emits `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, and `Referrer-Policy: strict-origin-when-cross-origin`, and adds `Strict-Transport-Security` in production (`NODE_ENV=production`). The frontend emits the `Content-Security-Policy` header on every response, regardless of `NODE_ENV`.
 
 ## Docker deployment
 
