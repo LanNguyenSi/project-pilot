@@ -17,7 +17,7 @@ Thanks for your interest. project-pilot is the unified control plane for the ful
    ```bash
    npm install
    npm run build --workspace=<surface>
-   npm run test  --workspace=<surface>   # all three surfaces define test scripts
+   npm run test  --workspace=<surface>   # run this for every surface you touched
    ```
 
 4. Open the PR with a clear summary, motivation, and test plan.

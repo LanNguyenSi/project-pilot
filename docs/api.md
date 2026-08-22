@@ -1,6 +1,6 @@
 # API
 
-The backend exposes a Hono HTTP API at `:3001/api/*`. All inputs are validated with Zod via `@hono/zod-validator`; invalid payloads return `400` before any handler logic runs.
+The backend exposes a Hono HTTP API at `:3001/api/*`. All `POST`/`PUT` JSON bodies are validated with Zod via `@hono/zod-validator`; invalid bodies return `400` before any handler logic runs (see the [validation surface](#validation-surface) section).
 
 ## Auth
 
@@ -62,6 +62,7 @@ Project and open-task counts come from agent-tasks; server, online-server, and a
 - `GET    /api/deploy/servers` list servers
 - `POST   /api/deploy/servers` add a server
 - `DELETE /api/deploy/servers/:id` remove a server
+- `POST   /api/deploy/servers/:id/test` relay connectivity check for a server
 - `GET    /api/deploy/apps` list apps
 - `POST   /api/deploy/trigger` deploy app
 - `GET    /api/deploy/status/:id` deploy status
@@ -69,7 +70,6 @@ Project and open-task counts come from agent-tasks; server, online-server, and a
 - `POST   /api/deploy/rollback` rollback
 - `POST   /api/deploy/preflight` preflight checks
 - `GET    /api/deploy/logs` app logs
-- `POST   /api/deploy/servers/:id/test` relay connectivity check for a server
 - `POST   /api/deploy/probe-vps` pre-install probe (SSH reachability, host-key fingerprint)
 - `POST   /api/deploy/install-relay` stream SSE relay-install progress
 
@@ -79,4 +79,4 @@ Project and open-task counts come from agent-tasks; server, online-server, and a
 
 ## Validation surface
 
-All `POST` / `PUT` JSON bodies go through Zod schemas defined alongside the route handlers in `backend/src/routes/`, via `@hono/zod-validator`. Query params are not Zod-validated: deploy history's `limit`/`offset`/filters are parsed manually with ad-hoc clamping (`backend/src/routes/deploy.ts`). Tasks and projects list routes take no query params; pagination and search there are purely client-side in the frontend.
+All `POST` / `PUT` JSON bodies go through Zod schemas defined alongside the route handlers in `backend/src/routes/`, via `@hono/zod-validator`. Query params are not Zod-validated: deploy history's `limit`/`offset`/filters are parsed manually with ad-hoc clamping, `deploy/apps?server_id` and `deploy/logs`'s `server`/`app`/`lines` are read directly with minimal manual checks (`backend/src/routes/deploy.ts`), and `forge/preview?sessionId` is checked by hand against a UUID regex (`backend/src/routes/forge.ts`). Tasks and projects list routes take no query params; pagination and search there are purely client-side in the frontend.

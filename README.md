@@ -91,7 +91,7 @@ Full tool list and env reference: [docs/architecture.md](docs/architecture.md#mc
 - Deploy history filters (by server, app, status)
 - Password reset flow (forgot password / reset with token)
 - Error boundaries for graceful failure handling
-- Zod input validation on all API endpoints
+- Zod validation on all JSON request bodies
 - Security headers: CSP from the frontend on every response, HSTS from the backend in production
 
 ## Next steps
