@@ -17,7 +17,7 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 22
-      - run: npm ci
+      - run: npm ci --no-audit --no-fund
       - run: cd backend && npx prisma generate
       - run: npm run lint --workspace=backend
       - run: npm run lint:test --workspace=backend
@@ -34,7 +34,7 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 22
-      - run: npm ci
+      - run: npm ci --no-audit --no-fund
       # The suite imports the generated Prisma client; generate it first
       # (mirrors the backend job) so the run does not fail on a missing
       # @prisma/client.
@@ -54,7 +54,7 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 22
-      - run: npm ci
+      - run: npm ci --no-audit --no-fund
       - name: Assert single zod resolution
         # Fails in ~1s with a clear message on a duplicate-zod relapse,
         # instead of the mcp build step dying after a ~60s heap crash.
@@ -78,7 +78,7 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 22
-      - run: npm ci
+      - run: npm ci --no-audit --no-fund
       - run: npm run test:coverage --workspace=mcp
 
   frontend:
@@ -88,7 +88,7 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 22
-      - run: npm ci
+      - run: npm ci --no-audit --no-fund
       - run: npm run typecheck:test --workspace=frontend
       - run: npm run build --workspace=frontend
 
@@ -103,5 +103,5 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 22
-      - run: npm ci
+      - run: npm ci --no-audit --no-fund
       - run: npm run test:coverage --workspace=frontend
