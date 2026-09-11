@@ -17,7 +17,10 @@
     "postcss": "^8.5.18",
     "shell-quote": "^1.8.4",
     "esbuild": "^0.28.1",
-    "sharp": "^0.35.3"
+    "sharp": "^0.35.4",
+    "next": {
+      "postcss": "^8.5.18"
+    }
   },
   "engines": {
     "node": ">=20"
