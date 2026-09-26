@@ -56,6 +56,24 @@ Email delivery for the reset link is on the roadmap, not yet wired. In the meant
 
 The backend always emits `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, and `Referrer-Policy: strict-origin-when-cross-origin`, and adds `Strict-Transport-Security` in production (`NODE_ENV=production`). The frontend emits the `Content-Security-Policy` header on every response, regardless of `NODE_ENV`.
 
+## Manual setup
+
+If you don't want `make dev-full` and prefer to run the steps individually (replace `make docker-up` with your own PostgreSQL 16 on :5432 if you do not use Docker):
+
+```bash
+make install        # npm install at the root (workspaces: backend, frontend, mcp)
+cp backend/.env.example backend/.env
+cp frontend/.env.example frontend/.env
+
+make docker-up      # start Postgres on :5432
+make db-generate    # prisma generate
+make db-push        # prisma db push (reads DATABASE_URL from backend/.env)
+
+make dev            # backend on :3001, frontend on :3000
+```
+
+See the env var tables above for what each `.env` file needs.
+
 ## Docker deployment
 
 ### Development

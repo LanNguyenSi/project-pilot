@@ -2,26 +2,31 @@
 
 Unified control plane for the full project lifecycle: **Create**, **Develop**, **Deploy**, all in one dashboard.
 
+[![CI](https://github.com/LanNguyenSi/project-pilot/actions/workflows/ci.yml/badge.svg)](https://github.com/LanNguyenSi/project-pilot/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
+## Overview
+
 project-pilot aggregates three independent services, [project-forge](https://github.com/LanNguyenSi/project-forge) (scaffolding), [agent-tasks](https://github.com/LanNguyenSi/agent-tasks) (task management), and [deploy-panel](https://github.com/LanNguyenSi/deploy-panel) (VPS deploys), behind a single login. Service credentials are stored encrypted per-user, validated via **Test Connection** before save, and exposed to AI agents over a stdio MCP server. The backend is a thin Hono proxy with Zod-validated inputs; the frontend is Next.js 15 with a unified dark-mode UI.
 
 ![The project-pilot dashboard: aggregated stats across the three connected services (projects via agent-tasks, open tasks, servers online, apps deployed) with quick actions.](docs/img/dashboard.png)
 
-```
-                  ┌──────────────────────┐
-                  │    project-pilot     │
-                  │  (one login, one UI) │
-                  └──────────┬───────────┘
-                             │
-        ┌────────────────────┼────────────────────┐
-        ▼                    ▼                    ▼
-  ┌───────────┐        ┌───────────┐        ┌───────────┐
-  │  Create   │        │  Develop  │        │  Deploy   │
-  │project-   │        │  agent-   │        │  deploy-  │
-  │  forge    │        │   tasks   │        │   panel   │
-  └───────────┘        └───────────┘        └───────────┘
-```
+## Key features
 
-## Try it in 60 seconds
+- Create (project-forge): scaffold, preview, and publish a project to GitHub from `/forge`
+- Develop (agent-tasks): browse and search projects, create tasks, and read agent instructions from `/tasks`
+  (claiming, transitions, and the signals inbox go through the agent-tasks API/MCP, not this UI)
+- Deploy (deploy-panel): list servers/apps, trigger deploys, watch status, run preflight checks, roll back,
+  and filter or paginate history from `/deploys`
+- Unified dark-mode dashboard with aggregated stats from all three services, and error boundaries for
+  graceful failure handling
+- Encrypted per-user service credential storage with **Test Connection** validation
+- MCP server exposing 18 tools (forge, tasks, deploy, plus `dashboard_summary`) over stdio
+- Password reset flow (forgot password / reset with token)
+- Security headers (CSP, HSTS in production) and Zod validation on all JSON request bodies
+
+## Quick start
+
+Prerequisites: Node.js >=20, make, Docker with Compose v2 (for the Postgres container).
 
 ```bash
 git clone https://github.com/LanNguyenSi/project-pilot.git
@@ -43,25 +48,11 @@ Then connect your existing service credentials:
 3. Paste your `pf_...` Forge key, agent-tasks Bearer token, and `dp_...` Deploy key. Hit **Test Connection** on each.
 4. Visit `/dashboard`, you should see aggregated stats from all three services.
 
-Need to run pieces individually (no Docker, separate terminals, etc.)? See [docs/configuration.md](docs/configuration.md).
+Need to run the steps individually? See [docs/configuration.md](docs/configuration.md#manual-setup).
 
-## What you get
+## Usage
 
-### Create, project-forge
-
-AI-powered project scaffolding. List existing projects, generate previews, and publish to GitHub from `/forge` and `/forge/create`.
-
-### Develop, agent-tasks
-
-Task management for human-agent collaboration. Browse projects and tasks, create tasks, and read agent instructions from `/tasks`; claiming, transitions, and the agent signals inbox go through the agent-tasks API/MCP, not this UI.
-
-### Deploy, deploy-panel
-
-VPS deployment management. List servers and apps, trigger deploys, watch status, run preflight checks, roll back, and filter history by server / app / status from `/deploys`.
-
-## MCP server
-
-The MCP server exposes 18 tools (forge, tasks, deploy, plus `dashboard_summary`) over stdio for Claude Code and other MCP clients.
+The MCP server exposes 18 tools (forge, tasks, deploy, plus `dashboard_summary`) over stdio for Claude Code and other MCP clients:
 
 ```json
 {
@@ -83,18 +74,7 @@ The snippet above runs the server from source with `tsx`. Alternatively, run `np
 
 Full tool list and env reference: [docs/architecture.md](docs/architecture.md#mcp-surface).
 
-## Key features
-
-- Unified dark-mode dashboard with aggregated stats from all services
-- Encrypted service credential storage with **Test Connection** validation
-- Pagination and search on tasks, deploys, and projects
-- Deploy history filters (by server, app, status)
-- Password reset flow (forgot password / reset with token)
-- Error boundaries for graceful failure handling
-- Zod validation on all JSON request bodies
-- Security headers: CSP from the frontend on every response, HSTS from the backend in production
-
-## Next steps
+## Documentation
 
 | If you want to... | Read |
 |------|------|
@@ -102,39 +82,11 @@ Full tool list and env reference: [docs/architecture.md](docs/architecture.md#mc
 | Understand the aggregation model and MCP surface | [docs/architecture.md](docs/architecture.md) |
 | Configure env vars, credentials, password reset, Docker | [docs/configuration.md](docs/configuration.md) |
 | Browse the HTTP API and Zod input validation | [docs/api.md](docs/api.md) |
+| See planned work | [docs/roadmap.md](docs/roadmap.md) |
 
-## Setup (manual)
+## Development and contributing
 
-If you don't want `make dev-full`:
-
-```bash
-make install        # npm install at the root (workspaces: backend, frontend, mcp)
-make docker-up      # start Postgres on :5432
-make db-generate    # prisma generate
-make db-push        # prisma db push
-
-cp backend/.env.example backend/.env
-cp frontend/.env.example frontend/.env
-
-make dev            # backend on :3001, frontend on :3000
-```
-
-See [docs/configuration.md](docs/configuration.md) for env var reference.
-
-## Production
-
-```bash
-docker compose -f docker-compose.prod.yml up --build -d
-```
-
-Exposes via Traefik at `project-pilot.opentriologue.ai` with automatic HTTPS. See [docs/configuration.md](docs/configuration.md#production-with-traefik).
-
-## Roadmap
-
-- [ ] Email notifications for password reset
-- [ ] Request logging (structured access / error logs)
-- [ ] User profile management (display name, avatar)
-- [ ] Session management (list active sessions, revoke)
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the dev setup, per-workspace build/test commands, and PR guidelines.
 
 ## License
 
