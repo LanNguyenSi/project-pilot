@@ -13,9 +13,12 @@ project-pilot aggregates three independent services, [project-forge](https://git
 ## Key features
 
 - Create (project-forge): scaffold, preview, and publish a project to GitHub from `/forge`
-- Develop (agent-tasks): browse projects, create tasks, and read agent instructions from `/tasks`
-- Deploy (deploy-panel): list servers/apps, trigger deploys, roll back, and filter history from `/deploys`
-- Unified dark-mode dashboard with aggregated stats from all three services
+- Develop (agent-tasks): browse and search projects, create tasks, and read agent instructions from `/tasks`
+  (claiming, transitions, and the signals inbox go through the agent-tasks API/MCP, not this UI)
+- Deploy (deploy-panel): list servers/apps, trigger deploys, watch status, run preflight checks, roll back,
+  and filter or paginate history from `/deploys`
+- Unified dark-mode dashboard with aggregated stats from all three services, and error boundaries for
+  graceful failure handling
 - Encrypted per-user service credential storage with **Test Connection** validation
 - MCP server exposing 18 tools (forge, tasks, deploy, plus `dashboard_summary`) over stdio
 - Password reset flow (forgot password / reset with token)
@@ -23,7 +26,7 @@ project-pilot aggregates three independent services, [project-forge](https://git
 
 ## Quick start
 
-Prerequisites: Node.js >=20, Docker (for the Postgres container).
+Prerequisites: Node.js >=20, make, Docker with Compose v2 (for the Postgres container).
 
 ```bash
 git clone https://github.com/LanNguyenSi/project-pilot.git
@@ -45,7 +48,7 @@ Then connect your existing service credentials:
 3. Paste your `pf_...` Forge key, agent-tasks Bearer token, and `dp_...` Deploy key. Hit **Test Connection** on each.
 4. Visit `/dashboard`, you should see aggregated stats from all three services.
 
-Need to run pieces individually (no Docker, separate terminals, etc.)? See [docs/configuration.md](docs/configuration.md#manual-setup).
+Need to run the steps individually? See [docs/configuration.md](docs/configuration.md#manual-setup).
 
 ## Usage
 
