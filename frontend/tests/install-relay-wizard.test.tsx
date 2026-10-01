@@ -385,6 +385,8 @@ describe("InstallRelayWizard", () => {
       expect(probeBody.sshPassphrase).toBe(PASSPHRASE);
       expect(probeBody).not.toHaveProperty("sshPassword");
       expect(probeUrl).not.toContain("?");
+      expect(probeUrl).not.toContain("abc123keybody");
+      expect(probeUrl).not.toContain(PASSPHRASE);
 
       await user.click(screen.getByRole("button", { name: /install relay/i }));
       await waitFor(() => expect(screen.getByText("Relay installed successfully")).toBeInTheDocument());
