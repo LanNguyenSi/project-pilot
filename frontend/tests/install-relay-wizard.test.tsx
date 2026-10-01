@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { InstallRelayWizard } from "@/components/deploys/InstallRelayWizard";
-import { apiFetch, ApiError } from "@/lib/api";
+import { API_URL, apiFetch, ApiError } from "@/lib/api";
 
 vi.mock("@/lib/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/api")>();
@@ -57,11 +57,10 @@ function sseGatedStream() {
   };
 }
 
-// Mirrors the base-URL resolution in InstallRelayWizard.tsx (and src/lib/api.ts)
-// so request-shape assertions compare against the same default the component uses.
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
-
 const noop = () => {};
+
+const KEY_PEM = "-----BEGIN OPENSSH PRIVATE KEY-----\nabc123keybody\n-----END OPENSSH PRIVATE KEY-----";
+const PASSPHRASE = "pass-phrase-xyz";
 
 /**
  * Fill in the minimum fields required by validateForm() (name/host/password).
@@ -102,6 +101,25 @@ describe("InstallRelayWizard", () => {
       rerender(<InstallRelayWizard open onClose={noop} onSuccess={noop} />);
 
       expect(screen.getByLabelText("SSH password")).toHaveValue("");
+    });
+
+    it("clears the private key and passphrase fields when the modal closes and reopens", () => {
+      const { rerender } = render(<InstallRelayWizard open onClose={noop} onSuccess={noop} />);
+      fireEvent.click(screen.getByRole("button", { name: "Private key" }));
+      fireEvent.change(screen.getByLabelText("Private key (PEM)"), { target: { value: KEY_PEM } });
+      fireEvent.change(screen.getByLabelText("Passphrase (optional)"), {
+        target: { value: PASSPHRASE },
+      });
+      expect(screen.getByLabelText("Private key (PEM)")).toHaveValue(KEY_PEM);
+      expect(screen.getByLabelText("Passphrase (optional)")).toHaveValue(PASSPHRASE);
+
+      rerender(<InstallRelayWizard open={false} onClose={noop} onSuccess={noop} />);
+      rerender(<InstallRelayWizard open onClose={noop} onSuccess={noop} />);
+
+      // The auth method toggle is not secret and survives the reset, so the
+      // private-key sub-form is still shown and must be empty.
+      expect(screen.getByLabelText("Private key (PEM)")).toHaveValue("");
+      expect(screen.getByLabelText("Passphrase (optional)")).toHaveValue("");
     });
   });
 
@@ -289,6 +307,112 @@ describe("InstallRelayWizard", () => {
       expect(url).not.toContain("s3cr3t");
     });
 
+    it("renders the error state with the JSON message when the install response is not ok", async () => {
+      const user = userEvent.setup();
+      fetchMock.mockResolvedValueOnce({
+        ok: false,
+        status: 403,
+        json: () => Promise.resolve({ message: "Not allowed to install relays." }),
+      });
+
+      render(<InstallRelayWizard open onClose={noop} onSuccess={noop} />);
+      fillRequiredFields();
+      await user.click(screen.getByRole("button", { name: /skip & install/i }));
+
+      await waitFor(() =>
+        expect(screen.getByRole("alert")).toHaveTextContent("Not allowed to install relays.")
+      );
+      expect(screen.getByRole("button", { name: /try again/i })).toBeInTheDocument();
+    });
+
+    it("falls back to the error field, then to the status code, for a non-ok install response", async () => {
+      const user = userEvent.setup();
+      fetchMock.mockResolvedValueOnce({
+        ok: false,
+        status: 422,
+        json: () => Promise.resolve({ error: "bad_host" }),
+      });
+
+      render(<InstallRelayWizard open onClose={noop} onSuccess={noop} />);
+      fillRequiredFields();
+      await user.click(screen.getByRole("button", { name: /skip & install/i }));
+      await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("bad_host"));
+
+      fetchMock.mockResolvedValueOnce({
+        ok: false,
+        status: 502,
+        json: () => Promise.reject(new SyntaxError("not json")),
+      });
+      await user.click(screen.getByRole("button", { name: /try again/i }));
+      fillRequiredFields();
+      await user.click(screen.getByRole("button", { name: /skip & install/i }));
+      await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Error 502"));
+    });
+
+    it("sends the private key and passphrase in the probe and install bodies and never in the URL", async () => {
+      const user = userEvent.setup();
+      mockedApiFetch.mockResolvedValueOnce({
+        probe: { suggestedMode: "docker", port80: { kind: "free" }, port443: { kind: "free" } },
+        hostKeySha256: "SHA256:abc123",
+      });
+      fetchMock.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        body: sseStream([
+          sseFrame("done", {
+            serverId: "srv1",
+            name: "vps-01",
+            host: "1.2.3.4",
+            relayUrl: "https://relay.example.com/deploy",
+          }),
+        ]),
+      });
+
+      render(<InstallRelayWizard open onClose={noop} onSuccess={noop} />);
+      fireEvent.change(screen.getByLabelText("Server name"), { target: { value: "vps-01" } });
+      fireEvent.change(screen.getByLabelText("Host"), { target: { value: "1.2.3.4" } });
+      fireEvent.click(screen.getByRole("button", { name: "Private key" }));
+      fireEvent.change(screen.getByLabelText("Private key (PEM)"), { target: { value: KEY_PEM } });
+      fireEvent.change(screen.getByLabelText("Passphrase (optional)"), {
+        target: { value: PASSPHRASE },
+      });
+      await user.click(screen.getByRole("button", { name: /test connection & continue/i }));
+
+      await waitFor(() => expect(screen.getByText("Connection test passed")).toBeInTheDocument());
+      const [probeUrl, probeInit] = mockedApiFetch.mock.calls[0] as [string, RequestInit];
+      const probeBody = JSON.parse(String(probeInit.body)) as Record<string, unknown>;
+      expect(probeBody.sshPrivateKey).toBe(KEY_PEM);
+      expect(probeBody.sshPassphrase).toBe(PASSPHRASE);
+      expect(probeBody).not.toHaveProperty("sshPassword");
+      expect(probeUrl).not.toContain("?");
+
+      await user.click(screen.getByRole("button", { name: /install relay/i }));
+      await waitFor(() => expect(screen.getByText("Relay installed successfully")).toBeInTheDocument());
+
+      const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+      const body = JSON.parse(String(init.body)) as Record<string, unknown>;
+      expect(body.sshPrivateKey).toBe(KEY_PEM);
+      expect(body.sshPassphrase).toBe(PASSPHRASE);
+      expect(body.expectedHostKeySha256).toBe("SHA256:abc123");
+      expect(body).not.toHaveProperty("sshPassword");
+      expect(url).toBe(`${API_URL}/api/deploy/install-relay`);
+      expect(url).not.toContain("?");
+      expect(url).not.toContain("abc123keybody");
+      expect(url).not.toContain(PASSPHRASE);
+    });
+
+    it("shows the form error and does not call the API when the private key is empty", async () => {
+      const user = userEvent.setup();
+      render(<InstallRelayWizard open onClose={noop} onSuccess={noop} />);
+      fireEvent.change(screen.getByLabelText("Server name"), { target: { value: "vps-01" } });
+      fireEvent.change(screen.getByLabelText("Host"), { target: { value: "1.2.3.4" } });
+      fireEvent.click(screen.getByRole("button", { name: "Private key" }));
+      await user.click(screen.getByRole("button", { name: /skip & install/i }));
+
+      expect(screen.getByRole("alert")).toHaveTextContent("Private key (PEM content) is required.");
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
     it("renders the error state on an event:error frame", async () => {
       const user = userEvent.setup();
       fetchMock.mockResolvedValueOnce({
@@ -336,6 +460,62 @@ describe("InstallRelayWizard", () => {
       unmount();
 
       expect(capturedSignal?.aborted).toBe(true);
+    });
+  });
+
+  describe("abort controller cleanup after install", () => {
+    it("does not abort a finished install request when the wizard is unmounted afterwards", async () => {
+      const user = userEvent.setup();
+      let capturedSignal: AbortSignal | undefined;
+      fetchMock.mockImplementationOnce((_url: string, init?: RequestInit) => {
+        capturedSignal = init?.signal ?? undefined;
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          body: sseStream([
+            sseFrame("done", {
+              serverId: "srv1",
+              name: "vps-01",
+              host: "1.2.3.4",
+              relayUrl: "https://relay.example.com/deploy",
+            }),
+          ]),
+        });
+      });
+
+      const { unmount } = render(<InstallRelayWizard open onClose={noop} onSuccess={noop} />);
+      fillRequiredFields();
+      await user.click(screen.getByRole("button", { name: /skip & install/i }));
+      await waitFor(() => expect(screen.getByText("Relay installed successfully")).toBeInTheDocument());
+
+      unmount();
+
+      expect(capturedSignal).toBeDefined();
+      expect(capturedSignal?.aborted).toBe(false);
+    });
+
+    it("does not abort a finished install request when the modal closes after a non-ok response", async () => {
+      const user = userEvent.setup();
+      let capturedSignal: AbortSignal | undefined;
+      fetchMock.mockImplementationOnce((_url: string, init?: RequestInit) => {
+        capturedSignal = init?.signal ?? undefined;
+        return Promise.resolve({
+          ok: false,
+          status: 500,
+          json: () => Promise.resolve({ message: "boom" }),
+        });
+      });
+
+      render(<InstallRelayWizard open onClose={noop} onSuccess={noop} />);
+      fillRequiredFields();
+      await user.click(screen.getByRole("button", { name: /skip & install/i }));
+      await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("boom"));
+
+      // The error step has its own Close button next to the modal's own.
+      await user.click(screen.getAllByRole("button", { name: /^close$/i })[0]);
+
+      expect(capturedSignal).toBeDefined();
+      expect(capturedSignal?.aborted).toBe(false);
     });
   });
 

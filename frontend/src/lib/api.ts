@@ -1,4 +1,4 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+export const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
 /**
  * Error thrown by {@link apiFetch} on a non-2xx response. Extends `Error` so
