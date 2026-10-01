@@ -52,9 +52,12 @@ export default defineConfig({
       // branches / functions / lines.
       // Measured baseline (2026-08-17): InstallRelayWizard.tsx is 60.70%
       // statements, 55.38% branches, 55.88% functions, 64.67% lines (the
-      // component test covers the probe + SSE-install-stream state machine;
-      // the sub-forms for the other wizard steps, e.g. private-key auth
-      // inputs, are not exercised yet).
+      // component test covered the probe + SSE-install-stream state machine
+      // only).
+      // Measured (2026-10-01, 3 runs, identical): InstallRelayWizard.tsx is
+      // 82.35% statements, 69.23% branches, 82.85% functions, 84.49% lines
+      // (private-key sub-form, non-ok install response and abort cleanup are
+      // now exercised); thresholds sit at the floor of those values.
       thresholds: {
         "src/lib/api.ts": {
           statements: 97,
@@ -63,10 +66,10 @@ export default defineConfig({
           lines: 97,
         },
         "src/components/deploys/InstallRelayWizard.tsx": {
-          statements: 58,
-          branches: 52,
-          functions: 45,
-          lines: 62,
+          statements: 82,
+          branches: 69,
+          functions: 82,
+          lines: 84,
         },
       },
     },

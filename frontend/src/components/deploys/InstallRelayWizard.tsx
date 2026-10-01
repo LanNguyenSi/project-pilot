@@ -2,12 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Button, ErrorBanner, Input, Modal, Textarea } from "@/components/ui";
-import { apiFetch, ApiError } from "@/lib/api";
-
-// Replicates the base-URL resolution from src/lib/api.ts so the streaming
-// fetch uses the exact same origin without going through apiFetch (which
-// always calls res.json() and cannot handle SSE).
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+// The streaming fetch shares the base URL constant with apiFetch so both use
+// the same origin, without going through apiFetch (which always calls
+// res.json() and cannot handle SSE).
+import { API_URL, apiFetch, ApiError } from "@/lib/api";
 
 type AuthMethod = "password" | "privateKey";
 
@@ -221,6 +219,18 @@ export function InstallRelayWizard({ open, onClose, onSuccess }: InstallRelayWiz
     const controller = new AbortController();
     abortRef.current = controller;
 
+    try {
+      await streamInstall(installBody, controller);
+    } finally {
+      // Drop the finished controller so a later close/unmount does not abort a
+      // request that already completed, but never clobber a newer controller.
+      if (abortRef.current === controller) {
+        abortRef.current = null;
+      }
+    }
+  }
+
+  async function streamInstall(installBody: Record<string, unknown>, controller: AbortController) {
     let res: Response;
     try {
       res = await fetch(`${API_URL}/api/deploy/install-relay`, {
