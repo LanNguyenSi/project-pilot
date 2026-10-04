@@ -75,5 +75,11 @@ See [configuration.md](configuration.md) for env vars and [api.md](api.md) for t
 | `/forge` | Project list |
 | `/forge/create` | Create project wizard |
 | `/tasks` | Task board |
+| `/tasks/[projectId]` | Per-project task list & board |
+| `/tasks/[projectId]/create` | Create task form |
 | `/deploys` | Server fleet & deploy management |
 | `/security` | Depsight CVE / repo health view |
+| `/forgot-password` | Password reset request form |
+| `/reset-password` | Set new password with token |
+| `/auth/error` | OAuth sign-in error landing page |
+| `/styleguide` | UI primitives showcase outside auth group, no login |
