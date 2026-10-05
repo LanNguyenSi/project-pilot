@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [0.5.0] - 2026-10-05
 
-**Headline: dependency-aware forge import and server Test Connection.** The forge task import can now wire task dependencies, deploy servers get a per-server Test Connection action, upstream timeouts surface as 504 across the backend, and a long run of dependency security fixes lands. The app is versioned at the repo root and deployed from `main`, so this tag is deploy provenance.
+**Headline: dependency-aware forge import and server Test Connection.** The forge task import can now wire task dependencies, deploy servers get a per-server Test Connection action, upstream timeouts are recognised at every backend call site, and a long run of dependency security fixes lands. The app is versioned at the repo root and deployed from `main`, so this tag is deploy provenance.
 
 ### Added
 
@@ -22,23 +22,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - **Empty values render as a middle dot everywhere** (#122), and long names in Select triggers are truncated instead of overflowing.
 - **Backend build generates the Prisma client** (#112), so `npm run build` works from a clean checkout.
-- **Backend `zod` range widened to `^3.25.0`** (#116), so the workspace resolves a single `zod` and the mcp workspace builds again; CI now builds the mcp workspace and asserts the single resolution.
+- **Backend `zod` range widened to `^3.25.0`** (#116), so the workspace resolves a single `zod` and the mcp workspace builds again; CI and the root `npm run build` now build the mcp workspace, and CI asserts the single resolution.
 - **`engines.node >=20`** declared in the root, mcp and frontend manifests (#117).
 - **Backend moved to `@hono/node-server` 2.x and `@modelcontextprotocol/sdk` 1.30.0** (#114).
 - **Prod image builds use npm 11** and backend `vitest` is pinned exactly (#128), fixing an npm 10 resolution crash in the Dockerfile installs.
 
 ### Fixed
 
-- **Upstream timeouts return 504** (#121, #123): `AbortSignal.timeout()` rejects with `TimeoutError`, which the deploy, credentials, forge and agent-tasks call sites did not match, so slow upstreams surfaced as 502 or generic errors. They now share one `isUpstreamTimeout` check.
+- **Upstream timeouts are recognised everywhere** (#121, #123): `AbortSignal.timeout()` rejects with `TimeoutError`, which the deploy, credentials, forge and agent-tasks call sites did not match, so slow upstreams surfaced as 502 or generic errors. They now share one `isUpstreamTimeout` check: deploy, forge and agent-tasks calls return 504, and a credentials check returns a `Service timed out` validation result.
 - **`apiFetch` keeps default headers when a caller passes its own** (#110): caller headers are merged on top of `Content-Type` and `X-Requested-With` instead of replacing them.
 
 ### Removed
 
-- **Unused `GET /api/tasks/claimable` and `POST /api/tasks/:taskId/transition` backend proxy routes** (#131): nothing in the repo called them; the MCP client and dashboard talk to agent-tasks directly.
+- **Dedicated `GET /api/tasks/claimable` and `POST /api/tasks/:taskId/transition` backend proxy routes** (#131): nothing in the repo called them; the MCP client and dashboard talk to agent-tasks directly. `POST /api/tasks/:taskId/transition` now returns 404; `GET /api/tasks/claimable` is still answered by the generic task proxy.
 
 ### Security
 
-- Dependency and lockfile fixes from the 2026 CVE sweeps (#111, #113, #115, #118, #119, #127, #135, #136, #138, #140, #141): `@hono/node-server` GHSA-frvp-7c67-39w9, `next` 15.5.25 (RCE advisories GHSA-2xp9-vwfh-vxw4, GHSA-p293-qw3h-jr36), `sharp`, `hono`, `vitest`, `js-yaml` (GHSA-5p4m-2wfm-xmqj, GHSA-2883-xcg3-v3hh), `nanoid` (GHSA-2v37-7h3g-55p8), `postcss` floor `^8.5.18`, `fast-uri`, `qs` (GHSA-x5fp-wj9c-mxmx, GHSA-4mjr-xmp4-gh2g), `ip-address`, `undici`, `brace-expansion`, `express-rate-limit`, `socket.io-parser`, and `shell-quote`. A CI npm audit regression gate was added (#134).
+- Dependency and lockfile fixes from the 2026 CVE sweeps (#111, #113, #115, #118, #119, #127, #135, #136, #138, #140, #141): `@hono/node-server` GHSA-frvp-7c67-39w9, `next` 15.5.25 (RCE advisories GHSA-2xp9-vwfh-vxw4, GHSA-p293-qw3h-jr36), `sharp`, `hono`, `vitest`, `js-yaml` (GHSA-5p4m-2wfm-xmqj, GHSA-2883-xcg3-v3hh), `nanoid` (GHSA-2v37-7h3g-55p8), `postcss` floor `^8.5.18`, `fast-uri`, `qs` (GHSA-x5fp-wj9c-mxmx, GHSA-4mjr-xmp4-gh2g), `ip-address`, `undici`, `brace-expansion` and `shell-quote`. A CI npm audit regression gate was added (#134).
 
 ### Docs
 
@@ -47,7 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Upgrade notes
 
 - Node.js 20 or newer is required (`engines.node >=20`); CI and the images use Node 22.
-- Callers of `GET /api/tasks/claimable` or `POST /api/tasks/:taskId/transition` on the backend must switch to agent-tasks directly; the routes are gone.
+- Callers of `POST /api/tasks/:taskId/transition` on the backend must switch to agent-tasks directly (no caller exists in this repo).
 - No database migration or new environment variable is introduced by this release.
 
 ## [0.4.0] - 2026-06-25
