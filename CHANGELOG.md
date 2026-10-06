@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Security
+
+- **`npm audit` gate now classifies with an ID-scoped, dated allowlist.** The audit workflow's gate step hands `npm audit --audit-level=high --json` output to `scripts/audit-gate.mjs` (dependency-free, vendored verbatim from depsight commit be8c7ea) and reads `.github/audit-allowlist.json`. The one entry excepts GHSA-vfj7-8cjw-p6xm (`braces` 3.0.3, dev dependency only, no upstream fix) by exact advisory id until its `reviewBy` date (2026-11-06); every other HIGH or CRITICAL advisory still fails the gate, as does an expired entry. A self-test (`scripts/audit-gate.test.mjs`, `node --test`) runs in the audit job before the gate.
+
 ## [0.5.0] - 2026-10-05
 
 **Headline: dependency-aware forge import and server Test Connection.** The forge task import can now wire task dependencies, deploy servers get a per-server Test Connection action, upstream timeouts are recognised at every backend call site, and a long run of dependency security fixes lands. The app is versioned at the repo root and deployed from `main`, so this tag is deploy provenance.
