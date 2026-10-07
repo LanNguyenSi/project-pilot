@@ -47,7 +47,7 @@ project-pilot does not duplicate business logic. It acts as a thin proxy layer i
 
 - **Frontend:** Next.js 15, React 19, Tailwind CSS
 - **Backend:** Hono 4, TypeScript (strict), Prisma 5, PostgreSQL 16
-- **MCP:** @modelcontextprotocol/sdk 1.29
+- **MCP:** @modelcontextprotocol/sdk 1.32
 - **Deployment:** Docker, Traefik
 
 ## MCP surface
