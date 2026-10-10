@@ -90,8 +90,13 @@ describe("node-server adapter: peer address", () => {
         headers: { ...REGISTER_HEADERS, "x-forwarded-for": xff },
         body: JSON.stringify({}),
       });
-    // A fresh client address gets its own bucket even though every request
-    // arrives from the same loopback socket that the previous test exhausted.
-    expect((await send("203.0.113.77")).status).toBe(400);
+    // Self-contained: every request arrives from the same loopback socket, so
+    // only the header can separate the buckets. One header value fills its
+    // own bucket; a different value is still served.
+    for (let i = 0; i < 5; i++) {
+      expect((await send("203.0.113.77")).status).toBe(400);
+    }
+    expect((await send("203.0.113.77")).status).toBe(429);
+    expect((await send("203.0.113.78")).status).toBe(400);
   });
 });
