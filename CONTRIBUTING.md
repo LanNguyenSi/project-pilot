@@ -12,13 +12,30 @@ Thanks for your interest. project-pilot is the unified control plane for the ful
 
 1. Fork, branch off `main` (e.g. `feat/<scope>`, `fix/<scope>`).
 2. Keep changes scoped where possible.
-3. Run the local checks scoped to the affected workspace:
+3. Run the checks CI runs for every workspace you touched:
 
    ```bash
    npm install
-   npm run build --workspace=<surface>
-   npm run test  --workspace=<surface>   # run this for every surface you touched
+
+   # backend
+   npm run db:generate --workspace=backend
+   npm run lint --workspace=backend
+   npm run lint:test --workspace=backend
+   npm run build --workspace=backend
+   npm run test:coverage --workspace=backend
+
+   # frontend
+   npm run typecheck:test --workspace=frontend
+   npm run build --workspace=frontend
+   npm run test:coverage --workspace=frontend
+
+   # mcp
+   npm run typecheck:test --workspace=mcp
+   npm run build --workspace=mcp
+   npm run test:coverage --workspace=mcp
    ```
+
+   Coverage thresholds in each workspace's `vitest.config.ts` are enforced in CI.
 
 4. Open the PR with a clear summary, motivation, and test plan.
 
@@ -27,9 +44,10 @@ Thanks for your interest. project-pilot is the unified control plane for the ful
 ```bash
 git clone https://github.com/LanNguyenSi/project-pilot.git
 cd project-pilot
-npm install
-docker compose up
+make dev-full
 ```
+
+`make dev-full` runs Postgres in Docker and the backend and frontend as local dev servers with hot reload (see the [README quick start](README.md#quick-start)). To run everything in containers instead, use `docker compose up`.
 
 ## Style
 

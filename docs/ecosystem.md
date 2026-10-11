@@ -27,35 +27,25 @@ These four principles hold across every tool in the toolchain:
 Scaffold  ->  Plan  ->  Build  ->  Validate  ->  Deploy  ->  Monitor
 ```
 
-```
-                    ┌─────────────────┐
-                    │  project-pilot  │   control plane (one login, one UI)
-                    └────────┬────────┘
-                             │
-     ┌────────────┬──────────┼──────────┬──────────────┐
-     ▼            ▼          ▼          ▼              ▼
-┌──────────┐┌───────────┐┌─────────┐┌───────────┐┌──────────────┐
-│ project- ││  agent-   ││ agent-  ││  agent-   ││   deploy-    │
-│  forge   ││ planforge ││  tasks  ││ preflight ││    panel     │
-│ scaffold ││   plan    ││  build  ││ validate  ││    deploy    │
-└──────────┘└───────────┘└─────────┘└───────────┘└──────┬───────┘
-                                                        │
-                                                        ▼
-                                              ┌───────────────────┐
-                                              │    agent-relay    │
-                                              │  (VPS execution)  │
-                                              └─────────┬─────────┘
-                                                        │
-                                                        ▼
-                                              ┌───────────────────┐
-                                              │agent-ops-dashboard│
-                                              │    (monitoring)   │
-                                              └───────────────────┘
+The diagram below shows which tools project-pilot calls and where the other
+lifecycle tools attach.
+
+```mermaid
+flowchart TD
+  PP["project-pilot<br/>control plane"] --> PF["project-forge<br/>scaffold"]
+  PP --> AT["agent-tasks<br/>build"]
+  PP --> DP["deploy-panel<br/>deploy"]
+  PF -->|plan request| PL["agent-planforge<br/>plan"]
+  DP --> AR["agent-relay<br/>VPS execution"]
+  AG[agents] -->|heartbeat| OD["agent-ops-dashboard<br/>monitoring"]
+  PRE["agent-preflight<br/>validate"]
 ```
 
 project-pilot is the control-plane UI. It currently aggregates project-forge,
 agent-tasks, and deploy-panel behind a single login; the remaining tools are
-composed directly or through those three.
+composed directly or through those three. project-forge calls agent-planforge
+for plans, deploy-panel runs deploys through agent-relay, agents report to
+agent-ops-dashboard by heartbeat, and agent-preflight runs on its own.
 
 ## Communication patterns
 
@@ -102,8 +92,9 @@ stage. They configure and verify the agents themselves:
   grounding, tools, memory, hooks, and policies.
 - **agent-grounding**: runtime verification for agents, claim validation and
   hypothesis tracking.
-- **agent-dx** (slop-detector): an AI-slop linter for pull requests and commit
-  messages.
+- **agent-dx**: agent-development tooling, including slop-detector (an
+  AI-slop linter for pull requests and committed content) and the
+  orchestrator workflow kit.
 
 They are not drawn in the lifecycle diagram above because they apply at every
 stage rather than one.

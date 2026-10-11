@@ -13,27 +13,82 @@ project-pilot/
 
 ## Aggregation model
 
-project-pilot does not duplicate business logic. It acts as a thin proxy layer in front of three independent services:
+project-pilot keeps business logic in the three services. The backend owns only user accounts and sessions, GitHub sign-in that registers the user with each service, encrypted service credentials, and forge task snapshots used to hand generated tasks to agent-tasks. All other calls are forwarded.
 
-- **Backend** authenticates users, stores encrypted service credentials, and forwards requests to downstream APIs.
+- **Backend** authenticates users (email/password or GitHub, see [GitHub sign-in](configuration.md#github-sign-in)), stores encrypted service credentials, keeps forge task snapshots for migration, and forwards requests (including the relay-install SSE stream) to downstream APIs.
 - **Frontend** provides a unified dark-mode UI across all services.
 - **MCP** exposes 18 tools for AI agent integration over stdio.
 
+The MCP server is a separate client of the three services and uses keys from its own environment, not the credentials stored in the backend.
+
+The component map below shows the browser path through the backend, the separate MCP path, the database and the external dependencies. The auth header each service expects is listed under [Downstream services](#downstream-services).
+
+```mermaid
+flowchart TD
+  Browser --> FE["Frontend<br/>Next.js :3000"]
+  FE -->|"apiFetch, session cookie"| BE["Backend<br/>Hono :3001"]
+  FE -.->|"iframe on /security"| DS[depsight]
+  BE --> DB[(PostgreSQL)]
+  BE -->|"OAuth code exchange"| GH[GitHub]
+  BE -->|"per-user keys from PostgreSQL"| SVC
+  MCP["MCP server<br/>stdio"] -->|"keys from its own env"| SVC
+  subgraph SVC["Downstream services"]
+    PF[project-forge]
+    AT[agent-tasks]
+    DP[deploy-panel]
+  end
 ```
-                  ┌──────────────────────┐
-                  │    project-pilot     │
-                  │  (one login, one UI) │
-                  └──────────┬───────────┘
-                             │
-        ┌────────────────────┼────────────────────┐
-        ▼                    ▼                    ▼
-  ┌───────────┐        ┌───────────┐        ┌───────────┐
-  │  Create   │        │  Develop  │        │  Deploy   │
-  │project-   │        │  agent-   │        │  deploy-  │
-  │  forge    │        │   tasks   │        │   panel   │
-  └───────────┘        └───────────┘        └───────────┘
-   X-API-Key            Bearer token         Bearer key
+
+## Create to Develop handoff
+
+Generating a project in `/forge/create` saves the preview's tasks as a `ForgeTaskSnapshot` keyed by user and forge session, and publishing binds that snapshot to the GitHub repo. **Migrate tasks** on `/forge` then loads the snapshot by repo, finds or creates the agent-tasks project for that repo, and imports the tasks. Re-runs are idempotent through each task's `externalRef`, and the snapshot is deleted only when the migration completed: it is kept when a task failed or when an already existing task's `dependsOn` edges could not be applied.
+
+The sequence below shows the snapshot lifecycle and the two import paths.
+
+```mermaid
+sequenceDiagram
+  participant UI as Frontend
+  participant P as Backend
+  participant F as project-forge
+  participant T as agent-tasks
+  participant D as PostgreSQL
+  UI->>P: POST /api/forge/generate
+  P->>F: POST /api/v1/generate
+  P->>D: save snapshot (user, sessionId)
+  UI->>P: POST /api/forge/publish
+  P->>F: POST /api/v1/publish
+  P->>D: link snapshot to repo
+  UI->>P: POST /api/forge/migrate-tasks
+  P->>D: load snapshot by repo
+  P->>T: find or create project for the repo
+  alt no task has dependsOn
+    P->>T: POST /api/projects/:id/tasks/import (batches)
+  else dependsOn present
+    P->>T: POST /api/projects/:id/tasks per task, in dependency order
+    Note over P,T: on 409, look up the task by externalRef
+  end
+  opt migration complete
+    P->>D: delete snapshot
+  end
 ```
+
+## Module map
+
+- `backend/src/routes/`: one Hono router per API area (`auth`, `oauth`, `credentials`, `dashboard`, `forge`, `tasks`, `deploy`, `health`), mounted in `backend/src/app.ts`.
+- `backend/src/services/`: `auth`, `credentials`, `downstream`, `agent-tasks-client`, `github-oauth`, `module-registration`, `forge-task-snapshot`, `forge-task-migration`.
+- `backend/src/middleware/`: `auth` (session check), `csrf`, `cors`, `rate-limit`, `security` (response headers).
+- `backend/src/lib/`: `crypto` (credential encryption), `prisma` (client), `upstream-timeout`.
+
+## Data model
+
+The Prisma schema (`backend/prisma/schema.prisma`) is applied with `prisma db push`; the repository has no migrations directory.
+
+- `User`: a local email/password account, a GitHub identity, or both.
+- `Session`: hashed session token, valid for 30 days.
+- `PasswordReset`: hashed reset token, valid for 1 hour.
+- `ServiceCredential`: encrypted token per user and service.
+- `ForgeTaskSnapshot`: forge preview tasks, kept until they are migrated into agent-tasks.
+- `ApiKey`: defined in the schema; no backend code reads or writes it.
 
 ## Downstream services
 
@@ -74,7 +129,7 @@ See [configuration.md](configuration.md) for env vars and [api.md](api.md) for t
 | `/settings` | Service credential management |
 | `/forge` | Project list |
 | `/forge/create` | Create project wizard |
-| `/tasks` | Task board |
+| `/tasks` | agent-tasks project list, create project, sync a team's GitHub repos |
 | `/tasks/[projectId]` | Per-project task list & board |
 | `/tasks/[projectId]/create` | Create task form |
 | `/deploys` | Server fleet & deploy management |

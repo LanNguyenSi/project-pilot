@@ -2,6 +2,13 @@
 
 The backend exposes a Hono HTTP API at `:3001/api/*`. All `POST`/`PUT` JSON bodies are validated with Zod via `@hono/zod-validator`; invalid bodies return `400` before any handler logic runs (see the [validation surface](#validation-surface) section).
 
+## Authentication and request rules
+
+- Session: register, login and GitHub sign-in set an httpOnly `session` cookie that lasts 30 days and is `Secure` when `NODE_ENV=production`. It is `SameSite=Strict` after register or password login and `SameSite=Lax` after GitHub sign-in. Every route except `GET /api/health`, `/api/oauth/*` and the auth endpoints `register`, `login`, `logout`, `forgot-password` and `reset-password` returns `401` without a valid session.
+- CSRF: `POST`, `PUT`, `PATCH` and `DELETE` requests under `/api/auth`, `/api/credentials`, `/api/dashboard`, `/api/forge`, `/api/tasks` and `/api/deploy` must send `X-Requested-With: XMLHttpRequest`, or they get `403` with `csrf_failed`.
+- Rate limits: per minute, per client IP and path: `register` 5, `login` 10, `forgot-password` 3, `reset-password` 5. `login` and `forgot-password` are also limited per submitted email. A breach returns `429` with `Retry-After`. The client IP is the last `X-Forwarded-For` entry (the socket address when the header is absent), so deploy behind exactly one reverse proxy. Counters are kept in memory per backend process.
+- CORS: only origins listed in `CORS_ORIGINS`, with credentials.
+
 ## Auth
 
 - `POST /api/auth/register` create account
@@ -14,7 +21,7 @@ The backend exposes a Hono HTTP API at `:3001/api/*`. All `POST`/`PUT` JSON bodi
 ## OAuth
 
 - `GET /api/oauth/github/start` begin GitHub OAuth flow (redirects to GitHub)
-- `GET /api/oauth/github/callback` GitHub OAuth callback (exchanges code for token)
+- `GET /api/oauth/github/callback` GitHub OAuth callback: checks the state cookie, exchanges the code, creates or links the user, registers the user with each downstream service, sets the session cookie and redirects to `/dashboard`. See [GitHub sign-in](configuration.md#github-sign-in).
 
 Both routes return `503` unless `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` are set in the backend env (see [configuration.md](configuration.md)).
 
@@ -29,7 +36,7 @@ Both routes return `503` unless `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` ar
 
 - `GET /api/dashboard/summary` aggregated service stats
 
-Project and open-task counts come from agent-tasks; server, online-server, and app counts come from deploy-panel. project-forge contributes only a `configured` flag (no live count or health check).
+Project and claimable-task counts come from agent-tasks; server, online-server, and app counts come from deploy-panel. project-forge contributes only a `configured` flag (no live count or health check).
 
 ## Forge proxy (project-forge)
 
