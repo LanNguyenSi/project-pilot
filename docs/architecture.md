@@ -21,12 +21,12 @@ project-pilot keeps business logic in the three services. The backend owns only 
 
 The MCP server is a separate client of the three services and uses keys from its own environment, not the credentials stored in the backend.
 
-The component map below shows the browser path through the backend, the separate MCP path, the database and the external dependencies. The auth header each service expects is listed under [Downstream services](#downstream-services).
+The component map below shows the browser loading pages from the frontend and calling the backend directly, the separate MCP path, the database and the external dependencies. The auth header each service expects is listed under [Downstream services](#downstream-services).
 
 ```mermaid
 flowchart TD
-  Browser --> FE["Frontend<br/>Next.js :3000"]
-  FE -->|"apiFetch, session cookie"| BE["Backend<br/>Hono :3001"]
+  Browser -->|"page loads"| FE["Frontend<br/>Next.js :3000"]
+  Browser -->|"apiFetch (frontend code), session cookie"| BE["Backend<br/>Hono :3001"]
   FE -.->|"iframe on /security"| DS[depsight]
   BE --> DB[(PostgreSQL)]
   BE -->|"OAuth code exchange"| GH[GitHub]

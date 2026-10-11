@@ -44,10 +44,12 @@ sequenceDiagram
   participant B as Browser
   participant P as Backend
   participant G as GitHub
-  participant M as project-forge, agent-tasks, deploy-panel
+  participant M as Downstream services
   participant D as PostgreSQL
   B->>P: GET /api/oauth/github/start
   P-->>B: oauth_state cookie, 302 to GitHub authorize URL
+  B->>G: authorize (user consents)
+  G-->>B: 302 to callback with code, state
   B->>P: GET /api/oauth/github/callback?code&state
   P->>P: compare state with oauth_state cookie
   P->>G: exchange code, fetch user and primary verified email

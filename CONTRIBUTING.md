@@ -35,7 +35,7 @@ Thanks for your interest. project-pilot is the unified control plane for the ful
    npm run test:coverage --workspace=mcp
    ```
 
-   Coverage thresholds in each workspace's `vitest.config.ts` are enforced in CI.
+   Coverage thresholds in each workspace's `vitest.config.ts` are enforced in CI. CI also asserts a single `zod` resolution in `package-lock.json` and runs a separate npm audit gate that fails on HIGH or CRITICAL advisories.
 
 4. Open the PR with a clear summary, motivation, and test plan.
 

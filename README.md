@@ -6,9 +6,9 @@ Unified control plane for the full project lifecycle: **Create**, **Develop**, *
 
 ## Overview
 
-project-pilot aggregates three independent services, [project-forge](https://github.com/LanNguyenSi/project-forge) (scaffolding), [agent-tasks](https://github.com/LanNguyenSi/agent-tasks) (task management), and [deploy-panel](https://github.com/LanNguyenSi/deploy-panel) (VPS deploys), behind a single login. Service credentials are stored encrypted per user and can be checked with **Test** after saving. A separate stdio MCP server gives AI agents access to the same three services, using keys from its own environment. The backend is a Hono API with Zod-validated inputs: it owns accounts, sessions, GitHub sign-in and the stored credentials, and forwards all other calls to the three services. The frontend is Next.js 15 with a unified dark-mode UI.
+project-pilot aggregates three independent services, [project-forge](https://github.com/LanNguyenSi/project-forge) (scaffolding), [agent-tasks](https://github.com/LanNguyenSi/agent-tasks) (task management), and [deploy-panel](https://github.com/LanNguyenSi/deploy-panel) (VPS deploys), behind a single login. Service credentials are stored encrypted per user and can be checked with **Test** after saving. A separate stdio MCP server gives AI agents access to the same three services, using keys from its own environment. The backend is a Hono API with Zod-validated inputs: it owns accounts, sessions, GitHub sign-in, the stored credentials and forge task snapshots for the migration into agent-tasks, and forwards all other calls to the three services. The frontend is Next.js 15 with a unified dark-mode UI.
 
-![The project-pilot dashboard: aggregated stats across the three connected services (projects via agent-tasks, open tasks, servers online, apps deployed) with quick actions.](docs/img/dashboard.png)
+![The project-pilot dashboard: aggregated stats from agent-tasks and deploy-panel (projects, open tasks, servers online, apps deployed) with quick actions.](docs/img/dashboard.png)
 
 ## Key features
 
@@ -18,8 +18,8 @@ project-pilot aggregates three independent services, [project-forge](https://git
 - Deploy (deploy-panel): add and remove servers, test relay connectivity, install a relay on a VPS, list apps,
   trigger deploys, watch status, view deploy logs, and filter or paginate history from `/deploys`
   (preflight and rollback are available through the HTTP API and MCP tools, not this UI)
-- Unified dark-mode dashboard with aggregated stats from agent-tasks and deploy-panel, plus connection status
-  for project-forge, and error boundaries for graceful failure handling
+- Unified dark-mode dashboard with aggregated stats from agent-tasks and deploy-panel, plus whether a
+  project-forge token is saved, and error boundaries for graceful failure handling
 - Encrypted per-user service credential storage, with a **Test** check for each saved credential
 - MCP server exposing 18 tools (forge, tasks, deploy, plus `dashboard_summary`) over stdio
 - Password reset flow (forgot password / reset with token)
@@ -47,7 +47,7 @@ Then connect your existing service credentials:
 1. Register an account at http://localhost:3000/login. If GitHub OAuth is configured (see [GitHub sign-in](docs/configuration.md#github-sign-in)), **Continue with GitHub** registers you with each service and fills `/settings` for every service that accepts the registration.
 2. Open `/settings`.
 3. Paste your `pf_...` Forge key, agent-tasks Bearer token, and `dp_...` Deploy key, click **Save**, then click **Test** on each. The project-forge **Test** reports a valid key as rejected ("Service rejected the request"); open `/forge` to confirm that key instead.
-4. Visit `/dashboard`, you should see stats from agent-tasks and deploy-panel and the project-forge connection status.
+4. Visit `/dashboard`, you should see stats from agent-tasks and deploy-panel and whether a project-forge token is saved.
 
 Need to run the steps individually? See [docs/configuration.md](docs/configuration.md#manual-setup).
 
