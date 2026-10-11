@@ -1,9 +1,9 @@
 ---
 type: invariant
 title: Request gating and session model
-description: Global CORS and security headers, CSRF registered per route prefix in app.ts, requireAuth registered per router, opaque hashed session tokens with SameSite Strict for password sign-in and Lax for GitHub sign-in, per-process rate limits on the four public auth endpoints keyed on the last X-Forwarded-For entry, and a CSP that only the frontend sets.
+description: Global CORS and security headers, CSRF registered per route prefix in app.ts, requireAuth registered per router, opaque hashed session tokens with SameSite Strict for password sign-in and Lax for GitHub sign-in, per-process rate limits on four public auth endpoints keyed on the last X-Forwarded-For entry, and a CSP that only the frontend sets.
 tags: [auth, sessions, csrf, cors, rate-limit, headers, csp]
-timestamp: 2026-10-11T12:40:55Z
+timestamp: 2026-10-11T16:05:30Z
 sources:
   - backend/src/app.ts
   - backend/src/middleware/auth.ts
@@ -26,10 +26,11 @@ sources:
 
 # Request gating and session model
 
-Every backend request passes the same global middleware, then a CSRF check
-chosen by path prefix in `app.ts`, then whatever the mounted router adds
-itself. Authentication is not global: each router opts in. This doc records
-which layer owns which check, so a new route group gets all of them.
+Every backend request passes the same global middleware, then, for six
+route prefixes, a CSRF check registered in `app.ts`, then whatever the
+mounted router adds itself. Authentication is not global: each router opts
+in. This doc records which layer owns which check, so a new route group gets
+all of them.
 
 ## The invariants
 

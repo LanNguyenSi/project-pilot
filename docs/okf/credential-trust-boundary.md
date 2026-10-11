@@ -3,7 +3,7 @@ type: invariant
 title: Credential and identity trust boundaries
 description: SESSION_SECRET is the only key material for stored service credentials and nothing else reads it; the GitHub access token is used for sign-in, forwarded once to the three module hosts and never stored; a failed module registration still signs the user in; the MCP server never touches the credential store.
 tags: [credentials, encryption, oauth, identity, mcp]
-timestamp: 2026-10-11T15:44:19Z
+timestamp: 2026-10-11T16:05:30Z
 sources:
   - backend/src/lib/crypto.ts
   - backend/src/config/index.ts
@@ -85,16 +85,20 @@ their own `try` blocks:
 - `forgeRequest` in the forge proxy
   (`backend/src/routes/forge.ts:24-25#"getCredential(userId, "`),
 - `deployRequest` in the deploy proxy
-  (`backend/src/routes/deploy.ts:86-87#"getCredential(userId, "`).
+  (`backend/src/routes/deploy.ts:86-87#"getCredential(userId, "`),
+- the `probe-vps` and `install-relay` handlers of the deploy proxy, which call
+  it directly before forwarding
+  (`backend/src/routes/deploy.ts:256#"getCredential(userId, "`,
+  `backend/src/routes/deploy.ts:288#"getCredential(userId, "`).
 
 The error reaches `app.onError`, which answers 500 with a generic message
 (`backend/src/app.ts:18-26#"Internal server error"`). Listing and deleting
-credentials keep working, because neither reads the token column
+credentials keep working, because neither decrypts the token
 (`backend/src/services/credentials.ts:39-42#"select: { id: true, service: true, label: true, updatedAt: true },"`,
 `backend/src/services/credentials.ts:47-49#"where: { userId_service: { userId, service } },"`).
 A new `PUT /api/credentials`, or a successful module registration on the next
-GitHub sign-in, overwrites the row with a ciphertext under the current secret. Sessions are unaffected, because they
-never involved the secret.
+GitHub sign-in, overwrites the row with a ciphertext under the current
+secret. Sessions are unaffected, because they never involved the secret.
 
 ## The GitHub access token: used, forwarded, dropped
 
@@ -125,8 +129,8 @@ The three target hosts come from `PROJECT_FORGE_URL`, `AGENT_TASKS_URL` and
 which default to the public opentriologue hosts
 (`backend/src/config/index.ts:18-26#"deploy-panel.opentriologue.ai"`). These
 variables therefore decide who receives every signing-in user's GitHub token
-with the scopes above. A module error is mapped to a status code only, without echoing
-the response body
+with the scopes above. A module error is mapped to a status code only,
+without echoing the response body
 (`backend/src/services/module-registration.ts:63-66#"ok: false, error:"`).
 
 ### Identity matching
@@ -159,9 +163,9 @@ comes before the only write
 (`backend/src/services/module-registration.ts:60-77#"no_token_in_response"`),
 and that write is an upsert keyed on user and service
 (`backend/src/services/credentials.ts:22-25#"update: { token: encrypted, label },"`).
-A first-time user therefore has no credential for that module until they
-paste a token in `/settings` or sign in with GitHub again, and a returning
-user keeps the credential stored earlier.
+A user with no earlier credential for that module therefore has none until
+they paste a token in `/settings` or sign in with GitHub again; a user who
+already has one keeps it.
 
 ## The MCP server is a separate trust domain
 

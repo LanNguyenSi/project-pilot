@@ -3,7 +3,7 @@ type: module
 title: Forge-to-tasks migration lifecycle
 description: How a project-forge preview's task list is snapshotted per forge session, bound to the published repo, imported into agent-tasks through the flat v1 batch path or the dependency-aware v2 path, and deleted only after a complete migration; re-runs rely on externalRef dedupe.
 tags: [forge, agent-tasks, migration, snapshot, idempotency]
-timestamp: 2026-10-11T15:44:19Z
+timestamp: 2026-10-11T16:05:30Z
 sources:
   - backend/src/routes/forge.ts
   - backend/src/services/forge-task-snapshot.ts
@@ -66,7 +66,7 @@ stateDiagram-v2
 ```
 
 - **Saved.** `saveForgeTaskSnapshot` upserts on `(userId, sessionId)` with
-  `repoUrl` empty
+  `repoUrl` unset (null)
   (`backend/src/services/forge-task-snapshot.ts:93-102#"update: { tasks: data },"`).
   Saving is best-effort: a failure is logged and the generate response is
   returned anyway.
@@ -129,9 +129,11 @@ labels are `source:forge` plus `wave:<wave>` when a wave is set
 is chosen by whether any task carries `dependsOn`: the v1 path runs only
 when no snapshot task carries one
 (`backend/src/services/forge-task-migration.ts:458-460#"if (!hasDependencies) {"`).
-`extractPreviewTasks` stores whatever `dependsOn` the forge preview carries,
-keeping only string ids and dropping an empty list
-(`backend/src/services/forge-task-snapshot.ts:74-86#".map(normalizeTaskDependsOn);"`).
+`extractPreviewTasks` passes on whatever `dependsOn` the forge preview
+carries, keeping only string ids and dropping an empty list
+(`backend/src/services/forge-task-snapshot.ts:74-86#".map(normalizeTaskDependsOn);"`),
+and the generate route saves that list as the snapshot
+(`backend/src/routes/forge.ts:98#"extractPreviewTasks(result.data.preview)"`).
 
 ### v1: flat batch import
 
@@ -159,8 +161,9 @@ and more than 50 dependencies on one task is 400 `too_many_dependencies`
 `backend/src/services/forge-task-migration.ts:507-513#"taskId: err.taskId,"`).
 
 Tasks are then created one at a time through the single-task route, with
-`dependsOn` set to the agent-tasks ids of the tasks created before them
-(`backend/src/services/forge-task-migration.ts:547-554#"dependsOn: dependsOnUuids"`).
+`dependsOn` set to the agent-tasks ids of its own dependencies, which the
+topological order created first
+(`backend/src/services/forge-task-migration.ts:536-554#"dependsOn: dependsOnUuids"`).
 A 409 means the `externalRef` already exists from an earlier run: the
 migration looks the task up by `externalRef`
 (`backend/src/services/forge-task-migration.ts:565-571#"tasks?externalRef="`)
