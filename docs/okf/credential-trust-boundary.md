@@ -3,7 +3,7 @@ type: invariant
 title: Credential and identity trust boundaries
 description: SESSION_SECRET is the only key material for stored service credentials and nothing else reads it; the GitHub access token is used for sign-in, forwarded once to the three module hosts and never stored; a failed module registration still signs the user in; the MCP server never touches the credential store.
 tags: [credentials, encryption, oauth, identity, mcp]
-timestamp: 2026-10-11T12:40:55Z
+timestamp: 2026-10-11T15:44:19Z
 sources:
   - backend/src/lib/crypto.ts
   - backend/src/config/index.ts
@@ -153,9 +153,15 @@ The session is created afterwards, whatever the registration outcome
 The `upsertCredential` call is the one step inside `registerWithModule`
 without its own error handling, so a database error there rejects the whole
 `Promise.all`; tokens already stored for the other modules stay stored, and
-the user is still signed in. A user whose registration failed for a module
-has no credential for it until they paste a token in `/settings` or sign in
-with GitHub again.
+the user is still signed in. A failed registration stores no new credential
+for that module and leaves an earlier one in place: every `ok: false` return
+comes before the only write
+(`backend/src/services/module-registration.ts:60-77#"no_token_in_response"`),
+and that write is an upsert keyed on user and service
+(`backend/src/services/credentials.ts:22-25#"update: { token: encrypted, label },"`).
+A first-time user therefore has no credential for that module until they
+paste a token in `/settings` or sign in with GitHub again, and a returning
+user keeps the credential stored earlier.
 
 ## The MCP server is a separate trust domain
 

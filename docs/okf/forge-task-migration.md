@@ -3,7 +3,7 @@ type: module
 title: Forge-to-tasks migration lifecycle
 description: How a project-forge preview's task list is snapshotted per forge session, bound to the published repo, imported into agent-tasks through the flat v1 batch path or the dependency-aware v2 path, and deleted only after a complete migration; re-runs rely on externalRef dedupe.
 tags: [forge, agent-tasks, migration, snapshot, idempotency]
-timestamp: 2026-10-11T12:40:55Z
+timestamp: 2026-10-11T15:44:19Z
 sources:
   - backend/src/routes/forge.ts
   - backend/src/services/forge-task-snapshot.ts
@@ -51,8 +51,8 @@ agent-tasks token
 
 The diagram shows the states of one `ForgeTaskSnapshot` row and the calls
 that move it between them. A migration is incomplete when it returns an
-error, when a task failed, or when a skipped task lost its own `dependsOn`
-edges (see the delete gate below).
+error, when a task failed, or when a skipped task carries `dependsOn` edges
+of its own (see the delete gate below).
 
 ```mermaid
 stateDiagram-v2
@@ -126,9 +126,12 @@ an unknown priority becomes `MEDIUM`
 (`backend/src/services/forge-task-migration.ts:98-100#"MEDIUM"`), and the
 labels are `source:forge` plus `wave:<wave>` when a wave is set
 (`backend/src/services/forge-task-migration.ts:103-113#"labels,"`). The path
-is chosen by whether any task carries `dependsOn`. No forge response emits
-`dependsOn` today, so the v1 path is the one that runs
-(`backend/src/services/forge-task-snapshot.ts:14-24#"takes its unchanged v1 flat-import path."`).
+is chosen by whether any task carries `dependsOn`: the v1 path runs only
+when no snapshot task carries one
+(`backend/src/services/forge-task-migration.ts:458-460#"if (!hasDependencies) {"`).
+`extractPreviewTasks` stores whatever `dependsOn` the forge preview carries,
+keeping only string ids and dropping an empty list
+(`backend/src/services/forge-task-snapshot.ts:74-86#".map(normalizeTaskDependsOn);"`).
 
 ### v1: flat batch import
 
@@ -164,15 +167,16 @@ migration looks the task up by `externalRef`
 and accepts the answer only when it is exactly one row with that
 `externalRef`; anything else fails the migration with 409
 (`backend/src/services/forge-task-migration.ts:586-592#"could not be verified"`).
-`dependsOn` is create-time only in agent-tasks, so a skipped task that had
-dependencies of its own keeps none, and the result carries a warning
-(`backend/src/services/forge-task-migration.ts:608#"v2SkippedOwnDependsOn = skippedIds.some("`).
+`dependsOn` is create-time only in agent-tasks, so this run cannot apply the
+edges of a skipped task that has dependencies of its own, nor confirm that
+the earlier run applied them; the result carries a warning
+(`backend/src/services/forge-task-migration.ts:608-612#"dependsOn is create-time only"`).
 
 ## The delete gate
 
-The snapshot is deleted only when no task failed and no skipped v2 task lost
-its own `dependsOn` edges
+The snapshot is deleted only when no task failed and no skipped v2 task
+carries `dependsOn` edges of its own
 (`backend/src/services/forge-task-migration.ts:626-628#"await deleteForgeSnapshotByRepo(userId, repoUrl);"`).
 Any early error return happens before this point, so the snapshot survives
-it. In the lost-edges case the snapshot is the only remaining copy of those
-edges, which is why it is kept.
+it. In the unconfirmed-edges case the snapshot is kept so those edges are
+not lost.
