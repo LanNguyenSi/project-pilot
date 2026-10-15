@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **The dashboard no longer shows every service as "Not configured" when a stored credential cannot be decrypted** (e.g. after `SESSION_SECRET` changed). `GET /api/dashboard/summary` now checks each stored credential's readability up front: a service whose credential fails to decrypt is reported with the optional `unreadable: true` field (`configured` stays `true`) and its downstream calls are skipped, while the other services still report their data. The dashboard renders a distinct **Credential unreadable** badge for that service plus a hint to re-enter it in Settings; the stat-card state mapping moved to `frontend/src/lib/service-state.ts` with its own unit test.
+
 ### Security
 
 - **next 15.5.27** (GHSA-mcj8-r9mp-w47p, GHSA-4jqv-mc3x-m676): the lockfile resolves 15.5.27 with its matching `@next/env` and `@next/swc-*` packages and the `next` dependency floor is now `^15.5.27`.

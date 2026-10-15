@@ -36,7 +36,7 @@ Both routes return `503` unless `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` ar
 
 - `GET /api/dashboard/summary` aggregated service stats
 
-Project and claimable-task counts come from agent-tasks; server, online-server, and app counts come from deploy-panel. project-forge contributes only a `configured` flag (no live count or health check).
+Project and claimable-task counts come from agent-tasks; server, online-server, and app counts come from deploy-panel. project-forge contributes only a `configured` flag (no live count or health check). A service whose stored credential cannot be decrypted (e.g. after a `SESSION_SECRET` change) reports the optional `unreadable: true` field (with `configured` still `true`), its count fields are `null`, and its downstream calls are skipped; the request itself stays 200.
 
 ## Forge proxy (project-forge)
 

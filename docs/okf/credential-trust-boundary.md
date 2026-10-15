@@ -3,7 +3,7 @@ type: invariant
 title: Credential and identity trust boundaries
 description: SESSION_SECRET is the only key material for stored service credentials and nothing else reads it; the GitHub access token is used for sign-in, forwarded once to the three module hosts and never stored; a failed module registration still signs the user in; the MCP server never touches the credential store.
 tags: [credentials, encryption, oauth, identity, mcp]
-timestamp: 2026-10-15T04:27:24Z
+timestamp: 2026-10-15T12:39:53Z
 sources:
   - backend/src/lib/crypto.ts
   - backend/src/config/index.ts
@@ -11,6 +11,7 @@ sources:
   - backend/src/services/credentials.ts
   - backend/src/routes/credentials.ts
   - backend/src/services/downstream.ts
+  - backend/src/routes/dashboard.ts
   - backend/src/services/agent-tasks-client.ts
   - backend/src/routes/forge.ts
   - backend/src/routes/deploy.ts
@@ -81,8 +82,15 @@ and its callers call it before their own `try` blocks:
 - `POST /api/credentials/validate`, which catches the error itself and answers
   `{ valid: false }` with the re-enter message
   (`backend/src/routes/credentials.ts:76-80#"return c.json({ valid: false, error: err.message });"`),
-- `callService` behind the dashboard summary
-  (`backend/src/services/downstream.ts:22-27#"const token = await getCredential(userId, service);"`),
+- `callService` behind the downstream calls of the dashboard summary
+  (`backend/src/services/downstream.ts:22-27#"const token = await getCredential(userId, service);"`).
+  The summary route is the exception to the pattern: it pre-checks readability
+  with `getCredential` inside a `try`/`catch`
+  (`backend/src/routes/dashboard.ts:37-41#"unreadable.add(service);"`),
+  marks a service whose credential cannot be decrypted `unreadable: true`, and
+  skips that service's downstream calls, so `GET /api/dashboard/summary` keeps
+  answering 200 and the dashboard shows "Credential unreadable" for that
+  service instead of failing with 409;
 - `agentTasksRequest`, used by the `/api/tasks` proxy and the forge task
   migration (`backend/src/services/agent-tasks-client.ts:16-21#"getCredential(userId, "`),
 - `forgeRequest` in the forge proxy
@@ -97,8 +105,8 @@ and its callers call it before their own `try` blocks:
 Every other caller lets the error reach `app.onError`, which answers 409 with
 code `credential_unreadable` and the message "Re-enter it in /settings"
 (`backend/src/app.ts:24-28#"code: err.code"`), after logging one line with the
-method, path and service name, so a rotation shows up in the logs; any other error still becomes
-a 500 with a generic message
+method, path and service name, so a rotation shows up in the logs; any other error without its
+own numeric status becomes a 500 with a generic message
 (`backend/src/app.ts:19-33#"Internal server error"`). Listing and deleting
 credentials keep working, because neither decrypts the token
 (`backend/src/services/credentials.ts:56-59#"select: { id: true, service: true, label: true, updatedAt: true },"`,
