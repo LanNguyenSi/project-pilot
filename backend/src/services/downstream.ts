@@ -51,13 +51,6 @@ async function callService<T>(
   }
 }
 
-// --- Project Forge ---
-
-export async function getForgeStats(userId: string) {
-  // project-forge doesn't have a list endpoint, return status only
-  return callService<{ ok: boolean }>(userId, "project-forge", "/api/v1/projects");
-}
-
 // --- Agent Tasks ---
 
 interface AgentTasksProject {

@@ -3,7 +3,8 @@ import type { MiddlewareHandler } from "hono";
 /**
  * CSRF protection via custom header check.
  * Browsers won't send custom headers in cross-origin simple requests.
- * Combined with SameSite=Strict cookies, this provides double protection.
+ * Combined with SameSite cookies (Strict for password login, Lax for GitHub
+ * sign-in), this provides double protection.
  */
 export const csrfProtection: MiddlewareHandler = async (c, next) => {
   const method = c.req.method;

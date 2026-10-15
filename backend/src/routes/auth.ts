@@ -135,7 +135,7 @@ auth.post("/forgot-password", rateLimit({ max: 3, windowMs: 60_000, keyGenerator
     data: { tokenHash, userId: user.id, expiresAt },
   });
 
-  // TODO: send email via notification-service — for now, token is only accessible via DB
+  // TODO: send email via notification-service. No delivery path exists yet: only the token hash is stored, so the token is never delivered or recoverable.
 
   return c.json({ ok: true });
 });

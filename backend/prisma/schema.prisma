@@ -23,7 +23,6 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  apiKeys            ApiKey[]
   serviceCredentials ServiceCredential[]
   sessions           Session[]
   passwordResets     PasswordReset[]
@@ -40,20 +39,6 @@ model Session {
 
   @@index([userId])
   @@index([expiresAt])
-}
-
-model ApiKey {
-  id        String    @id @default(uuid())
-  name      String
-  keyHash   String    @unique
-  keyPrefix String
-  userId    String
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  lastUsedAt DateTime?
-  revokedAt  DateTime?
-  createdAt  DateTime @default(now())
-
-  @@index([userId])
 }
 
 model PasswordReset {

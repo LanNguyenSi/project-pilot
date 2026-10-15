@@ -1,4 +1,4 @@
-.PHONY: install setup dev dev-full dev-backend dev-frontend build clean docker-up docker-down db-generate db-push
+.PHONY: install setup dev dev-full dev-backend dev-frontend build clean docker-up docker-down db-generate db-push deploy
 
 install:
 	npm install

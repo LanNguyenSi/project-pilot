@@ -9,6 +9,19 @@ export function isValidService(s: string): s is ServiceName {
   return VALID_SERVICES.includes(s as ServiceName);
 }
 
+/**
+ * Thrown when a stored credential exists but cannot be decrypted, for example
+ * after SESSION_SECRET changed. The user has to re-enter the credential.
+ */
+export class CredentialUnreadableError extends Error {
+  readonly status = 409;
+  readonly code = "credential_unreadable";
+  constructor(readonly service: ServiceName) {
+    super(`Stored ${service} credential is not readable. Re-enter it in /settings.`);
+    this.name = "CredentialUnreadableError";
+  }
+}
+
 export interface CredentialSummary {
   id: string;
   service: string;
@@ -33,7 +46,11 @@ export async function getCredential(userId: string, service: ServiceName): Promi
   });
 
   if (!cred) return null;
-  return decrypt(cred.token);
+  try {
+    return decrypt(cred.token);
+  } catch {
+    throw new CredentialUnreadableError(service);
+  }
 }
 
 export async function listCredentials(userId: string): Promise<CredentialSummary[]> {

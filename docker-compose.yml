@@ -24,7 +24,7 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgresql://project_pilot:project_pilot@db:5432/project_pilot
-      SESSION_SECRET: dev-session-secret-change-me
+      SESSION_SECRET: dev-credential-key-change-me
       PORT: "3001"
       CORS_ORIGINS: http://localhost:3000
       FRONTEND_URL: http://localhost:3000
@@ -36,10 +36,11 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        # Build-time only: Next.js inlines NEXT_PUBLIC_* into the client bundle.
+        NEXT_PUBLIC_API_URL: http://localhost:3001
     depends_on:
       - backend
-    environment:
-      NEXT_PUBLIC_API_URL: http://localhost:3001
     ports:
       - "3000:3000"
 

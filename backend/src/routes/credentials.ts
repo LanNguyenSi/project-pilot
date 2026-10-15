@@ -3,7 +3,7 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { config } from "../config/index.js";
 import { requireAuth } from "../middleware/auth.js";
-import { upsertCredential, listCredentials, deleteCredential, getCredential, isValidService } from "../services/credentials.js";
+import { upsertCredential, listCredentials, deleteCredential, getCredential, isValidService, CredentialUnreadableError } from "../services/credentials.js";
 import { isUpstreamTimeout } from "../lib/upstream-timeout.js";
 import type { AppEnv } from "../types/hono.js";
 
@@ -51,14 +51,15 @@ credentials.delete("/:service", async (c) => {
 });
 
 // POST /credentials/validate — test a service connection
-const SERVICE_TEST_URLS: Record<string, { url: string; auth: (token: string) => string }> = {
-  "project-forge": { url: config.PROJECT_FORGE_URL, auth: (t) => `Bearer ${t}` },
-  "agent-tasks": { url: config.AGENT_TASKS_URL, auth: (t) => `Bearer ${t}` },
-  "deploy-panel": { url: config.DEPLOY_PANEL_URL, auth: (t) => `Bearer ${t}` },
+const SERVICE_TEST_URLS: Record<string, { url: string; headers: (token: string) => Record<string, string> }> = {
+  // project-forge reads the key from X-API-Key, not from Authorization.
+  "project-forge": { url: config.PROJECT_FORGE_URL, headers: (t) => ({ "X-API-Key": t }) },
+  "agent-tasks": { url: config.AGENT_TASKS_URL, headers: (t) => ({ Authorization: `Bearer ${t}` }) },
+  "deploy-panel": { url: config.DEPLOY_PANEL_URL, headers: (t) => ({ Authorization: `Bearer ${t}` }) },
 };
 
 const SERVICE_TEST_PATHS: Record<string, string> = {
-  "project-forge": "/api/projects",
+  "project-forge": "/api/v1/projects",
   "agent-tasks": "/api/projects/available",
   "deploy-panel": "/api/v1/servers",
 };
@@ -71,7 +72,15 @@ credentials.post("/validate", zValidator("json", validateSchema), async (c) => {
   const userId = c.get("userId")!;
   const { service } = c.req.valid("json");
 
-  const token = await getCredential(userId, service);
+  let token: string | null;
+  try {
+    token = await getCredential(userId, service);
+  } catch (err) {
+    if (err instanceof CredentialUnreadableError) {
+      return c.json({ valid: false, error: err.message });
+    }
+    throw err;
+  }
   if (!token) {
     return c.json({ valid: false, error: "No token configured" });
   }
@@ -81,7 +90,7 @@ credentials.post("/validate", zValidator("json", validateSchema), async (c) => {
 
   try {
     const res = await fetch(`${config.url}${path}`, {
-      headers: { Authorization: config.auth(token) },
+      headers: config.headers(token),
       signal: AbortSignal.timeout(10_000),
     });
     if (res.ok) {

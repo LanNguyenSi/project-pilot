@@ -11,17 +11,13 @@ import { prisma } from "../lib/prisma.js";
  * `plan-output.json` (agent-planforge/models/planning-output.schema.json):
  * planforge task ids (i.e. other entries' `id`, same id-space as this
  * task's own `id`/`externalRef`) that must be imported before this task.
- * It is a forward-compatible extension point, NOT wired to a live data
- * source today: project-forge's `/api/v1/generate` and `/api/v1/preview`
- * responses build `preview.tasks[]` by regex-parsing `tasks/*.md` (see
- * project-forge/lib/v1-shared.ts `parseTasks`), which carries no dependency
- * data, and `plan-output.json` itself (which does have it) lives under
- * `planning/`, a directory project-forge deliberately excludes from the
- * published repo (project-forge/lib/planforge-output.ts
- * `PLANFORGE_PUBLISH_EXCLUDES`) — so it can't be read back from the pushed
- * repo either. Until project-forge is changed to surface it, `dependsOn`
- * stays absent on every task and the migration in forge-task-migration.ts
- * takes its unchanged v1 flat-import path.
+ * project-forge merges `dependsOn` from `plan-output.json` into the
+ * `preview.tasks[]` of its `/api/v1/generate` and `/api/v1/preview` responses
+ * (project-forge lib/v1-shared.ts `readPlanOutputTasksById`), keeping only ids
+ * that appear among the response's own tasks. The field stays absent when a
+ * task has no dependencies or when `plan-output.json` is missing or unreadable,
+ * and the migration in forge-task-migration.ts then takes its flat v1 import
+ * path.
  */
 export interface ForgePreviewTask {
   id: string;
@@ -80,9 +76,8 @@ export function extractPreviewTasks(preview: unknown): ForgePreviewTask[] {
       (t): t is ForgePreviewTask =>
         !!t && typeof t === "object" && typeof (t as ForgePreviewTask).id === "string" && typeof (t as ForgePreviewTask).title === "string",
     )
-    // dependsOn isn't emitted by any known forge response today (see the doc
-    // comment on ForgePreviewTask); normalized defensively here so a future
-    // upstream change that adds it needs no change on this side.
+    // dependsOn is present only when forge could read it from plan-output.json
+    // (see the doc comment on ForgePreviewTask); normalized defensively here.
     .map(normalizeTaskDependsOn);
 }
 

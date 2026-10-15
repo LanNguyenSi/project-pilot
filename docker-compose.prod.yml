@@ -64,8 +64,6 @@ services:
       - backend
     environment:
       HOSTNAME: "0.0.0.0"
-      NEXT_PUBLIC_API_URL: https://project-pilot.opentriologue.ai
-      NEXT_PUBLIC_DEPSIGHT_URL: https://depsight.opentriologue.ai
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.project-pilot.rule=Host(`project-pilot.opentriologue.ai`)"
