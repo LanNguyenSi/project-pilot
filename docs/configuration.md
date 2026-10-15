@@ -128,7 +128,7 @@ Other Makefile targets:
 
 ## Docker deployment
 
-The backend container applies the database schema with `prisma db push` on start and discards that command's error output. If the backend starts but queries fail, run `npx prisma db push` inside the backend container and read its output.
+The backend container runs `prisma db push` on start. When the push fails, the container exits non-zero with Prisma's error on stderr; read it with `docker logs project-pilot-backend`. A data-loss warning (for example dropping a non-empty table) also stops the start, because `--accept-data-loss` is not passed, and needs a deliberate decision before you change the schema or run the push by hand.
 
 ### Development
 

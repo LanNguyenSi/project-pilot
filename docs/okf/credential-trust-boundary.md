@@ -3,7 +3,7 @@ type: invariant
 title: Credential and identity trust boundaries
 description: SESSION_SECRET is the only key material for stored service credentials and nothing else reads it; the GitHub access token is used for sign-in, forwarded once to the three module hosts and never stored; a failed module registration still signs the user in; the MCP server never touches the credential store.
 tags: [credentials, encryption, oauth, identity, mcp]
-timestamp: 2026-10-15T04:19:15Z
+timestamp: 2026-10-15T04:27:24Z
 sources:
   - backend/src/lib/crypto.ts
   - backend/src/config/index.ts
@@ -64,7 +64,7 @@ model.
 `upsertCredential` encrypts before every write
 (`backend/src/services/credentials.ts:32-38#"update: { token: encrypted, label },"`),
 and the column holds only ciphertext
-(`backend/prisma/schema.prisma:92-97#"// encrypted"`). `getCredential` is the
+(`backend/prisma/schema.prisma:82-87#"// encrypted"`). `getCredential` is the
 only decrypting reader
 (`backend/src/services/credentials.ts:43-50#"return decrypt(cred.token);"`).
 
@@ -96,9 +96,10 @@ and its callers call it before their own `try` blocks:
 
 Every other caller lets the error reach `app.onError`, which answers 409 with
 code `credential_unreadable` and the message "Re-enter it in /settings"
-(`backend/src/app.ts:24-25#"code: err.code"`); any other error still becomes
+(`backend/src/app.ts:24-28#"code: err.code"`), after logging one line with the
+method, path and service name, so a rotation shows up in the logs; any other error still becomes
 a 500 with a generic message
-(`backend/src/app.ts:19-30#"Internal server error"`). Listing and deleting
+(`backend/src/app.ts:19-33#"Internal server error"`). Listing and deleting
 credentials keep working, because neither decrypts the token
 (`backend/src/services/credentials.ts:56-59#"select: { id: true, service: true, label: true, updatedAt: true },"`,
 `backend/src/services/credentials.ts:64-66#"where: { userId_service: { userId, service } },"`).

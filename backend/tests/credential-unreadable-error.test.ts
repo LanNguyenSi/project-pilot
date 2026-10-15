@@ -32,8 +32,15 @@ describe("app error handler: unreadable stored credential", () => {
   it("answers 409 credential_unreadable instead of a 500 when a route needs an undecryptable credential", async () => {
     (prisma.serviceCredential.findUnique as any).mockResolvedValue({ token: "not-encrypted" });
 
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const res = await app.request("/api/forge/projects", { method: "GET" });
     expect(res.status).toBe(409);
+    expect(errorSpy).toHaveBeenCalledTimes(1);
+    const logged = String(errorSpy.mock.calls[0][0]);
+    expect(logged).toContain("GET /api/forge/projects");
+    expect(logged).toContain("project-forge");
+    expect(logged).not.toContain("not-encrypted");
+    errorSpy.mockRestore();
     const body = (await res.json()) as { error: string; code: string };
     expect(body.code).toBe("credential_unreadable");
     expect(body.error).toMatch(/Re-enter it in \/settings/);

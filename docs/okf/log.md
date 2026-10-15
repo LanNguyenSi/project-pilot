@@ -2,6 +2,15 @@
 
 <!-- Add new entries at the top, newest first. -->
 
+- 2026-10-15T04:27:24Z, citations re-pointed and re-stamped after a review. Four
+  `backend/prisma/schema.prisma` citations (credential-trust-boundary and
+  forge-task-migration) and five `backend/src/app.ts` citations
+  (credential-trust-boundary and request-gating-and-sessions) now cover the
+  lines their anchors sit on after the schema and error handler shifted.
+  credential-trust-boundary: `app.onError` logs one line for an unreadable
+  credential. A script that checks every `path:start-end#"anchor"` citation
+  finds none out of range; `okf-kit check --json --require-anchors docs/okf`
+  does not check `.prisma` anchors.
 - 2026-10-15T04:19:15Z, all three docs re-verified against their sources and
   re-stamped after a source change. credential-trust-boundary: a stored
   credential that cannot be decrypted is now caught in `getCredential` and
@@ -9,7 +18,7 @@
   `valid: false` and every other caller gets a 409 `credential_unreadable`
   from `app.onError` instead of a 500. request-gating-and-sessions: the CSRF
   middleware comment now names Strict and Lax. forge-task-migration: only
-  citations moved. Citations re-pointed to the shifted lines.
+  citations moved.
   `okf-kit check --json --require-anchors docs/okf`: no errors, no warnings.
 - 2026-10-11T16:05:30Z, all three docs re-verified against their sources and
   re-stamped. credential-trust-boundary: the list of callers that turn a

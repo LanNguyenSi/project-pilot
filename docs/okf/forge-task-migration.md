@@ -3,7 +3,7 @@ type: module
 title: Forge-to-tasks migration lifecycle
 description: How a project-forge preview's task list is snapshotted per forge session, bound to the published repo, imported into agent-tasks through the flat v1 batch path or the dependency-aware v2 path, and deleted only after a complete migration; re-runs rely on externalRef dedupe.
 tags: [forge, agent-tasks, migration, snapshot, idempotency]
-timestamp: 2026-10-15T04:19:15Z
+timestamp: 2026-10-15T04:27:24Z
 sources:
   - backend/src/routes/forge.ts
   - backend/src/services/forge-task-snapshot.ts
@@ -19,7 +19,7 @@ sources:
 project-forge forgets a generated plan once the project is published, so
 pilot keeps its own copy of the preview's task list in the
 `ForgeTaskSnapshot` table and later imports it into agent-tasks
-(`backend/prisma/schema.prisma:72-77#"project-forge itself is never modified"`).
+(`backend/prisma/schema.prisma:62-67#"project-forge itself is never modified"`).
 This module owns that snapshot and the import. It does not own the tasks once
 they are in agent-tasks; from then on agent-tasks is the source of truth.
 
@@ -77,14 +77,14 @@ stateDiagram-v2
   (`backend/src/services/forge-task-snapshot.ts:38-40#"repoUrl.trim().toLowerCase()"`),
   so the publish URL and a later URL from the projects list find the same
   row through the `(userId, repoUrl)` index
-  (`backend/prisma/schema.prisma:88-89#"@@index([userId, repoUrl])"`).
+  (`backend/prisma/schema.prisma:74-75#"@@index([userId, repoUrl])"`).
 - **Migrated and deleted.** A migration reads the newest snapshot for the
   repo key (`backend/src/services/forge-task-snapshot.ts:116-122#"orderBy: { createdAt: "`),
   but the delete removes every snapshot of that user with that repo key
   (`backend/src/services/forge-task-snapshot.ts:129-130#"deleteMany({ where: { userId, repoUrl: repoKey(repoUrl) } })"`).
 - Nothing expires a snapshot. One that was never linked, or whose migration
   never completed, stays until the user row is deleted
-  (`backend/prisma/schema.prisma:81#"onDelete: Cascade"`).
+  (`backend/prisma/schema.prisma:80#"onDelete: Cascade"`).
 
 `migrate-tasks` answers 404 `no_snapshot` when no linked snapshot exists for
 the repo (`backend/src/services/forge-task-migration.ts:372-377#"no_snapshot"`):

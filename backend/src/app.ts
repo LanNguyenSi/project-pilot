@@ -22,6 +22,9 @@ app.onError((err, c) => {
     return c.json({ error: "Validation failed", issues }, 400);
   }
   if (err instanceof CredentialUnreadableError) {
+    console.error(
+      `[${new Date().toISOString()}] ${c.req.method} ${c.req.path}: stored ${err.service} credential is unreadable`,
+    );
     return c.json({ error: err.message, code: err.code }, 409);
   }
   console.error(`[${new Date().toISOString()}] ${c.req.method} ${c.req.path}:`, err.message);
