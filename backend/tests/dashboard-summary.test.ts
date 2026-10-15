@@ -168,4 +168,60 @@ describe("GET /api/dashboard/summary with unreadable credentials", () => {
     expect(body.services["deploy-panel"].unreadable ?? false).toBe(false);
     expect(body.services["project-forge"].unreadable ?? false).toBe(false);
   });
+
+  it("answers 200: an unreadable deploy-panel credential is flagged, agent-tasks still reports its data", async () => {
+    storedCredentials({
+      "agent-tasks": encrypt("tasks-token"),
+      "deploy-panel": UNREADABLE_TOKEN,
+    });
+    const fetchMock = stubDownstream();
+
+    const res = await app.request("/api/dashboard/summary");
+    expect(res.status).toBe(200);
+
+    const body = (await res.json()) as {
+      services: Record<string, Record<string, unknown>>;
+    };
+    expect(body.services["deploy-panel"]).toMatchObject({
+      configured: true,
+      unreadable: true,
+      serverCount: null,
+      onlineCount: null,
+      appCount: null,
+    });
+    expect(body.services["agent-tasks"]).toMatchObject({
+      configured: true,
+      projectCount: 1,
+      claimableCount: 1,
+    });
+    expect(body.services["agent-tasks"].unreadable).toBeFalsy();
+
+    const urls = fetchMock.mock.calls.map((call) => String(call[0]));
+    expect(urls.some((url) => url.includes("deploy.test"))).toBe(false);
+    expect(urls.some((url) => url.includes("tasks.test"))).toBe(true);
+  });
+
+  it("answers 500 when the readability check rejects with a generic error, not CredentialUnreadableError", async () => {
+    (prisma.serviceCredential.findMany as any).mockResolvedValue([
+      {
+        id: "id-deploy-panel",
+        service: "deploy-panel",
+        label: null,
+        updatedAt: new Date(),
+      },
+    ]);
+    // The readability pre-check is the first getCredential to run; a generic
+    // error there is not a CredentialUnreadableError, so the route must let it
+    // reach app.onError (500) rather than swallow it. Later calls (only
+    // reached if the route swallows the error) return a readable credential.
+    (prisma.serviceCredential.findUnique as any)
+      .mockRejectedValueOnce(new Error("generic lookup failure"))
+      .mockResolvedValue({ token: encrypt("deploy-token") });
+    stubDownstream();
+
+    const res = await app.request("/api/dashboard/summary");
+    expect(res.status).toBe(500);
+    const body = (await res.json()) as { error?: string };
+    expect(body.error).toBe("Internal server error");
+  });
 });

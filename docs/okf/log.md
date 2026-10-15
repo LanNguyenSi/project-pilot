@@ -2,6 +2,15 @@
 
 <!-- Add new entries at the top, newest first. -->
 
+- 2026-10-15T12:39:53Z, credential-trust-boundary re-verified against its
+  sources and re-stamped: `backend/src/routes/dashboard.ts` is now one of its
+  sources, and the dashboard summary route is described as the exception to the
+  error pattern, pre-checking each credential's readability with
+  `getCredential`, flagging an unreadable service `unreadable: true` and
+  skipping its downstream calls instead of letting `CredentialUnreadableError`
+  reach `app.onError`. request-gating-and-sessions: its dashboard citation was
+  re-pointed to `backend/src/routes/dashboard.ts:20`.
+  `okf-kit check --json --require-anchors docs/okf`: no errors.
 - 2026-10-15T04:27:24Z, citations re-pointed and re-stamped after a review. Four
   `backend/prisma/schema.prisma` citations (credential-trust-boundary and
   forge-task-migration) and five `backend/src/app.ts` citations
