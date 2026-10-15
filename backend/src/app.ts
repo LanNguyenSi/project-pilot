@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { ZodError } from "zod";
+import { CredentialUnreadableError } from "./services/credentials.js";
 import type { AppEnv } from "./types/hono.js";
 import { corsMiddleware } from "./middleware/cors.js";
 import { securityHeaders } from "./middleware/security.js";
@@ -19,6 +20,12 @@ app.onError((err, c) => {
   if (err instanceof ZodError) {
     const issues = err.issues.map((i) => `${i.path.join(".")}: ${i.message}`);
     return c.json({ error: "Validation failed", issues }, 400);
+  }
+  if (err instanceof CredentialUnreadableError) {
+    console.error(
+      `[${new Date().toISOString()}] ${c.req.method} ${c.req.path}: stored ${err.service} credential is unreadable`,
+    );
+    return c.json({ error: err.message, code: err.code }, 409);
   }
   console.error(`[${new Date().toISOString()}] ${c.req.method} ${c.req.path}:`, err.message);
   const status = "status" in err && typeof err.status === "number" ? err.status : 500;

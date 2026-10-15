@@ -61,6 +61,7 @@ import {
   listCredentials,
   deleteCredential,
   getCredential,
+  CredentialUnreadableError,
 } from "../src/services/credentials.js";
 
 // Typed mock refs
@@ -204,6 +205,24 @@ describe("services/credentials — getCredential (decrypt round-trip)", () => {
 
     const result = await getCredential("user-a", "agent-tasks");
     expect(result).toBe(plaintext);
+  });
+
+  it("throws CredentialUnreadableError when the stored token was encrypted under another key", async () => {
+    // Valid format, but the GCM auth tag does not verify under the current key.
+    const { createCipheriv, randomBytes, scryptSync } = await import("node:crypto");
+    const salt = randomBytes(16);
+    const iv = randomBytes(12);
+    const cipher = createCipheriv("aes-256-gcm", scryptSync("some-other-secret-value-xx", salt, 32), iv);
+    const ct = cipher.update("tok", "utf8", "hex") + cipher.final("hex");
+    const foreign = [salt.toString("hex"), iv.toString("hex"), cipher.getAuthTag().toString("hex"), ct].join(":");
+    mockSC.findUnique.mockResolvedValue({ token: foreign });
+
+    await expect(getCredential("user-a", "agent-tasks")).rejects.toBeInstanceOf(CredentialUnreadableError);
+  });
+
+  it("throws CredentialUnreadableError for a malformed stored value", async () => {
+    mockSC.findUnique.mockResolvedValue({ token: "not-encrypted" });
+    await expect(getCredential("user-a", "agent-tasks")).rejects.toThrow(/Re-enter it in \/settings/);
   });
 
   it("returns null when no credential exists for the userId+service", async () => {
@@ -432,6 +451,43 @@ describe("POST /credentials/validate — downstream connection check", () => {
     expect(body.valid).toBe(true);
 
     fetchSpy.mockRestore();
+  });
+
+  it("tests project-forge with the X-API-Key header against /api/v1/projects", async () => {
+    const { encrypt } = await import("../src/lib/crypto.js");
+    mockSC.findUnique.mockResolvedValue({ token: encrypt("pf_valid") });
+
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response("{}", { status: 200 }) as unknown as Response,
+    );
+
+    const res = await postValidate({ service: "project-forge" });
+    const body = (await res.json()) as { valid: boolean };
+    expect(body.valid).toBe(true);
+    const [url, init] = fetchSpy.mock.calls[0]!;
+    expect(url).toBe("http://forge.test/api/v1/projects");
+    const headers = (init as RequestInit).headers as Record<string, string>;
+    expect(headers["X-API-Key"]).toBe("pf_valid");
+    expect(headers.Authorization).toBeUndefined();
+
+    fetchSpy.mockRestore();
+  });
+
+  it("reports an unreadable stored credential as {valid:false} with a re-enter message", async () => {
+    mockSC.findUnique.mockResolvedValue({ token: "not-encrypted" });
+
+    const res = await postValidate({ service: "project-forge" });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { valid: boolean; error: string };
+    expect(body.valid).toBe(false);
+    expect(body.error).toMatch(/not readable.*Re-enter it in \/settings/);
+  });
+
+  it("does not mask unexpected lookup errors as a credential problem", async () => {
+    mockSC.findUnique.mockRejectedValue(new Error("db down"));
+
+    const res = await postValidate({ service: "agent-tasks" });
+    expect(res.status).toBe(500);
   });
 
   it("returns {valid:false, error:'Invalid token'} when downstream returns 401", async () => {

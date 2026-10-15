@@ -88,7 +88,6 @@ The Prisma schema (`backend/prisma/schema.prisma`) is applied with `prisma db pu
 - `PasswordReset`: hashed reset token, valid for 1 hour.
 - `ServiceCredential`: encrypted token per user and service.
 - `ForgeTaskSnapshot`: forge preview tasks, kept until they are migrated into agent-tasks.
-- `ApiKey`: defined in the schema; no backend code reads or writes it.
 
 ## Downstream services
 

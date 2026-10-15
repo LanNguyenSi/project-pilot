@@ -3,7 +3,7 @@ type: invariant
 title: Request gating and session model
 description: Global CORS and security headers, CSRF registered per route prefix in app.ts, requireAuth registered per router, opaque hashed session tokens with SameSite Strict for password sign-in and Lax for GitHub sign-in, per-process rate limits on four public auth endpoints keyed on the last X-Forwarded-For entry, and a CSP that only the frontend sets.
 tags: [auth, sessions, csrf, cors, rate-limit, headers, csp]
-timestamp: 2026-10-11T16:05:30Z
+timestamp: 2026-10-15T04:27:24Z
 sources:
   - backend/src/app.ts
   - backend/src/middleware/auth.ts
@@ -50,10 +50,10 @@ all of them.
 `app.ts` registers CORS and the security headers for every path, then the
 CSRF middleware for six prefixes: `/api/auth`, `/api/credentials`,
 `/api/dashboard`, `/api/forge`, `/api/tasks` and `/api/deploy`
-(`backend/src/app.ts:31-43#"/api/deploy/*"`). `/api/oauth/*` is left out on
+(`backend/src/app.ts:38-50#"/api/deploy/*"`). `/api/oauth/*` is left out on
 purpose: it is GET-only, and its CSRF defense is the OAuth state cookie
-(`backend/src/app.ts:34-38#"CSRF defense for this flow."`). The routers are
-mounted afterwards (`backend/src/app.ts:45-52#", deploy);"`).
+(`backend/src/app.ts:41-45#"CSRF defense for this flow."`). The routers are
+mounted afterwards (`backend/src/app.ts:52-59#", deploy);"`).
 
 - CORS allows only the comma-separated `CORS_ORIGINS`, with credentials and
   the `X-Requested-With` header
@@ -101,9 +101,9 @@ The two flows differ in the cookie's `SameSite` attribute:
   survive (`backend/src/routes/oauth.ts:213-224#"maxAge: SESSION_MAX_AGE,"`).
 
 Both cookies are `httpOnly`, and `Secure` only when `NODE_ENV` is
-`production`. The comment on the CSRF middleware still assumes Strict cookies
-(`backend/src/middleware/csrf.ts:6#"SameSite=Strict"`); for a session from
-GitHub sign-in, the cookie is Lax.
+`production`. The comment on the CSRF middleware names both settings, Strict for password
+login and Lax for GitHub sign-in
+(`backend/src/middleware/csrf.ts:5-7#"sign-in), this provides double protection."`).
 
 A session ends when it expires, on logout, which deletes the row and clears
 the cookie (`backend/src/routes/auth.ts:92-98#"deleteCookie(c, "`), or on a
@@ -119,7 +119,7 @@ cleared in the callback, and compared with the `state` query parameter
 
 For any method other than GET, HEAD and OPTIONS, `csrfProtection` requires
 `X-Requested-With: XMLHttpRequest` and otherwise answers 403 `csrf_failed`
-(`backend/src/middleware/csrf.ts:12-17#"requested !== "`). The check does not
+(`backend/src/middleware/csrf.ts:17-18#"requested !== "`). The check does not
 look at cookies, so it applies the same way to Strict and Lax sessions. The
 frontend's `apiFetch` sends the header on every call, together with
 `credentials: "include"`

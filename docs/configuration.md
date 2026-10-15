@@ -4,7 +4,7 @@ Credential storage, env vars, password reset.
 
 ## Credential storage
 
-Service credentials (Forge API key, Tasks token, Deploy API key) are stored encrypted in PostgreSQL via the backend, scoped to the logged-in user. The encryption key is derived from `SESSION_SECRET`. The Settings page (`/settings`) saves each credential and then offers a **Test** action that calls the downstream service with the saved token. For project-forge, **Test** reports a valid key as rejected ("Service rejected the request"); open `/forge` to confirm that key instead.
+Service credentials (Forge API key, Tasks token, Deploy API key) are stored encrypted in PostgreSQL via the backend, scoped to the logged-in user. The encryption key is derived from `SESSION_SECRET`. The Settings page (`/settings`) saves each credential and then offers a **Test** action that calls the downstream service with the saved token.
 
 The MCP server is a separate process and reads credentials from environment variables, not from the encrypted store.
 
@@ -13,7 +13,7 @@ The MCP server is a separate process and reads credentials from environment vari
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `DATABASE_URL` | yes |  | PostgreSQL connection string |
-| `SESSION_SECRET` | yes |  | Secret from which the backend derives the AES-256-GCM key that encrypts stored service credentials (min 16 chars). Sessions do not use it. Changing it makes every stored credential unreadable: users must re-enter them in `/settings`, and until then requests that use a stored credential fail with 500. To end sessions, delete rows from the `Session` table instead. |
+| `SESSION_SECRET` | yes |  | Secret from which the backend derives the AES-256-GCM key that encrypts stored service credentials (min 16 chars). Sessions do not use it. Changing it makes every stored credential unreadable: users must re-enter them in `/settings`, and until then requests that use a stored credential fail with 409 (`credential_unreadable`, "Re-enter it in /settings"); **Test** reports the same message. To end sessions, delete rows from the `Session` table instead. |
 | `PORT` | no | 3001 | Backend port |
 | `CORS_ORIGINS` | no | http://localhost:3000 | Allowed origins |
 | `FRONTEND_URL` | no | http://localhost:3000 | Frontend URL |
@@ -128,7 +128,7 @@ Other Makefile targets:
 
 ## Docker deployment
 
-The backend container applies the database schema with `prisma db push` on start and discards that command's error output. If the backend starts but queries fail, run `npx prisma db push` inside the backend container and read its output.
+The backend container runs `prisma db push` on start. When the push fails, the container exits non-zero with Prisma's error on stderr (under `restart: unless-stopped` in `docker-compose.prod.yml` it restarts repeatedly until the push succeeds); read it with `docker logs project-pilot-backend`. A data-loss warning (for example dropping a non-empty table) also stops the start, because `--accept-data-loss` is not passed, and needs a deliberate decision before you change the schema or run the push by hand.
 
 ### Development
 

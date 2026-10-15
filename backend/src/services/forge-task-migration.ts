@@ -353,8 +353,8 @@ async function resolveTeam(
  * on the agent-tasks side, so a second run imports only genuinely new tasks.
  *
  * Two import paths, chosen by whether any task carries `dependsOn`:
- *  - No dependencies (today's only live case — see the ForgePreviewTask doc
- *    comment): flat batch import via `/tasks/import`, unchanged from v1.
+ *  - No dependencies (no task carries `dependsOn`, for example when forge
+ *    found no plan-output.json; see the ForgePreviewTask doc comment): flat batch import via `/tasks/import`, unchanged from v1.
  *  - At least one dependency: dependency-aware import (D-003) — topological
  *    sort, then sequential single-task creates with `dependsOn` wired to the
  *    already-created agent-tasks uuids.
@@ -458,10 +458,9 @@ export async function migrateForgeTasks(
   const hasDependencies = snapshot.some((t) => (t.dependsOn?.length ?? 0) > 0);
 
   if (!hasDependencies) {
-    // v1 path (unchanged): flat batch import, no dependsOn wiring. This is
-    // the only path exercised while no forge source populates `dependsOn`
-    // (see the ForgePreviewTask doc comment) — agent-tasks caps a batch at
-    // 200 tasks.
+    // v1 path (unchanged): flat batch import, no dependsOn wiring. This
+    // path runs whenever no task carries `dependsOn` (see the
+    // ForgePreviewTask doc comment); agent-tasks caps a batch at 200 tasks.
     const items = snapshot.map(toImportTask);
     for (let i = 0; i < items.length; i += IMPORT_BATCH_SIZE) {
       const batch = items.slice(i, i + IMPORT_BATCH_SIZE);

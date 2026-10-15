@@ -46,7 +46,7 @@ Then connect your existing service credentials:
 
 1. Register an account at http://localhost:3000/login. If GitHub OAuth is configured (see [GitHub sign-in](docs/configuration.md#github-sign-in)), **Continue with GitHub** registers you with each service and fills `/settings` for every service that accepts the registration.
 2. Open `/settings`.
-3. Paste your `pf_...` Forge key, agent-tasks Bearer token, and `dp_...` Deploy key, click **Save**, then click **Test** on each. The project-forge **Test** reports a valid key as rejected ("Service rejected the request"); open `/forge` to confirm that key instead.
+3. Paste your `pf_...` Forge key, agent-tasks Bearer token, and `dp_...` Deploy key, click **Save**, then click **Test** on each.
 4. Visit `/dashboard`, you should see stats from agent-tasks and deploy-panel and whether a project-forge token is saved.
 
 Need to run the steps individually? See [docs/configuration.md](docs/configuration.md#manual-setup).
