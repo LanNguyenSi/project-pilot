@@ -128,7 +128,7 @@ Other Makefile targets:
 
 ## Docker deployment
 
-The backend container runs `prisma db push` on start. When the push fails, the container exits non-zero with Prisma's error on stderr; read it with `docker logs project-pilot-backend`. A data-loss warning (for example dropping a non-empty table) also stops the start, because `--accept-data-loss` is not passed, and needs a deliberate decision before you change the schema or run the push by hand.
+The backend container runs `prisma db push` on start. When the push fails, the container exits non-zero with Prisma's error on stderr (under `restart: unless-stopped` in `docker-compose.prod.yml` it restarts repeatedly until the push succeeds); read it with `docker logs project-pilot-backend`. A data-loss warning (for example dropping a non-empty table) also stops the start, because `--accept-data-loss` is not passed, and needs a deliberate decision before you change the schema or run the push by hand.
 
 ### Development
 
