@@ -3,7 +3,7 @@ type: module
 title: Forge-to-tasks migration lifecycle
 description: How a project-forge preview's task list is snapshotted per forge session, bound to the published repo, imported into agent-tasks through the flat v1 batch path or the dependency-aware v2 path, and deleted only after a complete migration; re-runs rely on externalRef dedupe.
 tags: [forge, agent-tasks, migration, snapshot, idempotency]
-timestamp: 2026-10-11T16:05:30Z
+timestamp: 2026-10-15T04:19:15Z
 sources:
   - backend/src/routes/forge.ts
   - backend/src/services/forge-task-snapshot.ts
@@ -67,21 +67,21 @@ stateDiagram-v2
 
 - **Saved.** `saveForgeTaskSnapshot` upserts on `(userId, sessionId)` with
   `repoUrl` unset (null)
-  (`backend/src/services/forge-task-snapshot.ts:93-102#"update: { tasks: data },"`).
+  (`backend/src/services/forge-task-snapshot.ts:88-97#"update: { tasks: data },"`).
   Saving is best-effort: a failure is logged and the generate response is
   returned anyway.
 - **Linked.** `linkForgeSnapshotToRepo` writes the repo key into `repoUrl`
-  (`backend/src/services/forge-task-snapshot.ts:110-117#"data: { repoUrl: repoKey(repoUrl) },"`),
+  (`backend/src/services/forge-task-snapshot.ts:105-112#"data: { repoUrl: repoKey(repoUrl) },"`),
   also best-effort. `repoKey` reduces a GitHub URL to lower-case
   `owner/repo`, and any other string to its trimmed lower-case form
-  (`backend/src/services/forge-task-snapshot.ts:42-44#"repoUrl.trim().toLowerCase()"`),
+  (`backend/src/services/forge-task-snapshot.ts:38-40#"repoUrl.trim().toLowerCase()"`),
   so the publish URL and a later URL from the projects list find the same
   row through the `(userId, repoUrl)` index
   (`backend/prisma/schema.prisma:88-89#"@@index([userId, repoUrl])"`).
 - **Migrated and deleted.** A migration reads the newest snapshot for the
-  repo key (`backend/src/services/forge-task-snapshot.ts:121-127#"orderBy: { createdAt: "`),
+  repo key (`backend/src/services/forge-task-snapshot.ts:116-122#"orderBy: { createdAt: "`),
   but the delete removes every snapshot of that user with that repo key
-  (`backend/src/services/forge-task-snapshot.ts:134-135#"deleteMany({ where: { userId, repoUrl: repoKey(repoUrl) } })"`).
+  (`backend/src/services/forge-task-snapshot.ts:129-130#"deleteMany({ where: { userId, repoUrl: repoKey(repoUrl) } })"`).
 - Nothing expires a snapshot. One that was never linked, or whose migration
   never completed, stays until the user row is deleted
   (`backend/prisma/schema.prisma:81#"onDelete: Cascade"`).
@@ -131,7 +131,7 @@ when no snapshot task carries one
 (`backend/src/services/forge-task-migration.ts:458-460#"if (!hasDependencies) {"`).
 `extractPreviewTasks` passes on whatever `dependsOn` the forge preview
 carries, keeping only string ids and dropping an empty list
-(`backend/src/services/forge-task-snapshot.ts:74-86#".map(normalizeTaskDependsOn);"`),
+(`backend/src/services/forge-task-snapshot.ts:70-81#".map(normalizeTaskDependsOn);"`),
 and the generate route saves that list as the snapshot
 (`backend/src/routes/forge.ts:98#"extractPreviewTasks(result.data.preview)"`).
 
@@ -151,7 +151,7 @@ only new tasks are created
 ### v2: dependency-aware import
 
 `topoSortForgeTasks` orders the tasks so every dependency comes first
-(`backend/src/services/forge-task-migration.ts:494-496#"sort = topoSortForgeTasks(snapshot);"`).
+(`backend/src/services/forge-task-migration.ts:493-495#"sort = topoSortForgeTasks(snapshot);"`).
 A `dependsOn` id that is not in the snapshot is dropped with a warning
 (`backend/src/services/forge-task-migration.ts:246-250#"(dropped)"`). A cycle
 is 409 `cyclic_dependencies` with the cycle
