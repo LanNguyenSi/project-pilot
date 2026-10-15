@@ -3,7 +3,7 @@ type: invariant
 title: Credential and identity trust boundaries
 description: SESSION_SECRET is the only key material for stored service credentials and nothing else reads it; the GitHub access token is used for sign-in, forwarded once to the three module hosts and never stored; a failed module registration still signs the user in; the MCP server never touches the credential store.
 tags: [credentials, encryption, oauth, identity, mcp]
-timestamp: 2026-10-15T04:27:24Z
+timestamp: 2026-10-15T12:25:25Z
 sources:
   - backend/src/lib/crypto.ts
   - backend/src/config/index.ts
@@ -86,7 +86,7 @@ and its callers call it before their own `try` blocks:
   (`backend/src/services/downstream.ts:22-27#"const token = await getCredential(userId, service);"`).
   The summary route is the exception to the pattern: it pre-checks readability
   with `getCredential` inside a `try`/`catch`
-  (`backend/src/routes/dashboard.ts:37-41#"await getCredential(userId, service);"`),
+  (`backend/src/routes/dashboard.ts:37-41#"unreadable.add(service);"`),
   marks a service whose credential cannot be decrypted `unreadable: true`, and
   skips that service's downstream calls, so `GET /api/dashboard/summary` keeps
   answering 200 and the dashboard shows "Credential unreadable" for that

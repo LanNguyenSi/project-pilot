@@ -3,7 +3,7 @@ type: invariant
 title: Request gating and session model
 description: Global CORS and security headers, CSRF registered per route prefix in app.ts, requireAuth registered per router, opaque hashed session tokens with SameSite Strict for password sign-in and Lax for GitHub sign-in, per-process rate limits on four public auth endpoints keyed on the last X-Forwarded-For entry, and a CSP that only the frontend sets.
 tags: [auth, sessions, csrf, cors, rate-limit, headers, csp]
-timestamp: 2026-10-15T04:27:24Z
+timestamp: 2026-10-15T12:25:25Z
 sources:
   - backend/src/app.ts
   - backend/src/middleware/auth.ts
@@ -72,7 +72,7 @@ success it sets `userId` on the context
 
 Each protected router registers it itself:
 `backend/src/routes/credentials.ts:12#"credentials.use("`,
-`backend/src/routes/dashboard.ts:14#"dashboard.use("`,
+`backend/src/routes/dashboard.ts:20#"dashboard.use("`,
 `backend/src/routes/forge.ts:18#"forge.use("`,
 `backend/src/routes/tasks.ts:38#"tasks.use("`, and
 `backend/src/routes/deploy.ts:82#"deploy.use("`. In the auth router only
