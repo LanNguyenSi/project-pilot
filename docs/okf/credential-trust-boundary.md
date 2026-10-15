@@ -11,6 +11,7 @@ sources:
   - backend/src/services/credentials.ts
   - backend/src/routes/credentials.ts
   - backend/src/services/downstream.ts
+  - backend/src/routes/dashboard.ts
   - backend/src/services/agent-tasks-client.ts
   - backend/src/routes/forge.ts
   - backend/src/routes/deploy.ts
@@ -81,8 +82,15 @@ and its callers call it before their own `try` blocks:
 - `POST /api/credentials/validate`, which catches the error itself and answers
   `{ valid: false }` with the re-enter message
   (`backend/src/routes/credentials.ts:76-80#"return c.json({ valid: false, error: err.message });"`),
-- `callService` behind the dashboard summary
-  (`backend/src/services/downstream.ts:22-27#"const token = await getCredential(userId, service);"`),
+- `callService` behind the downstream calls of the dashboard summary
+  (`backend/src/services/downstream.ts:22-27#"const token = await getCredential(userId, service);"`).
+  The summary route is the exception to the pattern: it pre-checks readability
+  with `getCredential` inside a `try`/`catch`
+  (`backend/src/routes/dashboard.ts:37-41#"await getCredential(userId, service);"`),
+  marks a service whose credential cannot be decrypted `unreadable: true`, and
+  skips that service's downstream calls, so `GET /api/dashboard/summary` keeps
+  answering 200 and the dashboard shows "Credential unreadable" for that
+  service instead of failing with 409;
 - `agentTasksRequest`, used by the `/api/tasks` proxy and the forge task
   migration (`backend/src/services/agent-tasks-client.ts:16-21#"getCredential(userId, "`),
 - `forgeRequest` in the forge proxy

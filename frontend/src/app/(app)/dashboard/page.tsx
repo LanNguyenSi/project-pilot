@@ -7,9 +7,12 @@ import { apiFetch } from "@/lib/api";
 import { Badge, Card, Icon, SkeletonBox } from "@/components/ui";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { useAuth } from "@/lib/auth-context";
+import { serviceState, type ServiceState } from "@/lib/service-state";
 
 interface ServiceStatus {
   configured: boolean;
+  /** Credential stored but not decryptable (e.g. after SESSION_SECRET changed). */
+  unreadable?: boolean;
   projectCount?: number | null;
   claimableCount?: number | null;
   serverCount?: number | null;
@@ -81,21 +84,23 @@ export default function DashboardPage() {
   const tasks = data?.services["agent-tasks"];
   const deploy = data?.services["deploy-panel"];
 
+  const forgeState = serviceState(forge);
+  const tasksState = serviceState(tasks);
+  const deployState = serviceState(deploy);
+
   const stats: StatItem[] = [
     {
       label: "Projects",
       value: tasks?.projectCount,
       subtitle: "via agent-tasks",
-      configured: tasks?.configured ?? false,
-      error: tasks?.error,
+      state: tasksState,
       accent: "blue",
     },
     {
       label: "Open Tasks",
       value: tasks?.claimableCount,
       subtitle: "claimable",
-      configured: tasks?.configured ?? false,
-      error: tasks?.error,
+      state: tasksState,
       accent: "amber",
     },
     {
@@ -104,16 +109,14 @@ export default function DashboardPage() {
         ? `${deploy.onlineCount ?? 0}/${deploy.serverCount}`
         : null,
       subtitle: "online / total",
-      configured: deploy?.configured ?? false,
-      error: deploy?.error,
+      state: deployState,
       accent: "green",
     },
     {
       label: "Apps",
       value: deploy?.appCount,
       subtitle: "deployed",
-      configured: deploy?.configured ?? false,
-      error: deploy?.error,
+      state: deployState,
       accent: "purple",
     },
   ];
@@ -168,7 +171,9 @@ export default function DashboardPage() {
           <Card className="p-5">
             <div className="flex items-center justify-between">
               <span className="text-sm text-content-secondary">Project Forge</span>
-              {forge?.configured ? (
+              {forgeState === "unreadable" ? (
+                <Badge variant="warning">Credential unreadable</Badge>
+              ) : forge?.configured ? (
                 <Badge variant="success">Token saved</Badge>
               ) : (
                 <Badge variant="neutral">Not configured</Badge>
@@ -178,6 +183,19 @@ export default function DashboardPage() {
           </Card>
         </div>
       </div>
+
+      {/* Unreadable credential hint: the credential is stored but cannot be
+          decrypted (e.g. SESSION_SECRET changed), so it must be entered again. */}
+      {(forgeState === "unreadable" || tasksState === "unreadable" || deployState === "unreadable") && (
+        <Card className="border-accent-amber/50 p-4 mb-4">
+          <p className="text-sm text-accent-amber">
+            A stored credential could not be decrypted.{" "}
+            <Link href="/settings" className="underline hover:text-accent-amber/80 transition-colors">
+              Re-enter it in Settings
+            </Link>
+          </p>
+        </Card>
+      )}
 
       {/* Not configured hint */}
       {(!forge?.configured || !tasks?.configured || !deploy?.configured) && (
@@ -200,8 +218,7 @@ interface StatItem {
   label: string;
   value: string | number | null | undefined;
   subtitle: string;
-  configured: boolean;
-  error?: string | null;
+  state: ServiceState;
   accent: "blue" | "amber" | "green" | "purple";
 }
 
@@ -229,16 +246,18 @@ function StatCard({ stat: s, index }: { stat: StatItem; index: number }) {
             <span className={`inline-block h-1.5 w-1.5 rounded-full ${tint.dot} bg-current`} />
             {s.label}
           </span>
-          {!s.configured ? (
+          {s.state === "not_configured" ? (
             <Badge variant="neutral">Not configured</Badge>
-          ) : s.error ? (
+          ) : s.state === "unreadable" ? (
+            <Badge variant="warning">Credential unreadable</Badge>
+          ) : s.state === "error" ? (
             <Badge variant="error">Error</Badge>
           ) : (
             <Badge variant="success">Connected</Badge>
           )}
         </div>
         <p className="text-2xl font-semibold text-content-primary mt-1">
-          {!s.configured ? "·" : s.value ?? "·"}
+          {s.state === "not_configured" ? "·" : s.value ?? "·"}
         </p>
         <p className="text-xs text-content-tertiary mt-1">{s.subtitle}</p>
       </Card>

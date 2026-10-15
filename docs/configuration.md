@@ -13,7 +13,7 @@ The MCP server is a separate process and reads credentials from environment vari
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `DATABASE_URL` | yes |  | PostgreSQL connection string |
-| `SESSION_SECRET` | yes |  | Secret from which the backend derives the AES-256-GCM key that encrypts stored service credentials (min 16 chars). Sessions do not use it. Changing it makes every stored credential unreadable: users must re-enter them in `/settings`, and until then requests that use a stored credential fail with 409 (`credential_unreadable`, "Re-enter it in /settings"); **Test** reports the same message. To end sessions, delete rows from the `Session` table instead. |
+| `SESSION_SECRET` | yes |  | Secret from which the backend derives the AES-256-GCM key that encrypts stored service credentials (min 16 chars). Sessions do not use it. Changing it makes every stored credential unreadable: users must re-enter them in `/settings`, and until then requests that use a stored credential fail with 409 (`credential_unreadable`, "Re-enter it in /settings"); **Test** reports the same message. The dashboard does not fail as a whole: the affected service is marked **Credential unreadable** with a hint to re-enter it in Settings, and the other services still show their data. To end sessions, delete rows from the `Session` table instead. |
 | `PORT` | no | 3001 | Backend port |
 | `CORS_ORIGINS` | no | http://localhost:3000 | Allowed origins |
 | `FRONTEND_URL` | no | http://localhost:3000 | Frontend URL |
