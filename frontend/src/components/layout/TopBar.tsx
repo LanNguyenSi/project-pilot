@@ -92,7 +92,7 @@ export function TopBar({ onMenuClick }: TopBarProps) {
           aria-expanded={open}
           aria-haspopup="true"
           aria-label="User menu"
-          className="flex items-center gap-2 px-2 py-1.5 rounded-button hover:bg-surface-overlay transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/60"
+          className="flex items-center gap-2 px-2 py-1.5 rounded-button hover:bg-surface-overlay transition-colors duration-fast focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-brand-500/60"
         >
           {/* Brand-tinted avatar: initials when known, generic glyph otherwise */}
           <span className="h-7 w-7 rounded-full bg-brand-500/15 border border-brand-500/30 text-brand-300 text-xs font-semibold flex items-center justify-center shrink-0 select-none">
@@ -131,7 +131,7 @@ export function TopBar({ onMenuClick }: TopBarProps) {
             {/* Logout action */}
             <button
               onClick={handleLogout}
-              className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-content-secondary hover:text-content-primary hover:bg-surface-overlay transition-colors duration-fast focus-visible:outline-none focus-visible:bg-surface-overlay"
+              className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-content-secondary hover:text-content-primary hover:bg-surface-overlay transition-colors duration-fast focus-visible:outline-hidden focus-visible:bg-surface-overlay"
             >
               <Icon name="logout" size={16} />
               Logout

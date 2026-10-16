@@ -2,7 +2,7 @@ import Link from "next/link";
 
 export default function Home() {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[radial-gradient(ellipse_at_center,_var(--surface-secondary)_0%,_var(--surface-primary)_70%)]">
+    <main className="flex min-h-screen items-center justify-center bg-[radial-gradient(ellipse_at_center,var(--surface-secondary)_0%,var(--surface-primary)_70%)]">
       <div className="text-center animate-fade-in px-4">
         {/* Brand mark */}
         <div className="flex justify-center mb-6">
@@ -19,7 +19,7 @@ export default function Home() {
         </p>
         <Link
           href="/login"
-          className="inline-flex items-center justify-center h-10 px-6 text-sm font-medium bg-brand-500 hover:bg-brand-600 text-white rounded-button transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/60"
+          className="inline-flex items-center justify-center h-10 px-6 text-sm font-medium bg-brand-500 hover:bg-brand-600 text-white rounded-button transition-colors duration-fast focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-brand-500/60"
         >
           Get started
         </Link>

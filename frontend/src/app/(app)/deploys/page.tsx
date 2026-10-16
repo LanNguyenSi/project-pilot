@@ -716,7 +716,7 @@ export default function DeploysPage() {
                   <SkeletonBox className="h-3 w-5/6" />
                 </div>
               ) : (
-                <pre className="text-xs text-content-secondary font-mono whitespace-pre-wrap break-words">{logContent}</pre>
+                <pre className="text-xs text-content-secondary font-mono whitespace-pre-wrap wrap-break-word">{logContent}</pre>
               )}
             </div>
           </>

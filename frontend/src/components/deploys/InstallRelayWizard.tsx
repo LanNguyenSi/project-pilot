@@ -438,7 +438,7 @@ export function InstallRelayWizard({ open, onClose, onSuccess }: InstallRelayWiz
             <div className="flex gap-1 p-1 bg-surface-primary border border-stroke-default rounded-button">
               <button
                 type="button"
-                className={`flex-1 text-xs font-medium py-1 rounded transition-colors duration-fast ${
+                className={`flex-1 text-xs font-medium py-1 rounded-sm transition-colors duration-fast ${
                   form.authMethod === "password"
                     ? "bg-surface-elevated text-content-primary shadow-sm"
                     : "text-content-tertiary hover:text-content-secondary"
@@ -449,7 +449,7 @@ export function InstallRelayWizard({ open, onClose, onSuccess }: InstallRelayWiz
               </button>
               <button
                 type="button"
-                className={`flex-1 text-xs font-medium py-1 rounded transition-colors duration-fast ${
+                className={`flex-1 text-xs font-medium py-1 rounded-sm transition-colors duration-fast ${
                   form.authMethod === "privateKey"
                     ? "bg-surface-elevated text-content-primary shadow-sm"
                     : "text-content-tertiary hover:text-content-secondary"
@@ -597,7 +597,7 @@ export function InstallRelayWizard({ open, onClose, onSuccess }: InstallRelayWiz
             <span>Installing relay — this may take a few minutes...</span>
           </div>
           <div className="bg-surface-primary border border-stroke-default rounded-button p-3 h-64 overflow-y-auto">
-            <pre className="font-mono text-xs text-content-secondary whitespace-pre-wrap break-words">
+            <pre className="font-mono text-xs text-content-secondary whitespace-pre-wrap wrap-break-word">
               {logs.length === 0 ? (
                 <span className="text-content-tertiary">Connecting...</span>
               ) : (
@@ -618,7 +618,7 @@ export function InstallRelayWizard({ open, onClose, onSuccess }: InstallRelayWiz
               <p className="text-xs text-content-tertiary font-medium uppercase tracking-wider mb-2">
                 Install output
               </p>
-              <pre className="font-mono text-xs text-content-secondary whitespace-pre-wrap break-words">
+              <pre className="font-mono text-xs text-content-secondary whitespace-pre-wrap wrap-break-word">
                 {logs.join("\n")}
               </pre>
             </div>
