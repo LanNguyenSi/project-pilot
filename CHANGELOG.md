@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- The frontend now self-hosts its fonts: `next/font/google` (Space Grotesk 500/600/700, Inter 400/500/600, JetBrains Mono 400/500) is replaced by `next/font/local` with vendored variable woff2 files and their OFL licenses in `frontend/src/fonts/`. `next build` no longer contacts fonts.googleapis.com or fonts.gstatic.com, so a malformed or throttled Google response can no longer fail CI or a deploy. The `--font-display`, `--font-sans` and `--font-mono` variables and `display: swap` are unchanged. Every subset the Google CSS served is vendored (latin, latin-ext and, where the family has them, cyrillic, cyrillic-ext, greek, greek-ext, vietnamese), so glyph coverage is unchanged; a subset file loads only when a glyph in its `unicode-range` is rendered. CI gains a guard that fails when `next/font/google` is imported again.
+
 ### Fixed
 
 - **The dashboard no longer shows every service as "Not configured" when a stored credential cannot be decrypted** (e.g. after `SESSION_SECRET` changed). `GET /api/dashboard/summary` now checks each stored credential's readability up front: a service whose credential fails to decrypt is reported with the optional `unreadable: true` field (`configured` stays `true`) and its downstream calls are skipped, while the other services still report their data. The dashboard renders a distinct **Credential unreadable** badge for that service plus a hint to re-enter it in Settings; the stat-card state mapping moved to `frontend/src/lib/service-state.ts` with its own unit test.
