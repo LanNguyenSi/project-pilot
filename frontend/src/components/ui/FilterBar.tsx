@@ -38,7 +38,7 @@ export function PillToggleGroup<T extends string>({
           type="button"
           aria-pressed={value === opt.key}
           onClick={() => onChange(opt.key)}
-          className={`px-3 py-1.5 text-xs font-medium rounded-button transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/60 ${
+          className={`px-3 py-1.5 text-xs font-medium rounded-button transition-colors duration-fast focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-brand-500/60 ${
             value === opt.key
               ? "bg-brand-500/10 text-brand-300"
               : "text-content-tertiary hover:text-content-primary hover:bg-surface-overlay"

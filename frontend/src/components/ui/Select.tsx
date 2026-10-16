@@ -108,7 +108,7 @@ export function Select({
 
   const triggerCls = [
     "w-full flex items-center justify-between bg-surface-overlay border rounded-input px-3 h-9 text-sm transition-colors duration-fast",
-    "focus:outline-none focus-visible:ring-2",
+    "focus:outline-hidden focus-visible:ring-2",
     error
       ? "border-accent-red focus-visible:ring-accent-red/50 focus-visible:border-accent-red"
       : "border-stroke-strong focus-visible:ring-brand-500/60 focus-visible:border-brand-500",

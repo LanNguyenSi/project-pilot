@@ -59,7 +59,7 @@ export function Modal({ open, onClose, children, title, showClose, size = "md" }
     >
       {/* Backdrop: fixed so it always covers the viewport while the dialog scrolls. */}
       <div
-        className="fixed inset-0 bg-black/60 backdrop-blur-sm animate-modal-backdrop"
+        className="fixed inset-0 bg-black/60 backdrop-blur-xs animate-modal-backdrop"
         onClick={onClose}
       />
 
@@ -85,7 +85,7 @@ export function Modal({ open, onClose, children, title, showClose, size = "md" }
                   type="button"
                   onClick={onClose}
                   aria-label="Close dialog"
-                  className="text-content-tertiary hover:text-content-primary transition-colors duration-fast p-1 -mr-1 rounded-button focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/60"
+                  className="text-content-tertiary hover:text-content-primary transition-colors duration-fast p-1 -mr-1 rounded-button focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-brand-500/60"
                 >
                   <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -103,7 +103,7 @@ export function Modal({ open, onClose, children, title, showClose, size = "md" }
               type="button"
               onClick={onClose}
               aria-label="Close dialog"
-              className="absolute top-4 right-4 text-content-tertiary hover:text-content-primary transition-colors duration-fast p-1 rounded-button focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/60"
+              className="absolute top-4 right-4 text-content-tertiary hover:text-content-primary transition-colors duration-fast p-1 rounded-button focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-brand-500/60"
             >
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />

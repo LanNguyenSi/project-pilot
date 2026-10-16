@@ -22,7 +22,7 @@ const DEPSIGHT_URL =
 
 export default function SecurityPage() {
   return (
-    <div className="flex flex-col h-[calc(100vh-theme(spacing.topbar))]">
+    <div className="flex flex-col h-[calc(100vh-(var(--spacing-topbar)))]">
       {/* Page header - inside the height-constrained wrapper; compact so iframe keeps most of the space */}
       <div className="px-6 pt-5 pb-3 shrink-0">
         <PageHeader

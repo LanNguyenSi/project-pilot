@@ -1,7 +1,9 @@
 /**
  * Design tokens for project-pilot - Refined Dark v1.
  *
- * Single source of truth consumed by tailwind.config.ts and globals.css.
+ * Token values mirrored by hand in src/app/globals.css (the @theme block and
+ * the :root custom properties, Tailwind CSS 4); keep both in sync. Not imported
+ * by the Tailwind build.
  * Tailwind classes use CSS variables so values can be changed at runtime.
  *
  * Surface naming note:

@@ -146,7 +146,7 @@ export default function StyleguidePage() {
                 ] as const
               ).map(([label, hex, cls]) => (
                 <div key={hex} className="flex items-center gap-2">
-                  <div className={`w-8 h-8 rounded border-2 ${cls} bg-surface-raised`} />
+                  <div className={`w-8 h-8 rounded-sm border-2 ${cls} bg-surface-raised`} />
                   <div>
                     <p className="text-xs text-content-secondary">{label}</p>
                     <p className="text-xs text-content-tertiary font-mono">{hex}</p>
@@ -215,7 +215,7 @@ export default function StyleguidePage() {
                   <div className={`w-24 h-24 rounded-card bg-surface-raised ${cls} flex items-center justify-center`}>
                     <span className="text-xs text-content-tertiary font-mono">{label}</span>
                   </div>
-                  <p className="text-xs text-content-tertiary mt-2 max-w-[6rem]">{desc}</p>
+                  <p className="text-xs text-content-tertiary mt-2 max-w-24">{desc}</p>
                 </div>
               ))}
             </div>

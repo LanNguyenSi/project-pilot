@@ -112,7 +112,7 @@ export function TaskDetailPanel({ taskId, open, onClose }: TaskDetailPanelProps)
 
   return createPortal(
     <div role="dialog" aria-modal="true" aria-labelledby={titleId} className="fixed inset-0 z-50 flex justify-end">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-xs" onClick={onClose} />
       {/* The panel (not the dialog) is the scroll region: the portaled dialog is
           exactly viewport-sized, so the panel fills the viewport height and scrolls
           its own content. Do not move overflow to the dialog as Modal does. */}
@@ -121,7 +121,7 @@ export function TaskDetailPanel({ taskId, open, onClose }: TaskDetailPanelProps)
         className="relative bg-surface-secondary border-l border-stroke-default shadow-elevated w-full max-w-xl overflow-y-auto animate-slide-in-right"
       >
         {/* Header */}
-        <div className="sticky top-0 bg-surface-secondary/95 backdrop-blur-sm border-b border-stroke-default px-6 py-4 flex items-start justify-between gap-4 z-10">
+        <div className="sticky top-0 bg-surface-secondary/95 backdrop-blur-xs border-b border-stroke-default px-6 py-4 flex items-start justify-between gap-4 z-10">
           <div className="min-w-0 flex-1">
             {loading ? (
               <SkeletonBox className="h-5 w-48" />
@@ -144,7 +144,7 @@ export function TaskDetailPanel({ taskId, open, onClose }: TaskDetailPanelProps)
           </div>
           <button
             onClick={onClose}
-            className="text-content-tertiary hover:text-content-primary transition-colors duration-fast p-1 rounded-button focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/60"
+            className="text-content-tertiary hover:text-content-primary transition-colors duration-fast p-1 rounded-button focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-brand-500/60"
             aria-label="Close"
           >
             <Icon name="x" size={20} />

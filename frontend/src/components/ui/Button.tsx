@@ -3,7 +3,7 @@
 import { forwardRef, type ButtonHTMLAttributes, type AnchorHTMLAttributes } from "react";
 
 const base =
-  "inline-flex items-center justify-center gap-2 font-medium transition-colors duration-fast disabled:opacity-50 disabled:pointer-events-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/60 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-primary";
+  "inline-flex items-center justify-center gap-2 font-medium transition-colors duration-fast disabled:opacity-50 disabled:pointer-events-none focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-brand-500/60 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-primary";
 
 const variants = {
   primary:   "bg-brand-500 text-white hover:bg-brand-600 rounded-button shadow-sm",
