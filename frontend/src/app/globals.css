@@ -74,8 +74,8 @@
   Font families: next/font sets --font-display, --font-sans and --font-mono via
   classes on <html> (see layout.tsx). @theme inline makes the font-* utilities
   read those variables directly, with the v3 generic fallbacks. Tailwind still
-  emits the same names as self-referencing theme variables on :root (inside
-  @layer theme); that is harmless only while the next/font classes sit on
+  emits --font-sans and --font-mono (referenced by its default theme) as
+  self-referencing variables on :root (inside @layer theme); that is harmless only while the next/font classes sit on
   <html>, whose unlayered declarations win there.
 */
 @theme inline {
