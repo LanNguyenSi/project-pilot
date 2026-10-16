@@ -5,9 +5,9 @@ fonts.gstatic.com. Loaded in `src/app/layout.tsx` through `next/font/local`.
 
 | Family | Weights used | Files |
 | --- | --- | --- |
-| Space Grotesk | 500, 600, 700 | `space-grotesk-latin-wght-normal.woff2`, `space-grotesk-latin-ext-wght-normal.woff2` |
-| Inter | 400, 500, 600 | `inter-latin-wght-normal.woff2`, `inter-latin-ext-wght-normal.woff2` |
-| JetBrains Mono | 400, 500 | `jetbrains-mono-latin-wght-normal.woff2`, `jetbrains-mono-latin-ext-wght-normal.woff2` |
+| Space Grotesk | 500, 600, 700 | `space-grotesk-<subset>-wght-normal.woff2` for latin, latin-ext, vietnamese |
+| Inter | 400, 500, 600 | `inter-<subset>-wght-normal.woff2` for latin, latin-ext, cyrillic, cyrillic-ext, greek, greek-ext, vietnamese |
+| JetBrains Mono | 400, 500 | `jetbrains-mono-<subset>-wght-normal.woff2` for latin, latin-ext, cyrillic, cyrillic-ext, greek, vietnamese |
 
 All are variable fonts (wght axis, normal style), declared in `layout.tsx` as a
 weight range (for example `500 700`), which covers the weights the UI uses.
@@ -19,16 +19,17 @@ Fonts, though not byte-identical files).
 
 ## Subsets
 
-latin and latin-ext. The UI shows user-entered project and task names, which
-can contain Latin Extended glyphs (for example Polish, Czech or Turkish
-letters), so latin alone is not enough. Each family declares its two faces
-under one family name with the `unicode-range` fontsource publishes for that
-subset, so the browser downloads the latin-ext file only when such a glyph is
-rendered. The Google CSS used to serve more subsets (Cyrillic, Greek and
-Vietnamese for Inter and JetBrains Mono, Vietnamese for Space Grotesk): those
-glyphs now render in the fallback font. Add the matching
-`<family>-<subset>-wght-normal.woff2` and a face with its `unicode-range`
-(copy it from the package's `wght.css`) if they are needed.
+Every subset the fontsource package ships for the family, which is exactly the
+set the Google Fonts CSS served: latin and latin-ext for all three families,
+plus vietnamese (all three), cyrillic and cyrillic-ext (Inter, JetBrains
+Mono), greek-ext (Inter) and greek (Inter, JetBrains Mono). `next/font/google`
+downloaded every subset in Google's response and only used `subsets` to choose
+the preloads, so the rendered font stack was never latin-only; vendoring all
+of them keeps that coverage, and user-entered project and task names with such
+glyphs render in the real font, not a fallback. Each family declares one face
+per subset under one family name with the `unicode-range` fontsource publishes
+for it, so the browser downloads a subset file only when a glyph in its range
+is rendered. Only the latin face is preloaded.
 
 ## Licenses
 
@@ -39,8 +40,7 @@ fontsource packages.
 
 ## Updating
 
-Fetch the new `files/*-latin-wght-normal.woff2` and
-`files/*-latin-ext-wght-normal.woff2` from the same packages
+Fetch the new `files/*-wght-normal.woff2` for every subset from the same packages
 (`npm pack @fontsource-variable/<family>`), replace the files here, check that
 the `unicode-range` values in `layout.tsx` still match the package's
 `wght.css`, and update the version above.

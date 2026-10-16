@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
-- The frontend now self-hosts its fonts: `next/font/google` (Space Grotesk 500/600/700, Inter 400/500/600, JetBrains Mono 400/500) is replaced by `next/font/local` with vendored variable woff2 files and their OFL licenses in `frontend/src/fonts/`. `next build` no longer contacts fonts.googleapis.com or fonts.gstatic.com, so a malformed or throttled Google response can no longer fail CI or a deploy. The `--font-display`, `--font-sans` and `--font-mono` variables and `display: swap` are unchanged. The latin and latin-ext subsets are vendored (the latin-ext file loads only when such a glyph is rendered, via `unicode-range`); the Cyrillic, Greek and Vietnamese faces the Google CSS also served now render in the fallback font. CI gains a guard that fails when `next/font/google` is imported again.
+- The frontend now self-hosts its fonts: `next/font/google` (Space Grotesk 500/600/700, Inter 400/500/600, JetBrains Mono 400/500) is replaced by `next/font/local` with vendored variable woff2 files and their OFL licenses in `frontend/src/fonts/`. `next build` no longer contacts fonts.googleapis.com or fonts.gstatic.com, so a malformed or throttled Google response can no longer fail CI or a deploy. The `--font-display`, `--font-sans` and `--font-mono` variables and `display: swap` are unchanged. Every subset the Google CSS served is vendored (latin, latin-ext and, where the family has them, cyrillic, cyrillic-ext, greek, greek-ext, vietnamese), so glyph coverage is unchanged; a subset file loads only when a glyph in its `unicode-range` is rendered. CI gains a guard that fails when `next/font/google` is imported again.
 
 ### Fixed
 
