@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Security
+
+- **Tailwind CSS 4** (GHSA-rj75-hqrm-r3gf): the frontend moves from Tailwind 3.4 to 4.3 (`@tailwindcss/postcss`, CSS-first `@theme` in `globals.css`, `tailwind.config.ts` and `autoprefixer` removed), which drops the vulnerable `postcss-selector-parser` 6.x from the lockfile. Opacity-modified theme colours such as `bg-brand-500/10` now render as written (Tailwind 3 silently dropped them), so active tabs, the avatar, badges and error banners show their intended tint.
+
 ### Changed
 
 - The frontend now self-hosts its fonts: `next/font/google` (Space Grotesk 500/600/700, Inter 400/500/600, JetBrains Mono 400/500) is replaced by `next/font/local` with vendored variable woff2 files and their OFL licenses in `frontend/src/fonts/`. `next build` no longer contacts fonts.googleapis.com or fonts.gstatic.com, so a malformed or throttled Google response can no longer fail CI or a deploy. The `--font-display`, `--font-sans` and `--font-mono` variables and `display: swap` are unchanged. Every subset the Google CSS served is vendored (latin, latin-ext and, where the family has them, cyrillic, cyrillic-ext, greek, greek-ext, vietnamese), so glyph coverage is unchanged; a subset file loads only when a glyph in its `unicode-range` is rendered. CI gains a guard that fails when `next/font/google` is imported again.

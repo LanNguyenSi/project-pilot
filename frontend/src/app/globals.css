@@ -71,18 +71,17 @@
 }
 
 /*
-  Font families: next/font sets --font-display, --font-sans and --font-mono on
-  <html> (see layout.tsx). Declaring the same names in @theme would make the
-  variables reference themselves, so the utilities are defined directly.
+  Font families: next/font sets --font-display, --font-sans and --font-mono via
+  classes on <html> (see layout.tsx). @theme inline makes the font-* utilities
+  read those variables directly, with the v3 generic fallbacks. Tailwind still
+  emits the same names as self-referencing theme variables on :root (inside
+  @layer theme); that is harmless only while the next/font classes sit on
+  <html>, whose unlayered declarations win there.
 */
-@utility font-display {
-  font-family: var(--font-display), system-ui, sans-serif;
-}
-@utility font-sans {
-  font-family: var(--font-sans), system-ui, sans-serif;
-}
-@utility font-mono {
-  font-family: var(--font-mono), monospace;
+@theme inline {
+  --font-display: var(--font-display), system-ui, sans-serif;
+  --font-sans: var(--font-sans), system-ui, sans-serif;
+  --font-mono: var(--font-mono), monospace;
 }
 
 /*
@@ -226,5 +225,13 @@ body {
   .animate-modal-panel,
   .animate-slide-in-right {
     animation: none;
+  }
+}
+
+/* Tailwind CSS v4 preflight no longer gives buttons a pointer cursor; keep v3. */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
   }
 }
