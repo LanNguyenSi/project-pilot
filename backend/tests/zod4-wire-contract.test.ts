@@ -217,7 +217,7 @@ describe("z.guid() keeps the zod 3 .uuid() accept set (tasks.createProject.teamI
   }
 });
 
-describe("z.guid() optional teamId + z.url() repoUrl (forge.migrate-tasks)", () => {
+describe("z.guid() optional teamId + urlString() repoUrl (forge.migrate-tasks)", () => {
   it("accepts a missing optional teamId (same as zod 3)", async () => {
     const res = await post(forge, "/migrate-tasks", { repoUrl: "https://github.com/o/r" });
     expect(res.status).toBe(200);
@@ -253,7 +253,7 @@ describe("z.guid() optional teamId + z.url() repoUrl (forge.migrate-tasks)", () 
   }
 });
 
-describe("z.url() relayUrl optional + output identity (deploy.createServer)", () => {
+describe("urlString() relayUrl optional + output identity (deploy.createServer)", () => {
   function stubFetch() {
     const calls: { url: string; body?: string }[] = [];
     vi.stubGlobal(
@@ -340,5 +340,64 @@ describe("defaults + .refine short-circuit (deploy.probe-vps, zod 4 defaults)", 
   it("XOR refine still rejects both credentials", async () => {
     const res = await post(deploy, "/probe-vps", { host: "1.2.3.4", sshPassword: "a", sshPrivateKey: "b" });
     await expectWireBody400(res, [[]]);
+  });
+});
+
+describe("urlString() repoUrl passes whitespace through unchanged (forge.migrate-tasks)", () => {
+  // zod 3 .url() validated with new URL() and forwarded the raw string;
+  // zod 4 z.url() trims edges and strips tab/LF/CR from the value it passes
+  // on. urlString() must keep the zod 3 output byte for byte.
+  const padded = [
+    " http://example.com",
+    "http://example.com ",
+    "http://example.com\n",
+    "http://example.com\t",
+    "https://github.com/o/r\n",
+  ];
+  for (const repoUrl of padded) {
+    it(`forwards repoUrl ${JSON.stringify(repoUrl)} to the migration byte for byte`, async () => {
+      const res = await post(forge, "/migrate-tasks", { repoUrl });
+      expect(res.status).toBe(200);
+      expect(mockMigrateForgeTasks).toHaveBeenCalledWith("user-1", repoUrl, undefined);
+    });
+  }
+});
+
+describe("urlString() relayUrl passes whitespace through unchanged (deploy.createServer)", () => {
+  function stubFetch() {
+    const calls: { url: string; body?: string }[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init?: RequestInit) => {
+        calls.push({ url, body: init?.body as string | undefined });
+        return new Response(JSON.stringify({ server: { id: "s1" } }), {
+          status: 201,
+          headers: { "content-type": "application/json" },
+        });
+      }),
+    );
+    return calls;
+  }
+
+  const padded = [" http://example.com", "http://example.com ", "http://example.com\n", "http://example.com\t"];
+  for (const relayUrl of padded) {
+    it(`forwards relayUrl ${JSON.stringify(relayUrl)} to deploy-panel byte for byte`, async () => {
+      const calls = stubFetch();
+      const res = await post(deploy, "/servers", { name: "web-1", host: "1.2.3.4", relayUrl });
+      expect(res.status).toBe(201);
+      expect(JSON.parse(calls[0]!.body!).relayUrl).toBe(relayUrl);
+    });
+  }
+});
+
+describe("z.email() rejects invalid emails on /login and /forgot-password (encoded 400 body)", () => {
+  it("rejects /login email user@localhost with the 400 envelope", async () => {
+    const res = await post(auth, "/login", { email: "user@localhost", password: "password123" });
+    await expectWireBody400(res, [["email"]]);
+  });
+
+  it("rejects /forgot-password email not-an-email with the 400 envelope", async () => {
+    const res = await post(auth, "/forgot-password", { email: "not-an-email" });
+    await expectWireBody400(res, [["email"]]);
   });
 });

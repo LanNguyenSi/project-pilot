@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { config } from "../config/index.js";
 import { requireAuth } from "../middleware/auth.js";
-import { zValidate } from "../lib/validate.js";
+import { urlString, zValidate } from "../lib/validate.js";
 import { getCredential } from "../services/credentials.js";
 import {
   extractPreviewTasks,
@@ -147,7 +147,7 @@ forge.post("/publish", zValidate("json", publishSchema), async (c) => {
 });
 
 const migrateSchema = z.object({
-  repoUrl: z.url(),
+  repoUrl: urlString(),
   teamId: z.guid().optional(),
 });
 

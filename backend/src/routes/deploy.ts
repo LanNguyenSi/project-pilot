@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { config } from "../config/index.js";
 import { requireAuth } from "../middleware/auth.js";
-import { zValidate } from "../lib/validate.js";
+import { urlString, zValidate } from "../lib/validate.js";
 import { getCredential } from "../services/credentials.js";
 import { isUpstreamTimeout } from "../lib/upstream-timeout.js";
 import type { AppEnv } from "../types/hono.js";
@@ -73,7 +73,7 @@ const probeVpsBodySchema = z
 const createServerSchema = z.object({
   name: z.string().min(1).max(100),
   host: z.string().min(1).max(255),
-  relayUrl: z.url().optional(),
+  relayUrl: urlString().optional(),
   relayToken: z.string().optional(),
 });
 
