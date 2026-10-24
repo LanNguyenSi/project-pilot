@@ -2,6 +2,12 @@
 
 <!-- Add new entries at the top, newest first. -->
 
+- 2026-10-24T13:37:21Z, zod 3 -> 4 migration: credential-trust-boundary,
+  forge-task-migration and request-gating-and-sessions re-verified against
+  their sources and re-stamped. The route files only swap `zValidator` for the
+  shared `zValidate` helper (same 400 body) and move `.email()`, `.url()` and
+  `.uuid()` to `z.email()`, `z.url()` and `z.guid()` on the same lines, so no
+  cited line moved and every cited quote still matches.
 - 2026-10-15T12:39:53Z, credential-trust-boundary re-verified against its
   sources and re-stamped: `backend/src/routes/dashboard.ts` is now one of its
   sources, and the dashboard summary route is described as the exception to the

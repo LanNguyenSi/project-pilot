@@ -3,7 +3,7 @@ type: module
 title: Forge-to-tasks migration lifecycle
 description: How a project-forge preview's task list is snapshotted per forge session, bound to the published repo, imported into agent-tasks through the flat v1 batch path or the dependency-aware v2 path, and deleted only after a complete migration; re-runs rely on externalRef dedupe.
 tags: [forge, agent-tasks, migration, snapshot, idempotency]
-timestamp: 2026-10-15T04:27:24Z
+timestamp: 2026-10-24T13:37:21Z
 sources:
   - backend/src/routes/forge.ts
   - backend/src/services/forge-task-snapshot.ts
