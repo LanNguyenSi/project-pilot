@@ -1,9 +1,9 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
-import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { setCookie, deleteCookie, getCookie } from "hono/cookie";
 import { registerUser, loginUser, generateSessionToken, hashToken, hashPassword } from "../services/auth.js";
+import { zValidate } from "../lib/validate.js";
 import { prisma } from "../lib/prisma.js";
 import { config } from "../config/index.js";
 import { requireAuth } from "../middleware/auth.js";
@@ -28,13 +28,13 @@ async function emailKey(c: Context): Promise<string | undefined> {
 }
 
 const registerSchema = z.object({
-  email: z.string().email(),
+  email: z.email(),
   password: z.string().min(8).max(128),
   name: z.string().optional(),
 });
 
 const loginSchema = z.object({
-  email: z.string().email(),
+  email: z.email(),
   password: z.string().min(1).max(128),
 });
 
@@ -61,7 +61,7 @@ async function createSession(userId: string): Promise<string> {
 }
 
 // POST /auth/register — 5 attempts per minute
-auth.post("/register", rateLimit({ max: 5, windowMs: 60_000 }), zValidator("json", registerSchema), async (c) => {
+auth.post("/register", rateLimit({ max: 5, windowMs: 60_000 }), zValidate("json", registerSchema), async (c) => {
   const { email, password, name } = c.req.valid("json");
 
   try {
@@ -75,7 +75,7 @@ auth.post("/register", rateLimit({ max: 5, windowMs: 60_000 }), zValidator("json
 });
 
 // POST /auth/login — 10 attempts per minute
-auth.post("/login", rateLimit({ max: 10, windowMs: 60_000, keyGenerator: emailKey }), zValidator("json", loginSchema), async (c) => {
+auth.post("/login", rateLimit({ max: 10, windowMs: 60_000, keyGenerator: emailKey }), zValidate("json", loginSchema), async (c) => {
   const { email, password } = c.req.valid("json");
 
   try {
@@ -110,9 +110,9 @@ auth.get("/me", requireAuth, async (c) => {
 });
 
 // POST /auth/forgot-password
-const forgotSchema = z.object({ email: z.string().email() });
+const forgotSchema = z.object({ email: z.email() });
 
-auth.post("/forgot-password", rateLimit({ max: 3, windowMs: 60_000, keyGenerator: emailKey }), zValidator("json", forgotSchema), async (c) => {
+auth.post("/forgot-password", rateLimit({ max: 3, windowMs: 60_000, keyGenerator: emailKey }), zValidate("json", forgotSchema), async (c) => {
   const { email } = c.req.valid("json");
   const user = await prisma.user.findUnique({ where: { email } });
 
@@ -146,7 +146,7 @@ const resetSchema = z.object({
   password: z.string().min(8).max(128),
 });
 
-auth.post("/reset-password", rateLimit({ max: 5, windowMs: 60_000 }), zValidator("json", resetSchema), async (c) => {
+auth.post("/reset-password", rateLimit({ max: 5, windowMs: 60_000 }), zValidate("json", resetSchema), async (c) => {
   const { token, password } = c.req.valid("json");
   const tokenHash = hashToken(token);
 

@@ -1,8 +1,8 @@
 import { Hono } from "hono";
-import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { config } from "../config/index.js";
 import { requireAuth } from "../middleware/auth.js";
+import { zValidate } from "../lib/validate.js";
 import { getCredential } from "../services/credentials.js";
 import { isUpstreamTimeout } from "../lib/upstream-timeout.js";
 import type { AppEnv } from "../types/hono.js";
@@ -73,7 +73,7 @@ const probeVpsBodySchema = z
 const createServerSchema = z.object({
   name: z.string().min(1).max(100),
   host: z.string().min(1).max(255),
-  relayUrl: z.string().url().optional(),
+  relayUrl: z.url().optional(),
   relayToken: z.string().optional(),
 });
 
@@ -131,7 +131,7 @@ deploy.get("/servers", async (c) => {
 // POST /deploy/servers — add a server. deploy-panel's CRUD lives at
 // /api/servers (not /api/v1/servers which is read-only); both accept
 // the same Bearer API key so existing credential flow works.
-deploy.post("/servers", zValidator("json", createServerSchema), async (c) => {
+deploy.post("/servers", zValidate("json", createServerSchema), async (c) => {
   const userId = c.get("userId")!;
   const body = c.req.valid("json");
   const result = await deployRequest<unknown>(userId, "/api/servers", {
@@ -179,7 +179,7 @@ deploy.get("/apps", async (c) => {
 });
 
 // POST /deploy/trigger — deploy an app
-deploy.post("/trigger", zValidator("json", deployTriggerSchema), async (c) => {
+deploy.post("/trigger", zValidate("json", deployTriggerSchema), async (c) => {
   const userId = c.get("userId")!;
   const body = c.req.valid("json");
   const result = await deployRequest<unknown>(userId, "/api/v1/deploy", {
@@ -220,7 +220,7 @@ deploy.get("/history", async (c) => {
 });
 
 // POST /deploy/rollback — rollback
-deploy.post("/rollback", zValidator("json", rollbackSchema), async (c) => {
+deploy.post("/rollback", zValidate("json", rollbackSchema), async (c) => {
   const userId = c.get("userId")!;
   const body = c.req.valid("json");
   const result = await deployRequest<unknown>(userId, "/api/v1/rollback", {
@@ -232,7 +232,7 @@ deploy.post("/rollback", zValidator("json", rollbackSchema), async (c) => {
 });
 
 // POST /deploy/preflight — preflight checks
-deploy.post("/preflight", zValidator("json", deployTriggerSchema), async (c) => {
+deploy.post("/preflight", zValidate("json", deployTriggerSchema), async (c) => {
   const userId = c.get("userId")!;
   const body = c.req.valid("json");
   const result = await deployRequest<unknown>(userId, "/api/v1/preflight", {
@@ -249,7 +249,7 @@ deploy.post("/preflight", zValidator("json", deployTriggerSchema), async (c) => 
 // slow on distant or heavily-loaded hosts). SSH credentials live only in
 // the parsed-body variable for the duration of this handler and are NEVER
 // persisted, logged, or echoed in error responses.
-deploy.post("/probe-vps", zValidator("json", probeVpsBodySchema), async (c) => {
+deploy.post("/probe-vps", zValidate("json", probeVpsBodySchema), async (c) => {
   const userId = c.get("userId")!;
   const body = c.req.valid("json");
 
@@ -280,7 +280,7 @@ deploy.post("/probe-vps", zValidator("json", probeVpsBodySchema), async (c) => {
 // `body` variable for the lifetime of this handler.
 deploy.post(
   "/install-relay",
-  zValidator("json", installRelayBodySchema),
+  zValidate("json", installRelayBodySchema),
   async (c) => {
     const userId = c.get("userId")!;
     const body = c.req.valid("json");

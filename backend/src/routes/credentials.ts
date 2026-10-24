@@ -1,8 +1,8 @@
 import { Hono } from "hono";
-import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { config } from "../config/index.js";
 import { requireAuth } from "../middleware/auth.js";
+import { zValidate } from "../lib/validate.js";
 import { upsertCredential, listCredentials, deleteCredential, getCredential, isValidService, CredentialUnreadableError } from "../services/credentials.js";
 import { isUpstreamTimeout } from "../lib/upstream-timeout.js";
 import type { AppEnv } from "../types/hono.js";
@@ -25,7 +25,7 @@ credentials.get("/", async (c) => {
 });
 
 // PUT /credentials — upsert a service credential
-credentials.put("/", zValidator("json", upsertSchema), async (c) => {
+credentials.put("/", zValidate("json", upsertSchema), async (c) => {
   const userId = c.get("userId")!;
   const { service, token, label } = c.req.valid("json");
 
@@ -68,7 +68,7 @@ const validateSchema = z.object({
   service: z.enum(["project-forge", "agent-tasks", "deploy-panel"]),
 });
 
-credentials.post("/validate", zValidator("json", validateSchema), async (c) => {
+credentials.post("/validate", zValidate("json", validateSchema), async (c) => {
   const userId = c.get("userId")!;
   const { service } = c.req.valid("json");
 
