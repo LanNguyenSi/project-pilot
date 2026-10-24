@@ -3,7 +3,7 @@ type: invariant
 title: Credential and identity trust boundaries
 description: SESSION_SECRET is the only key material for stored service credentials and nothing else reads it; the GitHub access token is used for sign-in, forwarded once to the three module hosts and never stored; a failed module registration still signs the user in; the MCP server never touches the credential store.
 tags: [credentials, encryption, oauth, identity, mcp]
-timestamp: 2026-10-24T13:37:21Z
+timestamp: 2026-10-24T14:13:19Z
 sources:
   - backend/src/lib/crypto.ts
   - backend/src/config/index.ts

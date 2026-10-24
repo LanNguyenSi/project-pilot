@@ -2,6 +2,9 @@
 
 <!-- Add new entries at the top, newest first. -->
 
+- 2026-10-24T14:13:19Z, the same three docs re-verified and re-stamped after
+  `repoUrl` (forge.ts) and `relayUrl` (deploy.ts) moved to the `urlString()`
+  helper on the same lines; no cited line moved.
 - 2026-10-24T13:37:21Z, zod 3 -> 4 migration: credential-trust-boundary,
   forge-task-migration and request-gating-and-sessions re-verified against
   their sources and re-stamped. The route files only swap `zValidator` for the
