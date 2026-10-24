@@ -1,7 +1,7 @@
 import { Hono } from "hono";
-import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { requireAuth } from "../middleware/auth.js";
+import { zValidate } from "../lib/validate.js";
 import { agentTasksRequest } from "../services/agent-tasks-client.js";
 import type { AppEnv } from "../types/hono.js";
 
@@ -26,7 +26,7 @@ const createProjectSchema = z.object({
     .max(100)
     .regex(/^[a-z0-9-]+$/, "Slug must be lowercase alphanumeric with dashes"),
   description: z.string().optional(),
-  teamId: z.string().uuid(),
+  teamId: z.guid(),
   githubRepo: z
     .string()
     .regex(/^[^/]+\/[^/]+$/, "GitHub repo format: owner/repo")
@@ -93,7 +93,7 @@ tasks.post("/teams/:teamId/sync", async (c) => {
 });
 
 // POST /tasks/projects — create a project inside a team.
-tasks.post("/projects", zValidator("json", createProjectSchema), async (c) => {
+tasks.post("/projects", zValidate("json", createProjectSchema), async (c) => {
   const userId = c.get("userId")!;
   const body = c.req.valid("json");
   const result = await tasksRequest<unknown>(userId, "/api/projects", {
@@ -123,7 +123,7 @@ tasks.get("/:taskId/instructions", async (c) => {
 });
 
 // POST /tasks/projects/:projectId/tasks — create task
-tasks.post("/projects/:projectId/tasks", zValidator("json", createTaskSchema), async (c) => {
+tasks.post("/projects/:projectId/tasks", zValidate("json", createTaskSchema), async (c) => {
   const userId = c.get("userId")!;
   const projectId = c.req.param("projectId");
   const body = c.req.valid("json");
@@ -136,7 +136,7 @@ tasks.post("/projects/:projectId/tasks", zValidator("json", createTaskSchema), a
 });
 
 // POST /tasks/:taskId/comments — add comment
-tasks.post("/:taskId/comments", zValidator("json", commentSchema), async (c) => {
+tasks.post("/:taskId/comments", zValidate("json", commentSchema), async (c) => {
   const userId = c.get("userId")!;
   const taskId = c.req.param("taskId");
   const body = c.req.valid("json");

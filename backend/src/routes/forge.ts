@@ -1,8 +1,8 @@
 import { Hono } from "hono";
-import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { config } from "../config/index.js";
 import { requireAuth } from "../middleware/auth.js";
+import { urlString, zValidate } from "../lib/validate.js";
 import { getCredential } from "../services/credentials.js";
 import {
   extractPreviewTasks,
@@ -81,7 +81,7 @@ const generateSchema = z.object({
 });
 
 // POST /forge/generate — generate preview
-forge.post("/generate", zValidator("json", generateSchema), async (c) => {
+forge.post("/generate", zValidate("json", generateSchema), async (c) => {
   const userId = c.get("userId")!;
   const body = c.req.valid("json");
   const result = await forgeRequest<{ sessionId: string; preview: unknown }>(userId, "/api/v1/generate", {
@@ -124,7 +124,7 @@ const publishSchema = z.object({
 });
 
 // POST /forge/publish — publish a previewed project
-forge.post("/publish", zValidator("json", publishSchema), async (c) => {
+forge.post("/publish", zValidate("json", publishSchema), async (c) => {
   const userId = c.get("userId")!;
   const { sessionId } = c.req.valid("json");
 
@@ -147,13 +147,13 @@ forge.post("/publish", zValidator("json", publishSchema), async (c) => {
 });
 
 const migrateSchema = z.object({
-  repoUrl: z.string().url(),
-  teamId: z.string().uuid().optional(),
+  repoUrl: urlString(),
+  teamId: z.guid().optional(),
 });
 
 // POST /forge/migrate-tasks — create/find the agent-tasks project for a forged
 // repo and import its captured planforge tasks. Idempotent on re-run.
-forge.post("/migrate-tasks", zValidator("json", migrateSchema), async (c) => {
+forge.post("/migrate-tasks", zValidate("json", migrateSchema), async (c) => {
   const userId = c.get("userId")!;
   const { repoUrl, teamId } = c.req.valid("json");
 
@@ -231,7 +231,7 @@ const magicFillSchema = z.object({
 });
 
 // POST /forge/ai-assist/magic-fill — ask the AI to fill project form fields
-forge.post("/ai-assist/magic-fill", zValidator("json", magicFillSchema), async (c) => {
+forge.post("/ai-assist/magic-fill", zValidate("json", magicFillSchema), async (c) => {
   const body = c.req.valid("json");
   const result = await forgeAiRequest<{
     ok: true;
