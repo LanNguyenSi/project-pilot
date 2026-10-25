@@ -149,3 +149,5 @@ docker compose -f docker-compose.prod.yml up --build -d
 ```
 
 Exposes via Traefik at `project-pilot.opentriologue.ai` with automatic HTTPS. `make deploy` runs `git pull` and then this command.
+
+Every service in `docker-compose.prod.yml` rotates its json-file logs (`max-size: 10m`, `max-file: 3`, shared through the `x-logging` anchor) and sets a memory limit with `mem_limit` (db `1g`, backend `768m`, frontend `512m`), so a chatty or leaking container cannot fill the host disk or memory. `mem_limit` is the Compose spec key applied by plain `docker compose up -d` without swarm; `docker compose -f docker-compose.prod.yml config` shows it in the rendered config.

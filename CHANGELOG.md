@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Changed
 
 - The frontend now self-hosts its fonts: `next/font/google` (Space Grotesk 500/600/700, Inter 400/500/600, JetBrains Mono 400/500) is replaced by `next/font/local` with vendored variable woff2 files and their OFL licenses in `frontend/src/fonts/`. `next build` no longer contacts fonts.googleapis.com or fonts.gstatic.com, so a malformed or throttled Google response can no longer fail CI or a deploy. The `--font-display`, `--font-sans` and `--font-mono` variables and `display: swap` are unchanged. Every subset the Google CSS served is vendored (latin, latin-ext and, where the family has them, cyrillic, cyrillic-ext, greek, greek-ext, vietnamese), so glyph coverage is unchanged; a subset file loads only when a glyph in its `unicode-range` is rendered. CI gains a guard that fails when `next/font/google` is imported again.
+- Every service in `docker-compose.prod.yml` now has json-file log rotation (`max-size: 10m`, `max-file: 3`, shared through an `x-logging` anchor) and a memory limit set with `mem_limit` (db `1g`, backend `768m`, frontend `512m`), so a chatty or leaking container can no longer fill the host disk or memory. `mem_limit` is the Compose spec key that plain `docker compose up -d` applies without swarm, and it shows up in `docker compose config` output.
 
 ### Fixed
 

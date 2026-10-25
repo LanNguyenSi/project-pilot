@@ -1,8 +1,16 @@
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   db:
     image: postgres:16-alpine
     container_name: project-pilot-db
     restart: unless-stopped
+    logging: *default-logging
+    mem_limit: 1g
     environment:
       POSTGRES_USER: project_pilot
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -23,6 +31,8 @@ services:
       dockerfile: Dockerfile
     container_name: project-pilot-backend
     restart: unless-stopped
+    logging: *default-logging
+    mem_limit: 768m
     depends_on:
       db:
         condition: service_healthy
@@ -60,6 +70,8 @@ services:
         NEXT_PUBLIC_DEPSIGHT_URL: https://depsight.opentriologue.ai
     container_name: project-pilot-frontend
     restart: unless-stopped
+    logging: *default-logging
+    mem_limit: 512m
     depends_on:
       - backend
     environment:
