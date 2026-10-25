@@ -1,3 +1,10 @@
+# Local development stack. The explicit project name keeps this stack's
+# resources (volume, network, containers) separate from the production stack
+# in docker-compose.prod.yml, which takes its project name from the checkout
+# directory (project-pilot). Never remove it: without it, running this file in
+# that directory would mount the production pgdata volume.
+name: project-pilot-dev
+
 services:
   db:
     image: postgres:16-alpine
@@ -6,7 +13,8 @@ services:
       POSTGRES_PASSWORD: project_pilot
       POSTGRES_DB: project_pilot
     ports:
-      - "5432:5432"
+      # Loopback only: the dev database uses a fixed development password.
+      - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:

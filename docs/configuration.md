@@ -126,6 +126,20 @@ Other Makefile targets:
 | `make docker-down` | Stops the Docker Compose stack |
 | `make deploy` | Manual fallback for the relay deploy: `git pull`, the production compose command (see [Production](#production-with-traefik)), `prisma db push` without a data-loss flag, then a bounded `/api/health` wait that exits non-zero on failure |
 
+### Dev database volume and port
+
+`docker-compose.yml` (the dev stack behind `make docker-up`) sets its own compose project name, `project-pilot-dev`, so its database volume is `project-pilot-dev_pgdata`. The production stack in `docker-compose.prod.yml` uses the checkout directory name as project name (`project-pilot` on the production host) and keeps its volume `project-pilot_pgdata`. Running the dev file on the production host therefore starts a separate, empty database and never touches the production volume. The dev Postgres publishes only on `127.0.0.1:5432`, so other machines cannot reach it.
+
+Upgrade note for developers: before this change the dev database lived in a volume named after your checkout directory (for example `project-pilot_pgdata`). The dev stack now starts with a fresh `project-pilot-dev_pgdata`. Either re-seed (`make docker-up`, then `make db-push`), or carry the old data over once. Stop the stack, then copy the old volume into the new one:
+
+```bash
+docker compose down
+docker volume create project-pilot-dev_pgdata
+docker run --rm -v <old-volume>:/from:ro -v project-pilot-dev_pgdata:/to alpine cp -a /from/. /to/
+```
+
+Replace `<old-volume>` with the old dev volume (`docker volume ls`). Only do this on a developer machine: on the production host the old name is the production volume, so skip the copy there, and never run `docker compose down -v` with `docker-compose.prod.yml`.
+
 ## Docker deployment
 
 No deploy path passes a data-loss flag to Prisma. Two steps run `prisma db push` without it:
