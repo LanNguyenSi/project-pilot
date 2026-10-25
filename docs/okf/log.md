@@ -2,6 +2,12 @@
 
 <!-- Add new entries at the top, newest first. -->
 
+- 2026-10-25T05:44:43Z, credential-trust-boundary re-verified and re-stamped after the
+  production config check: `backend/src/config/index.ts` keeps the schema (and
+  the cited `SESSION_SECRET: z.string().min(16),` on line 5) and adds
+  `parseConfig`, which in production also rejects the template placeholder
+  secrets (new citation on line 33). The route sources flagged as newer are the
+  squash commit of the zod 4 migration; their cited quotes still match.
 - 2026-10-24T14:13:19Z, the same three docs re-verified and re-stamped after
   `repoUrl` (forge.ts) and `relayUrl` (deploy.ts) moved to the `urlString()`
   helper on the same lines; no cited line moved.
