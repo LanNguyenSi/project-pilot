@@ -128,12 +128,12 @@ Other Makefile targets:
 
 ### Dev database volume and port
 
-`docker-compose.yml` (the dev stack behind `make docker-up`) sets its own compose project name, `project-pilot-dev`, so its database volume is `project-pilot-dev_pgdata`. The production stack in `docker-compose.prod.yml` uses the checkout directory name as project name (`project-pilot` on the production host) and keeps its volume `project-pilot_pgdata`. Running the dev file on the production host therefore starts a separate, empty database and never touches the production volume. The dev Postgres publishes only on `127.0.0.1:5432`, so other machines cannot reach it.
+`docker-compose.yml` (the dev stack behind `make docker-up`) sets its own compose project name, `project-pilot-dev`, so its database volume is `project-pilot-dev_pgdata`. The production stack in `docker-compose.prod.yml` uses the checkout directory name as project name (`project-pilot` on the production host) and keeps its volume `project-pilot_pgdata`. The dev file also pins the volume's own name, so the dev database volume stays `project-pilot-dev_pgdata` even when `COMPOSE_PROJECT_NAME` is exported or set in the shared `.env`, or when `-p` is passed; running the dev file on the production host therefore starts a separate, empty database and never touches the production volume. Those overrides do change the project of the dev containers and network, though: `docker compose -f docker-compose.yml -p project-pilot ...` on the production host acts on the production containers (same project), so never pass `-p project-pilot` with the dev file. CI renders both files and fails if their effective pgdata volume names are equal. The dev Postgres publishes only on `127.0.0.1:5432`, so other machines cannot reach it.
 
-Upgrade note for developers: before this change the dev database lived in a volume named after your checkout directory (for example `project-pilot_pgdata`). The dev stack now starts with a fresh `project-pilot-dev_pgdata`. Either re-seed (`make docker-up`, then `make db-push`), or carry the old data over once. Stop the stack, then copy the old volume into the new one:
+Upgrade note for developers: before this change the dev database lived in a volume named after your checkout directory (for example `project-pilot_pgdata`). The dev stack now starts with a fresh `project-pilot-dev_pgdata`. Either re-seed (`make docker-up`, then `make db-push`), or carry the old data over once. Stop the old dev database first (the new file targets `project-pilot-dev`, so a plain `docker compose down` would not stop it): find its container with `docker ps` and run `docker stop <old-db-container>`, or run `docker compose -p <old-directory-name> stop` using the OLD revision of `docker-compose.yml`. Then copy the old volume into the new one:
 
 ```bash
-docker compose down
+docker stop <old-db-container>
 docker volume create project-pilot-dev_pgdata
 docker run --rm -v <old-volume>:/from:ro -v project-pilot-dev_pgdata:/to alpine cp -a /from/. /to/
 ```

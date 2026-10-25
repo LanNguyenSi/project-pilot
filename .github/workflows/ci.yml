@@ -121,3 +121,31 @@ jobs:
           node-version: 22
       - run: npm ci --no-audit --no-fund
       - run: npm run test:coverage --workspace=frontend
+
+  compose-isolation:
+    # Guards against the dev compose file resolving to the same pgdata volume
+    # as the production file, however the compose project name is overridden.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Dev and prod pgdata volumes differ
+        env:
+          POSTGRES_PASSWORD: dummy
+          SESSION_SECRET: dummy
+        run: |
+          vol() {
+            docker compose "$@" config --format json | jq -r '.volumes.pgdata.name'
+          }
+          check() {
+            label="$1"; shift
+            dev=$(vol -f docker-compose.yml "$@")
+            prod=$(vol -f docker-compose.prod.yml)
+            echo "$label: dev=$dev prod=$prod"
+            if [ -z "$dev" ] || [ -z "$prod" ] || [ "$dev" = "$prod" ]; then
+              echo "dev and prod pgdata volume names must be set and differ ($label)" >&2
+              exit 1
+            fi
+          }
+          check plain
+          (export COMPOSE_PROJECT_NAME=project-pilot; check "COMPOSE_PROJECT_NAME=project-pilot")
+          check "-p project-pilot" -p project-pilot

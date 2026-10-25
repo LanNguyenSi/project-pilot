@@ -1,8 +1,10 @@
 # Local development stack. The explicit project name keeps this stack's
 # resources (volume, network, containers) separate from the production stack
 # in docker-compose.prod.yml, which takes its project name from the checkout
-# directory (project-pilot). Never remove it: without it, running this file in
-# that directory would mount the production pgdata volume.
+# directory (project-pilot). The volume below also pins its own name, because
+# COMPOSE_PROJECT_NAME (shell or the shared .env) and -p override `name:` but
+# not a volume's explicit name. Never remove either: without them, running
+# this file in that directory would mount the production pgdata volume.
 name: project-pilot-dev
 
 services:
@@ -54,3 +56,4 @@ services:
 
 volumes:
   pgdata:
+    name: project-pilot-dev_pgdata
