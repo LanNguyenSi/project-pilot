@@ -136,9 +136,11 @@ jobs:
           AGENT_TASKS_URL: http://tasks.invalid
           DEPLOY_PANEL_URL: http://deploy.invalid
         run: |
-          # Render each file once, with every compose profile enabled so no
-          # profile-gated service is left out, and run all checks on that one
-          # render. A failed render or a jq error fails the step.
+          # Per variant, render the prod file and the dev side (as
+          # `-f docker-compose.yml` and as a plain `docker compose`), each with
+          # every compose profile enabled so no profile-gated service is left
+          # out. A failed dev render leaves its JSON empty and fails the volume
+          # name check; a jq error fails the step.
           render() {
             docker compose "$@" --profile '*' config --format json
           }
