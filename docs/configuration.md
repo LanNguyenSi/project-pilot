@@ -131,11 +131,19 @@ Other Makefile targets:
 No deploy path passes a data-loss flag to Prisma. Two steps run `prisma db push` without it:
 
 - The backend container runs it on every start. When the push fails, the container exits non-zero with Prisma's error on stderr (under `restart: unless-stopped` in `docker-compose.prod.yml` it restarts repeatedly until the push succeeds); read it with `docker logs project-pilot-backend`.
-- The relay deploy (`.relay.yml`) runs it again as its `post_update` step, inside the running backend container, then checks `/api/health`. `make deploy` is the manual fallback and runs the same sequence: `git pull`, `docker compose -f docker-compose.prod.yml up --build -d`, the push, then a wait of up to 60 seconds (`HEALTH_TRIES` x `HEALTH_INTERVAL`, default 30 x 2) for `/api/health` inside the backend container. It exits non-zero when the push fails or the backend does not become healthy.
+- The relay deploy (`.relay.yml`) runs it again as its `post_update` step, inside the running backend container, then checks `/api/health`. `make deploy` is the manual fallback and runs the same sequence: `git pull`, `docker compose -f docker-compose.prod.yml up --build -d`, the push, then a wait of up to 60 seconds (`HEALTH_TRIES` x `HEALTH_INTERVAL`, default 30 x 2; both must be positive integers or the target exits with status 2 before pulling) for `/api/health` inside the backend container. It exits non-zero when the push fails or the backend does not become healthy.
 
 A change that Prisma flags as data loss (dropping a column or table that still holds values, adding a UNIQUE constraint over duplicate values) makes the push exit non-zero, so the deploy fails and nothing is dropped. The database keeps its old schema and data; the new backend container cannot start until the schema change is resolved or applied by hand.
 
-To apply such a change deliberately: back up the database first (for example `docker exec project-pilot-db pg_dump -U project_pilot project_pilot > backup.sql`), then run the push once by hand with the flag, `docker compose -f docker-compose.prod.yml exec -e HOME=/tmp backend npx prisma db push --schema=prisma/schema.prisma --accept-data-loss`, and redeploy. Do not add the flag to `.relay.yml`, the Makefile or the Dockerfile.
+To apply such a change deliberately, run the push once from a one-off container built from the new image. Do not use `exec` for this: after a relay failure, agent-relay rolls back (`git reset --hard` to the previous commit, rebuilds and restarts the old image), so a push exec'd into the running backend sees the old schema and does nothing; after a failed `make deploy` the new backend crash-loops on its own start-command push, so `exec` fails with "is restarting" or is killed mid-run. `run --rm --no-deps` starts a fresh container from the image and bypasses its `CMD`. On the host:
+
+1. Check out the new commit (`git pull`). After a relay failure the host tree and the backend are back at the previous commit, so the pull is needed; after a failed `make deploy` the tree is already at the new commit and the backend stays down until this procedure is done or the commit is reverted.
+2. Build the new backend image: `docker compose -f docker-compose.prod.yml build backend`.
+3. Back up the database: `docker exec project-pilot-db pg_dump -U project_pilot project_pilot > backup.sql`.
+4. Apply the schema once, with the flag: `docker compose -f docker-compose.prod.yml run --rm --no-deps -e HOME=/tmp backend npx prisma db push --schema=prisma/schema.prisma --accept-data-loss` (the image's working directory is `/app`, which holds `prisma/schema.prisma`; `--no-deps` leaves the running database container alone).
+5. Redeploy as usual (relay or `make deploy`); the push now finds nothing to change.
+
+Do not add the flag to `.relay.yml`, the Makefile or the Dockerfile.
 
 ### Development
 
