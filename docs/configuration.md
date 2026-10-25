@@ -124,11 +124,18 @@ Other Makefile targets:
 | `make build` | Builds backend, frontend and mcp |
 | `make clean` | Removes `backend/dist`, `frontend/.next` and `mcp/dist` |
 | `make docker-down` | Stops the Docker Compose stack |
-| `make deploy` | `git pull`, then the production compose command (see [Production](#production-with-traefik)) |
+| `make deploy` | Manual fallback for the relay deploy: `git pull`, the production compose command (see [Production](#production-with-traefik)), `prisma db push` without a data-loss flag, then a bounded `/api/health` wait that exits non-zero on failure |
 
 ## Docker deployment
 
-The backend container runs `prisma db push` on start. When the push fails, the container exits non-zero with Prisma's error on stderr (under `restart: unless-stopped` in `docker-compose.prod.yml` it restarts repeatedly until the push succeeds); read it with `docker logs project-pilot-backend`. A data-loss warning (for example dropping a non-empty table) also stops the start, because `--accept-data-loss` is not passed, and needs a deliberate decision before you change the schema or run the push by hand.
+No deploy path passes a data-loss flag to Prisma. Two steps run `prisma db push` without it:
+
+- The backend container runs it on every start. When the push fails, the container exits non-zero with Prisma's error on stderr (under `restart: unless-stopped` in `docker-compose.prod.yml` it restarts repeatedly until the push succeeds); read it with `docker logs project-pilot-backend`.
+- The relay deploy (`.relay.yml`) runs it again as its `post_update` step, inside the running backend container, then checks `/api/health`. `make deploy` is the manual fallback and runs the same sequence: `git pull`, `docker compose -f docker-compose.prod.yml up --build -d`, the push, then a wait of up to 60 seconds (`HEALTH_TRIES` x `HEALTH_INTERVAL`, default 30 x 2) for `/api/health` inside the backend container. It exits non-zero when the push fails or the backend does not become healthy.
+
+A change that Prisma flags as data loss (dropping a column or table that still holds values, adding a UNIQUE constraint over duplicate values) makes the push exit non-zero, so the deploy fails and nothing is dropped. The database keeps its old schema and data; the new backend container cannot start until the schema change is resolved or applied by hand.
+
+To apply such a change deliberately: back up the database first (for example `docker exec project-pilot-db pg_dump -U project_pilot project_pilot > backup.sql`), then run the push once by hand with the flag, `docker compose -f docker-compose.prod.yml exec -e HOME=/tmp backend npx prisma db push --schema=prisma/schema.prisma --accept-data-loss`, and redeploy. Do not add the flag to `.relay.yml`, the Makefile or the Dockerfile.
 
 ### Development
 
@@ -148,6 +155,6 @@ Prerequisites:
 docker compose -f docker-compose.prod.yml up --build -d
 ```
 
-Exposes via Traefik at `project-pilot.opentriologue.ai` with automatic HTTPS. `make deploy` runs `git pull` and then this command.
+Exposes via Traefik at `project-pilot.opentriologue.ai` with automatic HTTPS. `make deploy` runs `git pull`, this command, the schema push and a health wait (see [Docker deployment](#docker-deployment)).
 
 Every service in `docker-compose.prod.yml` rotates its json-file logs (`max-size: 10m`, `max-file: 3`, shared through the `x-logging` anchor) and sets a memory limit with `mem_limit` (db `1g`, backend `768m`, frontend `512m`), so a chatty or leaking container cannot fill the host disk or memory. `mem_limit` is the Compose spec key applied by plain `docker compose up -d` without swarm; `docker compose -f docker-compose.prod.yml config` shows it in the rendered config. The limits take effect when `up -d` recreates the containers; a container that reaches its limit is OOM-killed and comes back through `restart: unless-stopped`, so check `docker inspect --format '{{.State.OOMKilled}}' <container>` after a restart.
