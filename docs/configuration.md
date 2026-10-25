@@ -139,9 +139,10 @@ To apply such a change deliberately, run the push once from a one-off container 
 
 1. Check out the new commit (`git pull`). After a relay failure the host tree and the backend are back at the previous commit, so the pull is needed; after a failed `make deploy` the tree is already at the new commit and the backend stays down until this procedure is done or the commit is reverted.
 2. Build the new backend image: `docker compose -f docker-compose.prod.yml build backend`.
-3. Back up the database: `docker exec project-pilot-db pg_dump -U project_pilot project_pilot > backup.sql`.
-4. Apply the schema once, with the flag: `docker compose -f docker-compose.prod.yml run --rm --no-deps -e HOME=/tmp backend npx prisma db push --schema=prisma/schema.prisma --accept-data-loss` (the image's working directory is `/app`, which holds `prisma/schema.prisma`; `--no-deps` leaves the running database container alone).
-5. Redeploy as usual (relay or `make deploy`); the push now finds nothing to change.
+3. Back up the database to a file outside the checkout, and check it is not empty: `docker exec project-pilot-db pg_dump -U project_pilot project_pilot > ~/project-pilot-$(date +%Y%m%d-%H%M%S).sql`, then `test -s` on that file. Do not write the dump into the checkout: agent-relay refuses to deploy a tree with untracked files, so step 5 would fail, and a production dump does not belong next to the app source.
+4. Optional, to avoid errors during the next step: stop the backend (`docker compose -f docker-compose.prod.yml stop backend`). Otherwise the backend that is still running (the previous commit after a relay failure) serves requests against the changed schema until step 5 and fails on queries that touch the dropped column or table, and after a failed `make deploy` its own start-command push runs at the same time as the one below.
+5. Apply the schema once, with the flag: `docker compose -f docker-compose.prod.yml run --rm --no-deps -e HOME=/tmp backend npx prisma db push --schema=prisma/schema.prisma --accept-data-loss` (the schema path is relative to the image's working directory, which holds `prisma/schema.prisma`; `--no-deps` leaves the running database container alone).
+6. Redeploy as usual (relay or `make deploy`); the push now finds nothing to change.
 
 Do not add the flag to `.relay.yml`, the Makefile or the Dockerfile.
 
