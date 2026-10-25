@@ -23,7 +23,9 @@ RUN npm run build --workspace=backend
 
 # Production dependencies of the backend workspace only, from the same lockfile.
 FROM node:22-alpine AS prod-deps
-# Same reason as in the builder stage: engines are chosen at install time.
+# The builder's Prisma engines are copied over this stage's node_modules in
+# the runner; openssl here keeps this stage's engines on the same openssl
+# version, so no unused openssl-1.1 engine files remain in the image.
 RUN apk add --no-cache openssl
 WORKDIR /app
 COPY package.json package-lock.json ./
