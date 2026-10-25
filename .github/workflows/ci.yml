@@ -149,6 +149,12 @@ jobs:
               echo "dev and prod pgdata volume names must be set and differ ($label)" >&2
               exit 1
             fi
+            # No dev service may mount any volume carrying the production name.
+            if docker compose -f docker-compose.yml "$@" config --format json \
+                | jq -e --arg p "$prod" '[.volumes[]?.name] | index($p)' >/dev/null; then
+              echo "a dev volume is named like the production volume $prod ($label)" >&2
+              exit 1
+            fi
           }
           check plain
           (export COMPOSE_PROJECT_NAME=project-pilot; check "COMPOSE_PROJECT_NAME=project-pilot")
