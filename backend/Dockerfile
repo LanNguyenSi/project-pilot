@@ -3,9 +3,6 @@
 FROM node:22-alpine AS builder
 
 WORKDIR /app
-# node 22's bundled npm 10 crashes resolving @vitest/coverage-v8's exact vitest
-# peer pin ("Cannot read properties of null (reading 'edgesOut')"); npm >= 11 resolves it.
-RUN npm install -g npm@11
 # Root manifest + lockfile and every workspace manifest, so `npm ci` can check
 # the lockfile against the whole workspace tree and installs exactly what CI tests.
 COPY package.json package-lock.json ./
@@ -18,14 +15,27 @@ RUN cd backend && npx prisma generate
 COPY backend ./backend
 RUN npm run build --workspace=backend
 
+# Production dependencies of the backend workspace only, from the same lockfile.
+FROM node:22-alpine AS prod-deps
+WORKDIR /app
+COPY package.json package-lock.json ./
+COPY backend/package.json ./backend/
+COPY frontend/package.json ./frontend/
+COPY mcp/package.json ./mcp/
+RUN npm ci --workspace=backend --omit=dev --no-audit --no-fund
+
 FROM node:22-alpine AS runner
 
 RUN apk add --no-cache openssl
 WORKDIR /app/backend
 
-# node_modules is carried over from the builder as before: the start command
-# needs the prisma CLI (a devDependency), so dev dependencies stay in this image.
-COPY --from=builder /app/node_modules /app/node_modules
+# node_modules holds the backend's production dependencies only. The start
+# command also needs the prisma CLI (a devDependency) with its engines, and the
+# client generated in the builder, so exactly those are copied from the builder.
+COPY --from=prod-deps /app/node_modules /app/node_modules
+COPY --from=builder /app/node_modules/prisma /app/node_modules/prisma
+COPY --from=builder /app/node_modules/@prisma/engines /app/node_modules/@prisma/engines
+COPY --from=builder /app/node_modules/.prisma /app/node_modules/.prisma
 COPY --from=builder /app/backend/package.json ./
 COPY --from=builder /app/backend/dist ./dist
 COPY --from=builder /app/backend/prisma ./prisma

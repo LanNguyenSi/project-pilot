@@ -14,7 +14,10 @@
 **/.env
 **/.env.*
 !**/.env.example
-*.db
-*.db-journal
+**/*.db
+**/*.db-journal
+**/*.pem
+**/*.key
+**/.npmrc
 docs
 **/tests
