@@ -2,6 +2,11 @@
 
 <!-- Add new entries at the top, newest first. -->
 
+- 2026-10-25T06:19:11Z, credential-trust-boundary re-verified and re-stamped after the review
+  fix of the production config check: an empty service URL now counts as unset
+  before parsing as well, and the paragraph on who receives GitHub tokens says
+  that production refuses to start without the three URLs (new citation on
+  `backend/src/config/index.ts:42`); the lines 5 and 33 citations are unchanged.
 - 2026-10-25T05:44:43Z, credential-trust-boundary re-verified and re-stamped after the
   production config check: `backend/src/config/index.ts` keeps the schema (and
   the cited `SESSION_SECRET: z.string().min(16),` on line 5) and adds
