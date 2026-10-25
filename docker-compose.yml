@@ -17,8 +17,8 @@ services:
 
   backend:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     depends_on:
       db:
         condition: service_healthy
@@ -34,8 +34,8 @@ services:
 
   frontend:
     build:
-      context: ./frontend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: frontend/Dockerfile
       args:
         # Build-time only: Next.js inlines NEXT_PUBLIC_* into the client bundle.
         NEXT_PUBLIC_API_URL: http://localhost:3001

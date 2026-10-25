@@ -1,0 +1,20 @@
+# Build context is the repo root (see docker-compose*.yml). Keep secrets,
+# VCS data and host-built artifacts out of it.
+.git
+.github
+.ai
+.claude
+**/node_modules
+**/.next
+**/dist
+**/coverage
+**/*.tsbuildinfo
+.env
+.env.*
+**/.env
+**/.env.*
+!**/.env.example
+*.db
+*.db-journal
+docs
+**/tests

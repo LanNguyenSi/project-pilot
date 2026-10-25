@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Docker images install from the lockfile.** `backend/Dockerfile` and `frontend/Dockerfile` now run `npm ci` against the root workspace `package-lock.json` instead of `npm install` on a copied `package.json`, so production images resolve the same dependency versions CI tests. The build context of both services in `docker-compose.yml` and `docker-compose.prod.yml` is now the repository root (`dockerfile: backend/Dockerfile`, `dockerfile: frontend/Dockerfile`); build them from the root, for example `docker build -f backend/Dockerfile .`. A root `.dockerignore` replaces the per-workspace ones and keeps `.git`, `.env*` and `node_modules` out of the context. In the frontend image the standalone server now starts as `node frontend/server.js` because Next traces from the repository root.
 - **The dashboard no longer shows every service as "Not configured" when a stored credential cannot be decrypted** (e.g. after `SESSION_SECRET` changed). `GET /api/dashboard/summary` now checks each stored credential's readability up front: a service whose credential fails to decrypt is reported with the optional `unreadable: true` field (`configured` stays `true`) and its downstream calls are skipped, while the other services still report their data. The dashboard renders a distinct **Credential unreadable** badge for that service plus a hint to re-enter it in Settings; the stat-card state mapping moved to `frontend/src/lib/service-state.ts` with its own unit test.
 
 ### Security
