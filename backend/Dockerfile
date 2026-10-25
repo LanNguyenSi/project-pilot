@@ -29,9 +29,12 @@ FROM node:22-alpine AS runner
 RUN apk add --no-cache openssl
 WORKDIR /app/backend
 
-# node_modules holds the backend's production dependencies only. The start
-# command also needs the prisma CLI (a devDependency) with its engines, and the
-# client generated in the builder, so exactly those are copied from the builder.
+# node_modules holds the backend's production dependencies only. The prisma CLI
+# the start command needs is already among them: the lockfile marks prisma and
+# @prisma/engines devOptional (optional peer of @prisma/client), which
+# `--omit=dev` keeps. Copying both from the builder guards against a lockfile
+# where that is no longer so; the copy that adds something today is `.prisma`,
+# the client generated in the builder.
 COPY --from=prod-deps /app/node_modules /app/node_modules
 COPY --from=builder /app/node_modules/prisma /app/node_modules/prisma
 COPY --from=builder /app/node_modules/@prisma/engines /app/node_modules/@prisma/engines
