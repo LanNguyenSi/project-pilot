@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **A new backend container starts without network access to `binaries.prisma.sh`.** The `builder` and `prod-deps` stages of `backend/Dockerfile` ran `npm ci` without openssl, so the Prisma CLI engines from the `@prisma/engines` postinstall (and the client's native engine) targeted openssl 1.1 while the runner has openssl 3; every new container downloaded the openssl-3.0.x engines for its platform (`linux-musl-openssl-3.0.x` on amd64, `linux-musl-arm64-openssl-3.0.x` on arm64) before `prisma db push`. Separately, on arm64 the generated client's native engine targeted openssl 1.1 and did not match the runner. Both stages now run `apk add --no-cache openssl` before `npm ci`, so the engines in the image match the runner. The `binaryTargets` route was not chosen: it only affects the generated client, not the CLI engines that `prisma db push` uses. Measured with an internal Docker network (Postgres reachable, no route out): the old image exits on the engine download on linux/amd64 and arm64, the new one runs db push and the server to healthy on both. The amd64 image shrinks from 498 MB to 450 MB; arm64 is unchanged at 482 MB.
+
 ## [0.6.0] - 2026-10-25
 
 ### Changed

@@ -2,6 +2,12 @@
 # available: docker build -f backend/Dockerfile .
 FROM node:22-alpine AS builder
 
+# openssl must be present before `npm ci`: @prisma/engines downloads the CLI
+# query and schema engines in its postinstall for the openssl version it
+# detects. The runner has openssl 3; without it here the engines copied into
+# the image target openssl 1.1 and every new container would fetch the
+# openssl-3.0.x engines from binaries.prisma.sh before `prisma db push`.
+RUN apk add --no-cache openssl
 WORKDIR /app
 # Root manifest + lockfile and every workspace manifest, so `npm ci` can check
 # the lockfile against the whole workspace tree and installs exactly what CI tests.
@@ -17,6 +23,10 @@ RUN npm run build --workspace=backend
 
 # Production dependencies of the backend workspace only, from the same lockfile.
 FROM node:22-alpine AS prod-deps
+# The builder's Prisma engines are copied over this stage's node_modules in
+# the runner; openssl here keeps this stage's engines on the same openssl
+# version, so no unused openssl-1.1 engine files remain in the image.
+RUN apk add --no-cache openssl
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY backend/package.json ./backend/
