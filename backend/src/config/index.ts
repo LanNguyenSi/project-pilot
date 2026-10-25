@@ -49,11 +49,17 @@ export type Config = z.infer<typeof configSchema>;
 
 // Validates `env` (process.env at startup, a controlled object in tests).
 // Throws on any fatal problem so the caller decides how to exit; a schema
-// default only fills an absent key, so emptiness is checked against `env`
-// directly (an empty string counts as missing) while the fallback the warning
-// reports is taken from the parsed default.
+// default only fills an absent key, so an empty service URL is turned into an
+// absent key on a copy before parsing (development really gets the default)
+// while the required-in-production check still reads the raw `env` (an empty
+// string counts as missing there too) and the fallback the warning reports is
+// taken from the parsed default.
 export function parseConfig(env: NodeJS.ProcessEnv): Config {
-  const parsed = configSchema.safeParse(env);
+  const schemaEnv = { ...env };
+  for (const key of SERVICE_URL_KEYS) {
+    if (schemaEnv[key] === "") delete schemaEnv[key];
+  }
+  const parsed = configSchema.safeParse(schemaEnv);
   if (!parsed.success) {
     throw new Error(
       `Invalid environment configuration:\n${JSON.stringify(

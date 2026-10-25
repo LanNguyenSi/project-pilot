@@ -145,7 +145,10 @@ The three target hosts come from `PROJECT_FORGE_URL`, `AGENT_TASKS_URL` and
 `DEPLOY_PANEL_URL`
 (`backend/src/services/module-registration.ts:17-21#"config.DEPLOY_PANEL_URL,"`),
 which default to the public opentriologue hosts
-(`backend/src/config/index.ts:18-26#"deploy-panel.opentriologue.ai"`). These
+(`backend/src/config/index.ts:18-26#"deploy-panel.opentriologue.ai"`). With
+`NODE_ENV=production` a missing or empty URL stops startup
+(`backend/src/config/index.ts:42#"const SERVICE_URL_KEYS = ["`), so these
+public defaults never receive tokens in production. These
 variables therefore decide who receives every signing-in user's GitHub token
 with the scopes above. A module error is mapped to a status code only,
 without echoing the response body

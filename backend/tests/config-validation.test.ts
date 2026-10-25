@@ -7,6 +7,8 @@ import {
   afterEach,
   beforeAll,
 } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { Config } from "../src/config/index.js";
 
 // Importing the config module runs its startup validation against
@@ -57,6 +59,26 @@ function without(env: NodeJS.ProcessEnv, keys: readonly string[]) {
   return env;
 }
 
+// The placeholder values as actually shipped in the templates, read from the
+// files themselves: changing or deleting a PLACEHOLDER_SESSION_SECRETS entry
+// without changing the template (or vice versa) breaks the rejection tests
+// below instead of staying green by the test taking its value from the list.
+const ENV_EXAMPLE_SECRET =
+  readFileSync(join(__dirname, "..", ".env.example"), "utf8").match(
+    /^SESSION_SECRET=(.+)$/m,
+  )?.[1]
+    .trim() ?? "";
+const COMPOSE_SECRET =
+  readFileSync(join(__dirname, "..", "..", "docker-compose.yml"), "utf8").match(
+    /^\s+SESSION_SECRET:\s*(.+)$/m,
+  )?.[1]
+    .trim() ?? "";
+
+const TEMPLATE_PLACEHOLDERS = [
+  { file: "backend/.env.example", secret: ENV_EXAMPLE_SECRET },
+  { file: "docker-compose.yml", secret: COMPOSE_SECRET },
+];
+
 let warnSpy: { mock: { calls: unknown[][] }; mockRestore: () => void };
 
 beforeEach(() => {
@@ -100,6 +122,36 @@ describe("SESSION_SECRET placeholder rejection", () => {
       parseConfig(envWith({ NODE_ENV: "development", SESSION_SECRET: "short" })),
     ).toThrow(/SESSION_SECRET/i);
   });
+});
+
+describe("placeholders shipped in the templates are rejected in production", () => {
+  it("backend/.env.example literally ships change-me-to-something-secure", () => {
+    expect(ENV_EXAMPLE_SECRET).toBe("change-me-to-something-secure");
+  });
+
+  it("docker-compose.yml literally ships dev-credential-key-change-me", () => {
+    expect(COMPOSE_SECRET).toBe("dev-credential-key-change-me");
+  });
+
+  it.each(TEMPLATE_PLACEHOLDERS)(
+    "production + $file placeholder throws naming SESSION_SECRET",
+    ({ secret }) => {
+      expect(() =>
+        parseConfig(envWith({ NODE_ENV: "production", SESSION_SECRET: secret })),
+      ).toThrow(/SESSION_SECRET/i);
+    },
+  );
+
+  it.each(TEMPLATE_PLACEHOLDERS)(
+    "development + $file placeholder is accepted with a warning",
+    ({ secret }) => {
+      const config = parseConfig(
+        envWith({ NODE_ENV: "development", SESSION_SECRET: secret }),
+      );
+      expect(config.SESSION_SECRET).toBe(secret);
+      expect(warnText()).toMatch(/placeholder/i);
+    },
+  );
 });
 
 describe("downstream service URL requirements", () => {
@@ -155,6 +207,16 @@ describe("downstream service URL requirements", () => {
     expect(warnSpy.mock.calls).toHaveLength(1);
     for (const key of URL_KEYS) expect(warnText()).toContain(key);
   });
+
+  it.each(URL_KEYS.map((key) => ({ key })))(
+    "development + $key set to empty string falls back to the default with a warning naming $key",
+    ({ key }) => {
+      const config = parseConfig(envWith({ NODE_ENV: "development", [key]: "" }));
+      expect(config[key]).toBe(URL_DEFAULTS[key]);
+      expect(warnSpy.mock.calls).toHaveLength(1);
+      expect(warnText()).toContain(key);
+    },
+  );
 
   it("development + URLs set uses given values with no warning", () => {
     const config = parseConfig(envWith({ NODE_ENV: "development" }));
