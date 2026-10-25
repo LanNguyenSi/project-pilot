@@ -148,26 +148,44 @@ jobs:
               [.services.db.volumes[]? | select(.type == "volume") | .source] as $src
               | if ($src | length) == 1 then (.volumes[$src[0]].name // "") else "" end'
           }
-          check() {
-            label="$1"; shift
-            dev_json=$(render -f docker-compose.yml "$@")
-            prod_json=$(render -f docker-compose.prod.yml)
+          # Checks on one dev render: the db volume differs from prod, no dev
+          # volume carries the production name, and no service borrows another
+          # container's volumes (volumes_from container:...).
+          check_dev() {
+            local label="$1" dev_json="$2" dev rc
             dev=$(printf '%s' "$dev_json" | db_volume)
-            prod=$(printf '%s' "$prod_json" | db_volume)
             echo "$label: dev=$dev prod=$prod"
-            if [ -z "$dev" ] || [ -z "$prod" ] || [ "$dev" = null ] || [ "$prod" = null ] || [ "$dev" = "$prod" ]; then
+            if [ -z "$dev" ] || [ "$dev" = null ] || [ "$dev" = "$prod" ]; then
               echo "dev and prod pgdata volume names must be set and differ ($label)" >&2
               exit 1
             fi
-            # No dev service, in any profile, may mount a volume carrying the
-            # production name. jq exits 0 on a match, 1 on none; anything else
-            # is an error and fails too.
+            # jq exits 0 on a match, 1 on none; anything else is an error.
             rc=0
             printf '%s' "$dev_json" | jq -e --arg p "$prod" '[.volumes[]?.name] | index($p)' >/dev/null || rc=$?
             if [ "$rc" -ne 1 ]; then
               echo "a dev volume is named like the production volume $prod, or the check failed (jq exit $rc, $label)" >&2
               exit 1
             fi
+            rc=0
+            printf '%s' "$dev_json" | jq -e '[.services[]?.volumes_from[]?] | length > 0' >/dev/null || rc=$?
+            if [ "$rc" -ne 1 ]; then
+              echo "a dev service uses volumes_from, or the check failed (jq exit $rc, $label)" >&2
+              exit 1
+            fi
+          }
+          check() {
+            label="$1"; shift
+            prod_json=$(render -f docker-compose.prod.yml)
+            prod=$(printf '%s' "$prod_json" | db_volume)
+            if [ -z "$prod" ] || [ "$prod" = null ]; then
+              echo "prod pgdata volume name must be set ($label)" >&2
+              exit 1
+            fi
+            # The dev file as named, and whatever a plain `docker compose`
+            # resolves in the repo root (what the make targets run; it also
+            # picks up compose.yaml or an override file if one is committed).
+            check_dev "$label (-f docker-compose.yml)" "$(render -f docker-compose.yml "$@")"
+            check_dev "$label (plain)" "$(render "$@")"
           }
           check plain
           (export COMPOSE_PROJECT_NAME=project-pilot; check "COMPOSE_PROJECT_NAME=project-pilot")
