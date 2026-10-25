@@ -44,6 +44,9 @@ services:
       FRONTEND_URL: https://project-pilot.opentriologue.ai
       BACKEND_URL: https://project-pilot.opentriologue.ai
       NODE_ENV: production
+      PROJECT_FORGE_URL: ${PROJECT_FORGE_URL:?PROJECT_FORGE_URL must be set for production}
+      AGENT_TASKS_URL: ${AGENT_TASKS_URL:?AGENT_TASKS_URL must be set for production}
+      DEPLOY_PANEL_URL: ${DEPLOY_PANEL_URL:?DEPLOY_PANEL_URL must be set for production}
       # GitHub OAuth — optional; the /api/oauth/github/* routes return 503
       # when either value is empty, so leaving them unset is a safe no-op.
       GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}

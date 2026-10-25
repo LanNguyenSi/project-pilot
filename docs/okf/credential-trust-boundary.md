@@ -52,8 +52,11 @@ salt (`backend/src/lib/crypto.ts:15#"scryptSync(config.SESSION_SECRET, salt, 32)
 `encrypt` draws a fresh salt and IV for every call and stores AES-256-GCM
 output as `salt:iv:tag:ciphertext`
 (`backend/src/lib/crypto.ts:21-24#"const iv = randomBytes(IV_LENGTH);"`).
-The config schema only requires the secret to be at least 16 characters
-(`backend/src/config/index.ts:5#"SESSION_SECRET: z.string().min(16),"`).
+The config schema requires the secret to be at least 16 characters
+(`backend/src/config/index.ts:5#"SESSION_SECRET: z.string().min(16),"`),
+and with `NODE_ENV=production` the backend also refuses to start on the
+placeholder values shipped in the example and compose templates
+(`backend/src/config/index.ts:33#"export const PLACEHOLDER_SESSION_SECRETS = ["`).
 
 Despite its name, the value plays no part in sessions. A session token is 32
 random bytes (`backend/src/services/auth.ts:44-45#"randomBytes(32).toString("`),

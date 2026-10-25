@@ -13,14 +13,14 @@ The MCP server is a separate process and reads credentials from environment vari
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `DATABASE_URL` | yes |  | PostgreSQL connection string |
-| `SESSION_SECRET` | yes |  | Secret from which the backend derives the AES-256-GCM key that encrypts stored service credentials (min 16 chars). Sessions do not use it. Changing it makes every stored credential unreadable: users must re-enter them in `/settings`, and until then requests that use a stored credential fail with 409 (`credential_unreadable`, "Re-enter it in /settings"); **Test** reports the same message. The dashboard does not fail as a whole: the affected service is marked **Credential unreadable** with a hint to re-enter it in Settings, and the other services still show their data. To end sessions, delete rows from the `Session` table instead. |
+| `SESSION_SECRET` | yes |  | Secret from which the backend derives the AES-256-GCM key that encrypts stored service credentials (min 16 chars). With `NODE_ENV=production` a known placeholder value (the ones in `backend/.env.example` and `docker-compose.yml`) is rejected at start even though it clears the length rule; outside production a placeholder is accepted with a warning. Sessions do not use it. Changing it makes every stored credential unreadable: users must re-enter them in `/settings`, and until then requests that use a stored credential fail with 409 (`credential_unreadable`, "Re-enter it in /settings"); **Test** reports the same message. The dashboard does not fail as a whole: the affected service is marked **Credential unreadable** with a hint to re-enter it in Settings, and the other services still show their data. To end sessions, delete rows from the `Session` table instead. |
 | `PORT` | no | 3001 | Backend port |
 | `CORS_ORIGINS` | no | http://localhost:3000 | Allowed origins |
 | `FRONTEND_URL` | no | http://localhost:3000 | Frontend URL |
 | `NODE_ENV` | no | development | development, production, test |
-| `PROJECT_FORGE_URL` | no | https://project-forge.opentriologue.ai | Forge API base URL |
-| `AGENT_TASKS_URL` | no | https://agent-tasks.opentriologue.ai | Tasks API base URL |
-| `DEPLOY_PANEL_URL` | no | https://deploy-panel.opentriologue.ai | Deploy API base URL |
+| `PROJECT_FORGE_URL` | yes in production | https://project-forge.opentriologue.ai | Forge API base URL. Required with `NODE_ENV=production` (missing or empty fails startup); outside production it falls back to this default with a warning |
+| `AGENT_TASKS_URL` | yes in production | https://agent-tasks.opentriologue.ai | Tasks API base URL. Required with `NODE_ENV=production` (missing or empty fails startup); outside production it falls back to this default with a warning |
+| `DEPLOY_PANEL_URL` | yes in production | https://deploy-panel.opentriologue.ai | Deploy API base URL. Required with `NODE_ENV=production` (missing or empty fails startup); outside production it falls back to this default with a warning |
 | `BACKEND_URL` | no | http://localhost:3001 | Public backend URL, used to build the OAuth redirect URI |
 | `GITHUB_CLIENT_ID` | no |  | GitHub OAuth app client ID. When unset (along with `GITHUB_CLIENT_SECRET`), the `/api/oauth/github/*` routes return 503. Enabling it forwards users' GitHub tokens to the three service URLs, see [GitHub sign-in](#github-sign-in) |
 | `GITHUB_CLIENT_SECRET` | no |  | GitHub OAuth app client secret. When unset (along with `GITHUB_CLIENT_ID`), the `/api/oauth/github/*` routes return 503. Enabling it forwards users' GitHub tokens to the three service URLs, see [GitHub sign-in](#github-sign-in) |
@@ -32,7 +32,7 @@ When `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` are both set, the login page'
 - Register `<BACKEND_URL>/api/oauth/github/callback` as the OAuth App's callback URL.
 - The requested scopes are `read:user user:email read:org repo workflow`. `repo` lets the downstream services read the user's repositories; `workflow` lets project-forge push scaffolds that contain `.github/workflows`.
 - After sign-in, the backend sends the user's GitHub access token once to `POST /api/auth/register-from-project-pilot` on `PROJECT_FORGE_URL`, `AGENT_TASKS_URL` and `DEPLOY_PANEL_URL`. It stores each returned API token as that user's encrypted credential (labelled `GitHub: <login>`) and does not keep the GitHub token.
-- Point these three variables at instances you trust before you set `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET`, because their defaults are the hosted instances listed in the table above.
+- Point these three variables at instances you trust before you set `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET`, because their defaults are the hosted instances listed in the table above. `PROJECT_FORGE_URL`, `AGENT_TASKS_URL` and `DEPLOY_PANEL_URL` are required with `NODE_ENV=production`: a missing or empty one stops the backend at start, so the defaults are never used in production.
 - If a service fails to register the user, sign-in still succeeds, and that service's credential can be pasted in `/settings`.
 - An existing email/password account with the same verified email is not merged, and neither is an account already linked to a different GitHub user. The user lands on `/auth/error?reason=email_collision`.
 - The session cookie from GitHub sign-in is `SameSite=Lax`; password login sets a `SameSite=Strict` cookie.
@@ -170,7 +170,7 @@ docker compose up
 
 Prerequisites:
 
-1. Set `POSTGRES_PASSWORD` and `SESSION_SECRET` (min 16 chars), and optionally `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET`, in the shell or in a `.env` file next to `docker-compose.prod.yml`. The backend exits at start when `SESSION_SECRET` is missing or shorter than 16 chars. The file does not pass `PROJECT_FORGE_URL`, `AGENT_TASKS_URL` or `DEPLOY_PANEL_URL` to the backend, so their defaults apply unless you add them to the backend's `environment` (see [GitHub sign-in](#github-sign-in)).
+1. Set `POSTGRES_PASSWORD`, a real `SESSION_SECRET` (min 16 chars, not a known placeholder), and `PROJECT_FORGE_URL`, `AGENT_TASKS_URL` and `DEPLOY_PANEL_URL` in the shell or in a `.env` file next to `docker-compose.prod.yml`; optionally set `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET`. The backend exits at start when `SESSION_SECRET` is missing, shorter than 16 chars, or a known placeholder, and `docker-compose.prod.yml` passes the three service URLs with `${NAME:?...}`, so compose itself fails until you set them (see [GitHub sign-in](#github-sign-in)).
 2. Run Traefik attached to an external Docker network named `traefik`, with a certificate resolver named `letsencrypt`.
 3. The hostname is set inside `docker-compose.prod.yml`: in the `Host()` router rules, `CORS_ORIGINS`, `FRONTEND_URL`, `BACKEND_URL` and the frontend `NEXT_PUBLIC_*` build args. To deploy under another domain, change all of them and rebuild the frontend image, because `NEXT_PUBLIC_*` values are fixed at build time.
 
