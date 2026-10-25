@@ -3,7 +3,7 @@ type: invariant
 title: Credential and identity trust boundaries
 description: SESSION_SECRET is the only key material for stored service credentials and nothing else reads it; the GitHub access token is used for sign-in, forwarded once to the three module hosts and never stored; a failed module registration still signs the user in; the MCP server never touches the credential store.
 tags: [credentials, encryption, oauth, identity, mcp]
-timestamp: 2026-10-24T14:13:19Z
+timestamp: 2026-10-25T06:19:11Z
 sources:
   - backend/src/lib/crypto.ts
   - backend/src/config/index.ts
@@ -52,8 +52,11 @@ salt (`backend/src/lib/crypto.ts:15#"scryptSync(config.SESSION_SECRET, salt, 32)
 `encrypt` draws a fresh salt and IV for every call and stores AES-256-GCM
 output as `salt:iv:tag:ciphertext`
 (`backend/src/lib/crypto.ts:21-24#"const iv = randomBytes(IV_LENGTH);"`).
-The config schema only requires the secret to be at least 16 characters
-(`backend/src/config/index.ts:5#"SESSION_SECRET: z.string().min(16),"`).
+The config schema requires the secret to be at least 16 characters
+(`backend/src/config/index.ts:5#"SESSION_SECRET: z.string().min(16),"`),
+and with `NODE_ENV=production` the backend also refuses to start on the
+placeholder values shipped in the example and compose templates
+(`backend/src/config/index.ts:33#"export const PLACEHOLDER_SESSION_SECRETS = ["`).
 
 Despite its name, the value plays no part in sessions. A session token is 32
 random bytes (`backend/src/services/auth.ts:44-45#"randomBytes(32).toString("`),
@@ -142,7 +145,10 @@ The three target hosts come from `PROJECT_FORGE_URL`, `AGENT_TASKS_URL` and
 `DEPLOY_PANEL_URL`
 (`backend/src/services/module-registration.ts:17-21#"config.DEPLOY_PANEL_URL,"`),
 which default to the public opentriologue hosts
-(`backend/src/config/index.ts:18-26#"deploy-panel.opentriologue.ai"`). These
+(`backend/src/config/index.ts:18-26#"deploy-panel.opentriologue.ai"`). With
+`NODE_ENV=production` a missing or empty URL stops startup
+(`backend/src/config/index.ts:42#"const SERVICE_URL_KEYS = ["`), so these
+public defaults never receive tokens in production. These
 variables therefore decide who receives every signing-in user's GitHub token
 with the scopes above. A module error is mapped to a status code only,
 without echoing the response body
