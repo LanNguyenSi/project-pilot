@@ -124,11 +124,41 @@ Other Makefile targets:
 | `make build` | Builds backend, frontend and mcp |
 | `make clean` | Removes `backend/dist`, `frontend/.next` and `mcp/dist` |
 | `make docker-down` | Stops the Docker Compose stack |
-| `make deploy` | `git pull`, then the production compose command (see [Production](#production-with-traefik)) |
+| `make deploy` | Manual fallback for the relay deploy: `git pull`, the production compose command (see [Production](#production-with-traefik)), `prisma db push` without a data-loss flag, then a bounded `/api/health` wait that exits non-zero on failure |
+
+### Dev database volume and port
+
+`docker-compose.yml` (the dev stack behind `make docker-up`) sets its own compose project name, `project-pilot-dev`, so its database volume is `project-pilot-dev_pgdata`. The production stack in `docker-compose.prod.yml` uses the checkout directory name as project name (`project-pilot` on the production host) and keeps its volume `project-pilot_pgdata`. The dev file also pins the volume's own name, so the dev database volume stays `project-pilot-dev_pgdata` even when `COMPOSE_PROJECT_NAME` is exported or set in the shared `.env`, or when `-p` is passed; running the dev file on the production host therefore starts a separate, empty database and never touches the production volume. Those overrides do change the project of the dev containers and network, though: `docker compose -f docker-compose.yml -p project-pilot ...` on the production host acts on the production containers (same project), so never pass `-p project-pilot` with the dev file. The same happens when the shared `.env` or the shell sets `COMPOSE_PROJECT_NAME=project-pilot`: then `make docker-up` replaces the production db container with the dev one (the production data stays in its volume, but production is down) and `make docker-down` removes the production containers. Never run the dev targets on the production host. CI renders both files (the dev side once as `-f docker-compose.yml` and once as a plain `docker compose` in the repo root, with every compose profile enabled) and fails if their effective pgdata volume names are equal, if any dev volume carries the production volume's name, or if a dev service uses `volumes_from`. The dev Postgres publishes only on `127.0.0.1:5432`, so other machines cannot reach it.
+
+Upgrade note for developers: before this change the dev database lived in a volume named after your checkout directory (for example `project-pilot_pgdata`). The dev stack now starts with a fresh `project-pilot-dev_pgdata`. Either re-seed (`make docker-up`, then `make db-push`), or carry the old data over once. Everything below is for a developer machine only; never run it on the production host, where the old directory name is the production project. Stop the old dev database first (the new file targets `project-pilot-dev`, so a plain `docker compose down` would not stop it): find its container with `docker ps` and run `docker stop <old-db-container>`, or run `docker compose -p <old-directory-name> stop` using the OLD revision of `docker-compose.yml`. Then copy the old volume into the new one:
+
+```bash
+docker stop <old-db-container>
+docker volume create project-pilot-dev_pgdata
+docker run --rm -v <old-volume>:/from:ro -v project-pilot-dev_pgdata:/to alpine cp -a /from/. /to/
+```
+
+Replace `<old-volume>` with the old dev volume (`docker volume ls`). Only do this on a developer machine: on the production host the old name is the production volume, so skip the copy there, and never run `docker compose down -v` with `docker-compose.prod.yml`.
 
 ## Docker deployment
 
-The backend container runs `prisma db push` on start. When the push fails, the container exits non-zero with Prisma's error on stderr (under `restart: unless-stopped` in `docker-compose.prod.yml` it restarts repeatedly until the push succeeds); read it with `docker logs project-pilot-backend`. A data-loss warning (for example dropping a non-empty table) also stops the start, because `--accept-data-loss` is not passed, and needs a deliberate decision before you change the schema or run the push by hand.
+No deploy path passes a data-loss flag to Prisma. Two steps run `prisma db push` without it:
+
+- The backend container runs it on every start. When the push fails, the container exits non-zero with Prisma's error on stderr (under `restart: unless-stopped` in `docker-compose.prod.yml` it restarts repeatedly until the push succeeds); read it with `docker logs project-pilot-backend`.
+- The relay deploy (`.relay.yml`) runs it again as its `post_update` step, inside the running backend container, then checks `/api/health`. `make deploy` is the manual fallback and runs the same sequence: `git pull`, `docker compose -f docker-compose.prod.yml up --build -d`, the push, then a wait of up to 60 seconds (`HEALTH_TRIES` x `HEALTH_INTERVAL`, default 30 x 2; both must be positive integers or the target exits with status 2 before pulling) for `/api/health` inside the backend container. It exits non-zero when the push fails or the backend does not become healthy.
+
+A change that Prisma flags as data loss (dropping a column or table that still holds values, adding a UNIQUE constraint over duplicate values) makes the push exit non-zero, so the deploy fails and nothing is dropped. The database keeps its old schema and data; the new backend container cannot start until the schema change is resolved or applied by hand.
+
+To apply such a change deliberately, run the push once from a one-off container built from the new image. Do not use `exec` for this: after a relay failure, agent-relay rolls back (`git reset --hard` to the previous commit, rebuilds and restarts the old image), so a push exec'd into the running backend sees the old schema and does nothing; after a failed `make deploy` the new backend crash-loops on its own start-command push, so `exec` fails with "is restarting" or is killed mid-run. `run --rm --no-deps` starts a fresh container from the image and bypasses its `CMD`. On the host:
+
+1. Check out the new commit (`git pull`). After a relay failure the host tree and the backend are back at the previous commit, so the pull is needed; after a failed `make deploy` the tree is already at the new commit and the backend stays down until this procedure is done or the commit is reverted.
+2. Build the new backend image: `docker compose -f docker-compose.prod.yml build backend`.
+3. Back up the database to a file outside the checkout, readable only by you, and continue only if it prints `backup ok`: `( umask 077; f="$HOME/project-pilot-$(date +%Y%m%d-%H%M%S).sql"; docker exec project-pilot-db pg_dump -U project_pilot project_pilot > "$f" && test -s "$f" && echo "backup ok: $f" )`. Keep the printed path for a restore and delete the dump once it is no longer needed. Do not write the dump into the checkout: agent-relay refuses to deploy a tree with untracked files, so the redeploy in step 6 would fail, and a production dump does not belong next to the app source.
+4. Optional, to avoid errors during the next step: stop the backend (`docker compose -f docker-compose.prod.yml stop backend`). Otherwise the backend that is still running (the previous commit after a relay failure) serves requests against the changed schema from step 5 until the redeploy in step 6 and fails on queries that touch the dropped column or table, and after a failed `make deploy` its own start-command push runs at the same time as the one below.
+5. Apply the schema once, with the flag: `docker compose -f docker-compose.prod.yml run --rm --no-deps -e HOME=/tmp backend npx prisma db push --schema=prisma/schema.prisma --accept-data-loss` (the schema path is relative to the image's working directory, which holds `prisma/schema.prisma`; `--no-deps` leaves the running database container alone).
+6. Redeploy as usual (relay or `make deploy`); the push now finds nothing to change.
+
+Do not add the flag to `.relay.yml`, the Makefile or the Dockerfile.
 
 ### Development
 
@@ -148,7 +178,7 @@ Prerequisites:
 docker compose -f docker-compose.prod.yml up --build -d
 ```
 
-Exposes via Traefik at `project-pilot.opentriologue.ai` with automatic HTTPS. `make deploy` runs `git pull` and then this command.
+Exposes via Traefik at `project-pilot.opentriologue.ai` with automatic HTTPS. `make deploy` runs `git pull`, this command, the schema push and a health wait (see [Docker deployment](#docker-deployment)).
 
 Every service in `docker-compose.prod.yml` rotates its json-file logs (`max-size: 10m`, `max-file: 3`, shared through the `x-logging` anchor) and sets a memory limit with `mem_limit` (db `1g`, backend `768m`, frontend `512m`), so a chatty or leaking container cannot fill the host disk or memory. `mem_limit` is the Compose spec key applied by plain `docker compose up -d` without swarm; `docker compose -f docker-compose.prod.yml config` shows it in the rendered config. The limits take effect when `up -d` recreates the containers; a container that reaches its limit is OOM-killed and comes back through `restart: unless-stopped`, so check `docker inspect --format '{{.State.OOMKilled}}' <container>` after a restart.
 

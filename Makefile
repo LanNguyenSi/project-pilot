@@ -42,6 +42,24 @@ db-generate:
 db-push:
 	cd backend && npx prisma db push
 
+# Manual fallback for the relay deploy: same steps as `.relay.yml`
+# (pull, build/up, `prisma db push` without a data-loss flag, health wait).
+# A destructive schema change makes the push fail and the deploy exit non-zero.
+HEALTH_TRIES ?= 30
+HEALTH_INTERVAL ?= 2
+
 deploy:
+	@case "$(HEALTH_TRIES)" in ''|*[!0-9]*|0*) echo "deploy: HEALTH_TRIES must be a positive integer, got '$(HEALTH_TRIES)'" >&2; exit 2;; esac; \
+	case "$(HEALTH_INTERVAL)" in ''|*[!0-9]*|0*) echo "deploy: HEALTH_INTERVAL must be a positive integer, got '$(HEALTH_INTERVAL)'" >&2; exit 2;; esac
 	git pull
 	docker compose -f docker-compose.prod.yml up --build -d
+	docker compose -f docker-compose.prod.yml exec -T -e HOME=/tmp backend npx prisma db push --schema=prisma/schema.prisma
+	@i=0; \
+	until docker compose -f docker-compose.prod.yml exec -T backend wget -q --spider http://localhost:3001/api/health; do \
+		i=$$((i+1)); \
+		if [ $$i -ge $(HEALTH_TRIES) ]; then \
+			echo "deploy failed: /api/health still failing after $(HEALTH_TRIES) attempts, $(HEALTH_INTERVAL)s apart" >&2; exit 1; \
+		fi; \
+		sleep $(HEALTH_INTERVAL); \
+	done; \
+	echo "deploy ok: backend healthy"
