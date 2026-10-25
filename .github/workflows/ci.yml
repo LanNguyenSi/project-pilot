@@ -134,14 +134,18 @@ jobs:
           SESSION_SECRET: dummy
         run: |
           vol() {
-            docker compose "$@" config --format json | jq -r '.volumes.pgdata.name'
+            # Resolve the volume the db service actually mounts, not a fixed key,
+            # so renaming the volume key cannot make the guard pass vacuously.
+            docker compose "$@" config --format json | jq -r '
+              [.services.db.volumes[]? | select(.type == "volume") | .source] as $src
+              | if ($src | length) == 1 then (.volumes[$src[0]].name // "") else "" end'
           }
           check() {
             label="$1"; shift
             dev=$(vol -f docker-compose.yml "$@")
             prod=$(vol -f docker-compose.prod.yml)
             echo "$label: dev=$dev prod=$prod"
-            if [ -z "$dev" ] || [ -z "$prod" ] || [ "$dev" = "$prod" ]; then
+            if [ -z "$dev" ] || [ -z "$prod" ] || [ "$dev" = null ] || [ "$prod" = null ] || [ "$dev" = "$prod" ]; then
               echo "dev and prod pgdata volume names must be set and differ ($label)" >&2
               exit 1
             fi
