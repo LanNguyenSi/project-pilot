@@ -132,27 +132,40 @@ jobs:
         env:
           POSTGRES_PASSWORD: dummy
           SESSION_SECRET: dummy
+          PROJECT_FORGE_URL: http://forge.invalid
+          AGENT_TASKS_URL: http://tasks.invalid
+          DEPLOY_PANEL_URL: http://deploy.invalid
         run: |
-          vol() {
-            # Resolve the volume the db service actually mounts, not a fixed key,
-            # so renaming the volume key cannot make the guard pass vacuously.
-            docker compose "$@" config --format json | jq -r '
+          # Render each file once, with every compose profile enabled so no
+          # profile-gated service is left out, and run all checks on that one
+          # render. A failed render or a jq error fails the step.
+          render() {
+            docker compose "$@" --profile '*' config --format json
+          }
+          # Name of the volume the db service mounts (not a fixed key).
+          db_volume() {
+            jq -r '
               [.services.db.volumes[]? | select(.type == "volume") | .source] as $src
               | if ($src | length) == 1 then (.volumes[$src[0]].name // "") else "" end'
           }
           check() {
             label="$1"; shift
-            dev=$(vol -f docker-compose.yml "$@")
-            prod=$(vol -f docker-compose.prod.yml)
+            dev_json=$(render -f docker-compose.yml "$@")
+            prod_json=$(render -f docker-compose.prod.yml)
+            dev=$(printf '%s' "$dev_json" | db_volume)
+            prod=$(printf '%s' "$prod_json" | db_volume)
             echo "$label: dev=$dev prod=$prod"
             if [ -z "$dev" ] || [ -z "$prod" ] || [ "$dev" = null ] || [ "$prod" = null ] || [ "$dev" = "$prod" ]; then
               echo "dev and prod pgdata volume names must be set and differ ($label)" >&2
               exit 1
             fi
-            # No dev service may mount any volume carrying the production name.
-            if docker compose -f docker-compose.yml "$@" config --format json \
-                | jq -e --arg p "$prod" '[.volumes[]?.name] | index($p)' >/dev/null; then
-              echo "a dev volume is named like the production volume $prod ($label)" >&2
+            # No dev service, in any profile, may mount a volume carrying the
+            # production name. jq exits 0 on a match, 1 on none; anything else
+            # is an error and fails too.
+            rc=0
+            printf '%s' "$dev_json" | jq -e --arg p "$prod" '[.volumes[]?.name] | index($p)' >/dev/null || rc=$?
+            if [ "$rc" -ne 1 ]; then
+              echo "a dev volume is named like the production volume $prod, or the check failed (jq exit $rc, $label)" >&2
               exit 1
             fi
           }
