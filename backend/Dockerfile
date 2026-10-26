@@ -5,7 +5,7 @@ FROM node:22-alpine AS builder
 # openssl must be present before `npm ci`: @prisma/engines downloads the CLI
 # query and schema engines in its postinstall for the openssl version it
 # detects. The runner has openssl 3; without it here the engines copied into
-# the image target openssl 1.1 and every new container would fetch the
+# the image target openssl 1.1 and every schema step would fetch the
 # openssl-3.0.x engines from binaries.prisma.sh before `prisma db push`.
 RUN apk add --no-cache openssl
 WORKDIR /app
@@ -40,7 +40,7 @@ RUN apk add --no-cache openssl
 WORKDIR /app/backend
 
 # node_modules holds the backend's production dependencies only. The prisma CLI
-# the start command needs is already among them: the lockfile marks prisma and
+# the schema step (`prisma db push`, run in this image) needs is already among them: the lockfile marks prisma and
 # @prisma/engines devOptional (optional peer of @prisma/client), which
 # `--omit=dev` keeps. Copying both from the builder guards against a lockfile
 # where that is no longer so; the copy that adds something today is `.prisma`,
@@ -58,4 +58,8 @@ EXPOSE 3001
 HEALTHCHECK --interval=30s --timeout=3s --start-period=15s \
   CMD wget --no-verbose --tries=1 --spider http://localhost:3001/api/health || exit 1
 
-CMD ["sh", "-c", "npx prisma db push --skip-generate && node dist/server.js"]
+# The container only starts the server. It never changes the schema: that is a
+# separate, explicit step (the relay post_update in .relay.yml in production,
+# the migrate service in docker-compose.yml for local development), so a
+# restart needs no push and two containers never push DDL at the same time.
+CMD ["node", "dist/server.js"]

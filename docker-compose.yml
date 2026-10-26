@@ -25,13 +25,34 @@ services:
       timeout: 3s
       retries: 5
 
+  # One-shot schema step. The backend image only starts the server, so the
+  # development stack applies the schema here, once per `docker compose up`,
+  # before the backend starts (a failed push keeps the backend from starting).
+  # It uses the backend image and no data-loss flag; production applies the
+  # schema in the relay post_update step instead (see docs/configuration.md).
+  migrate:
+    image: project-pilot-dev-backend
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    command: ["npx", "prisma", "db", "push", "--skip-generate", "--schema=prisma/schema.prisma"]
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://project_pilot:project_pilot@db:5432/project_pilot
+
   backend:
+    image: project-pilot-dev-backend
     build:
       context: .
       dockerfile: backend/Dockerfile
     depends_on:
       db:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     environment:
       DATABASE_URL: postgresql://project_pilot:project_pilot@db:5432/project_pilot
       SESSION_SECRET: dev-credential-key-change-me
