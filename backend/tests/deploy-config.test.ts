@@ -60,3 +60,20 @@ describe("production schema step", () => {
     expect(backend).not.toMatch(/^\s{4}(command|entrypoint):/m);
   });
 });
+
+describe("dev compose schema step", () => {
+  const dev = code(read("docker-compose.yml"));
+  const service = (name: string) =>
+    dev.split(new RegExp(`^\\s{2}${name}:`, "m"))[1]?.split(/^\s{2}\S[^:]*:\s*$/m)[0] ?? "";
+
+  it("has a one-shot migrate service that runs prisma db push", () => {
+    const migrate = service("migrate");
+    expect(migrate).toMatch(/prisma["',\s]+db["',\s]+push/);
+    expect(migrate).toMatch(/^\s{4}restart:\s*"?no"?/m);
+  });
+
+  it("starts the backend only after migrate completed successfully", () => {
+    const backend = service("backend");
+    expect(backend).toMatch(/^\s{6}migrate:\s*\n\s{8}condition:\s*service_completed_successfully/m);
+  });
+});

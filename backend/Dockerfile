@@ -40,8 +40,8 @@ RUN apk add --no-cache openssl
 WORKDIR /app/backend
 
 # node_modules holds the backend's production dependencies only. The prisma CLI
-# the schema step (`prisma db push`, run in this image) needs is already among them: the lockfile marks prisma and
-# @prisma/engines devOptional (optional peer of @prisma/client), which
+# the schema step (`prisma db push`, run in this image) needs is already among
+# them: the lockfile marks prisma and @prisma/engines devOptional (optional peer of @prisma/client), which
 # `--omit=dev` keeps. Copying both from the builder guards against a lockfile
 # where that is no longer so; the copy that adds something today is `.prisma`,
 # the client generated in the builder.
