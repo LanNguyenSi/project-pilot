@@ -81,7 +81,7 @@ sequenceDiagram
 
 ## Data model
 
-The Prisma schema (`backend/prisma/schema.prisma`) is applied with `prisma db push`; the repository has no migrations directory.
+The Prisma schema (`backend/prisma/schema.prisma`) is applied with `prisma db push`; the repository has no migrations directory. The backend image does not apply it on start: production applies it in the relay `post_update` step, the development compose stack in its `migrate` service.
 
 - `User`: a local email/password account, a GitHub identity, or both.
 - `Session`: hashed session token, valid for 30 days.
