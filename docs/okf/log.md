@@ -2,6 +2,12 @@
 
 <!-- Add new entries at the top, newest first. -->
 
+- 2026-10-26T13:53:12Z, request-gating-and-sessions re-verified and re-stamped after the CSP
+  moved into `frontend/src/lib/csp.ts`: `connect-src` adds the http(s) origin of
+  `NEXT_PUBLIC_API_URL`; the `next.config.ts` and `csp.ts` citations were re-pointed.
+  The route files changed by the zod 4 migration (auth, credentials, forge, tasks,
+  deploy) were re-read against the doc: CSRF per prefix, `requireAuth` per router,
+  the four auth rate limits and the session claims still hold.
 - 2026-10-25T06:19:11Z, credential-trust-boundary re-verified and re-stamped after the review
   fix of the production config check: an empty service URL now counts as unset
   before parsing as well, and the paragraph on who receives GitHub tokens says

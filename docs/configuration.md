@@ -92,7 +92,7 @@ Email delivery for the reset link is on the roadmap, not yet wired. Only the SHA
 
 ## Security headers
 
-The backend always emits `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, and `Referrer-Policy: strict-origin-when-cross-origin`, and adds `Strict-Transport-Security` in production (`NODE_ENV=production`). The frontend emits the `Content-Security-Policy` header on every response, regardless of `NODE_ENV`.
+The backend always emits `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, and `Referrer-Policy: strict-origin-when-cross-origin`, and adds `Strict-Transport-Security` in production (`NODE_ENV=production`). The frontend emits the `Content-Security-Policy` header on every response, regardless of `NODE_ENV`: `next start` sends it and `next dev` sends it too (verified with Next.js 15: `next dev` applies the `headers()` from `frontend/next.config.ts`). Its `connect-src` allows `'self'` plus the origin of `NEXT_PUBLIC_API_URL`, the same value and default (`http://localhost:3001`) the browser calls in `frontend/src/lib/api.ts`, so the dev setup's cross-origin API calls pass; an unparseable `NEXT_PUBLIC_API_URL` adds nothing and leaves `connect-src` at `'self'` only. Like the other `NEXT_PUBLIC_*` values, that origin is fixed when the frontend is built, so changing it takes a rebuild (or a dev server restart, see [Frontend](#frontend-frontendenv)).
 
 Session, CSRF, rate-limit and CORS rules for API requests are listed in [api.md](api.md#authentication-and-request-rules).
 

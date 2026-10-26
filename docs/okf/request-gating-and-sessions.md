@@ -3,7 +3,7 @@ type: invariant
 title: Request gating and session model
 description: Global CORS and security headers, CSRF registered per route prefix in app.ts, requireAuth registered per router, opaque hashed session tokens with SameSite Strict for password sign-in and Lax for GitHub sign-in, per-process rate limits on four public auth endpoints keyed on the last X-Forwarded-For entry, and a CSP that only the frontend sets.
 tags: [auth, sessions, csrf, cors, rate-limit, headers, csp]
-timestamp: 2026-10-24T14:13:19Z
+timestamp: 2026-10-26T13:53:12Z
 sources:
   - backend/src/app.ts
   - backend/src/middleware/auth.ts
@@ -21,6 +21,7 @@ sources:
   - backend/src/routes/deploy.ts
   - backend/src/services/auth.ts
   - frontend/src/lib/api.ts
+  - frontend/src/lib/csp.ts
   - frontend/next.config.ts
 ---
 
@@ -158,13 +159,19 @@ backend instance keeps its own
 
 The backend sets no `Content-Security-Policy`. The frontend's Next config
 sends one on every path
-(`frontend/next.config.ts:24-27#"Content-Security-Policy"`). Its `frame-src`
+(`frontend/next.config.ts:11-16#"Content-Security-Policy"`). Its
+`connect-src` lists `'self'` plus the origin (never a path, never a
+wildcard) of `NEXT_PUBLIC_API_URL`, the same value and default
+`http://localhost:3001` that `frontend/src/lib/api.ts` calls, so the
+browser can reach the API in dev; an unparseable or non-http(s) value adds nothing and
+the string is built in a pure function
+(`frontend/src/lib/csp.ts:23-27#"DEFAULT_API_URL"`). Its `frame-src`
 lists the module origins pilot embeds as iframes, built from
-`NEXT_PUBLIC_DEPSIGHT_URL` (`frontend/next.config.ts:7-9#"].join("`), and
+`NEXT_PUBLIC_DEPSIGHT_URL` (`frontend/src/lib/csp.ts:35-37#"].join("`), and
 `frame-ancestors 'none'` forbids framing pilot itself
-(`frontend/next.config.ts:18-19#"frame-ancestors 'none'"`). A new embedded
+(`frontend/src/lib/csp.ts:52-53#"frame-ancestors 'none'"`). A new embedded
 module has to be added to that list
-(`frontend/next.config.ts:3-6#"to forbid anyone else from framing project-pilot."`).
+(`frontend/src/lib/csp.ts:4-7#"to forbid anyone else from framing project-pilot."`).
 
 ## What breaks these invariants
 
