@@ -43,6 +43,11 @@ describe("buildCsp connect-src", () => {
   it("keeps only 'self' for an unparseable value and does not throw", () => {
     expect(connectSrc({ NEXT_PUBLIC_API_URL: "not a url" })).toBe("connect-src 'self'");
   });
+
+  it("keeps only 'self' for a value without an http(s) scheme", () => {
+    expect(connectSrc({ NEXT_PUBLIC_API_URL: "localhost:3001" })).toBe("connect-src 'self'");
+    expect(connectSrc({ NEXT_PUBLIC_API_URL: "file:///tmp/api" })).toBe("connect-src 'self'");
+  });
 });
 
 describe("buildCsp other directives", () => {

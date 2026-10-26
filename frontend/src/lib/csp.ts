@@ -17,12 +17,15 @@ export interface CspEnv {
   NEXT_PUBLIC_DEPSIGHT_URL?: string;
 }
 
-// ORIGIN (scheme://host[:port]) of an API URL, or undefined when the value
-// cannot be parsed (then connect-src keeps only 'self', and the build never
-// crashes). Never a wildcard, never a path.
+// ORIGIN (scheme://host[:port]) of an http or https API URL, or undefined
+// when the value cannot be parsed or is not http(s) (then connect-src keeps
+// only 'self', and the build never crashes). A value without a scheme such
+// as `localhost:3001` parses with the scheme `localhost:` and the origin
+// "null", so it is refused too. Never a wildcard, never a path.
 function apiOrigin(raw: string | undefined): string | undefined {
   try {
-    return new URL(raw || DEFAULT_API_URL).origin;
+    const url = new URL(raw || DEFAULT_API_URL);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.origin : undefined;
   } catch {
     return undefined;
   }
