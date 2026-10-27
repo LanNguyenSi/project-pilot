@@ -80,8 +80,9 @@ phys_repo="$(cd "$REPO_ROOT" && pwd -P)"
 
 # The dev stack (docker-compose.yml) has its own throwaway database; backing it up
 # (or, in restore.sh, replacing it) from a production script is always a mistake.
+# The -ef test also catches a file symlink or hardlink to it; a copy is not caught.
 phys_compose="$(cd "$(dirname "$COMPOSE_FILE")" && pwd -P)/$(basename "$COMPOSE_FILE")"
-[ "$phys_compose" != "$phys_repo/docker-compose.yml" ] \
+[ "$phys_compose" != "$phys_repo/docker-compose.yml" ] && [ ! "$COMPOSE_FILE" -ef "$REPO_ROOT/docker-compose.yml" ] \
   || refuse "$COMPOSE_FILE is the development stack; this script only handles docker-compose.prod.yml"
 
 # A dump inside the checkout would block the next relay deploy (untracked file) and enter

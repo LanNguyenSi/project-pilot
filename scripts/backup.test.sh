@@ -448,10 +448,15 @@ done
   run_backup "$d" BACKUP_COMPOSE_FILE="$REPO/scripts/../docker-compose.yml"; r2=$rc
   ln -sfn "$REPO" "$WORKDIR/repo_link"
   run_backup "$d" BACKUP_COMPOSE_FILE="$WORKDIR/repo_link/docker-compose.yml"; r3=$rc
-  if [ "$r1" = 2 ] && [ "$u1" = 0 ] && [ "$r2" = 2 ] && [ "$r3" = 2 ] && grep -q "development stack" <<< "$out_text" && [ ! -d "$d" ]; then
-    pass "(q) docker-compose.yml (the dev stack) is refused, also via .. and a symlink"
+  ln -sf "$REPO/docker-compose.yml" "$WORKDIR/compose_symlink.yml"
+  run_backup "$d" BACKUP_COMPOSE_FILE="$WORKDIR/compose_symlink.yml"; r4=$rc
+  ln -f "$REPO/docker-compose.yml" "$REPO/.hardlink-compose.yml" || r5=ln-failed
+  [ -n "${r5:-}" ] || { run_backup "$d" BACKUP_COMPOSE_FILE="$REPO/.hardlink-compose.yml"; r5=$rc; }
+  rm -f "$REPO/.hardlink-compose.yml"
+  if [ "$r1" = 2 ] && [ "$u1" = 0 ] && [ "$r2" = 2 ] && [ "$r3" = 2 ] && [ "$r4" = 2 ] && [ "$r5" = 2 ] && grep -q "development stack" <<< "$out_text" && [ ! -d "$d" ]; then
+    pass "(q) docker-compose.yml (the dev stack) is refused, also via .. , a symlink to the directory, a file symlink and a hardlink"
   else
-    fail "(q) dev stack file: $r1 docker=$u1 $r2 $r3"
+    fail "(q) dev stack file: $r1 docker=$u1 $r2 $r3 file-symlink=$r4 hardlink=$r5"
   fi
 }
 

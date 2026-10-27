@@ -84,10 +84,24 @@ run_script() {
     "${envs[@]}" "$REPO_ROOT/scripts/$script" "$@"
 }
 
+# The drill truncates "User" in the source database: refuse anything that looks like the
+# production database. By name, and (once the schema exists) by content: any user whose id
+# does not start with drill- means this is not a scratch database.
+guard_container() { # guard_container <container name>
+  [ "$1" != project-pilot-db ] || fail "refusing to run against the production container project-pilot-db"
+}
+guard_rows() { # guard_rows <database>
+  local n
+  n="$(sql "$1" "SELECT count(*) FROM \"User\" WHERE id NOT LIKE 'drill-%'")"
+  [ "$n" = 0 ] || fail "refusing to seed: database $1 holds $n user(s) that are not drill rows"
+}
+guard_container "$DRILL_PG_CONTAINER"
+
 echo "drill: applying the schema like a deploy (prisma db push)"
 cd "$REPO_ROOT/backend"
 DATABASE_URL="$DRILL_DATABASE_URL" HOME="$WORK" npx prisma db push --skip-generate --schema=prisma/schema.prisma
 
+guard_rows "$SRC_DB"
 echo "drill: seeding"
 sql "$SRC_DB" 'TRUNCATE "User" CASCADE' > /dev/null
 sql "$SRC_DB" "INSERT INTO \"User\" (id, email, name, \"updatedAt\") VALUES
@@ -181,8 +195,10 @@ expect "credentials after the vanished-copy restore" "$(sql "$DST_DB" 'SELECT co
 [ -z "$(find "$WORK/tmp" -mindepth 1)" ] || fail "temporary copy of the dump was left behind"
 
 echo "drill: backup.sh must not publish a truncated dump"
-# backup.sh validates by reading the archive completely; feed the validator the
-# truncated file through a shim whose pg_dump output is cut short.
+# backup.sh validates by reading the archive completely; feed the validator a real dump
+# cut 20 bytes short (inside the data section, so the table of contents still lists
+# fine and only a full read notices) through a shim whose pg_dump output is cut short.
+CUT=$((size - 20))
 mkdir -p "$WORK/shortbin"
 cat > "$WORK/shortbin/docker" <<SHIM
 #!/usr/bin/env bash
@@ -195,7 +211,7 @@ if [ "\$1" = compose ] && [ "\$2" = -f ]; then
       [ "\$1" = -T ] && shift
       shift # service name
       case "\$*" in
-        *pg_dump*) "$REAL_DOCKER" exec -i "$DRILL_PG_CONTAINER" "\$@" | head -c 3000; exit 0 ;;
+        *pg_dump*) "$REAL_DOCKER" exec -i "$DRILL_PG_CONTAINER" "\$@" | head -c $CUT; exit 0 ;;
       esac
       exec "$REAL_DOCKER" exec -i "$DRILL_PG_CONTAINER" "\$@"
       ;;
@@ -208,10 +224,23 @@ chmod +x "$WORK/shortbin/docker"
 mkdir -p "$WORK/backups2"
 if env PATH="$WORK/shortbin:$PATH" BACKUP_COMPOSE_FILE="$WORK/compose.yml" BACKUP_DIR="$WORK/backups2" PG_DB="$SRC_DB" \
   "$REPO_ROOT/scripts/backup.sh" 2> "$WORK/short.err"; then
-  fail "backup.sh published a dump cut off after 3000 bytes"
+  fail "backup.sh published a dump cut off 20 bytes before its end"
 fi
 [ -z "$(find "$WORK/backups2" -mindepth 1)" ] || fail "backup.sh left files behind after a cut-off dump"
 echo "drill: ok: a cut-off dump is not published"
+
+echo "drill: the scratch-database guards must refuse a production-looking target"
+if ( guard_container project-pilot-db ) 2> "$WORK/guard1.err"; then fail "guard_container accepted project-pilot-db"; fi
+grep -q 'production container' "$WORK/guard1.err" || fail "guard_container failed for another reason: $(cat "$WORK/guard1.err")"
+sql "$SRC_DB" "INSERT INTO \"User\" (id, email, name, \"updatedAt\") VALUES ('real-1', 'real@example.invalid', 'real user', now())" > /dev/null
+if ( guard_rows "$SRC_DB" ) 2> "$WORK/guard2.err"; then
+  sql "$SRC_DB" "DELETE FROM \"User\" WHERE id = 'real-1'" > /dev/null
+  fail "guard_rows accepted a database holding a non-drill user"
+fi
+sql "$SRC_DB" "DELETE FROM \"User\" WHERE id = 'real-1'" > /dev/null
+grep -q 'not drill rows' "$WORK/guard2.err" || fail "guard_rows failed for another reason: $(cat "$WORK/guard2.err")"
+guard_rows "$SRC_DB"
+echo "drill: ok: production-looking targets are refused"
 
 sql postgres "DROP DATABASE $DST_DB" > /dev/null
 echo "drill: PASSED"

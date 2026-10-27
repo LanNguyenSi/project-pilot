@@ -72,4 +72,4 @@ backup:
 
 # Destructive. make restore FILE=<dump> CONFIRM=yes [NO_PRE_BACKUP=yes]
 restore:
-	scripts/restore.sh $(if $(filter yes,$(CONFIRM)),--yes) $(if $(filter yes,$(NO_PRE_BACKUP)),--no-pre-backup) $(FILE)
+	scripts/restore.sh $(if $(filter yes,$(CONFIRM)),--yes) $(if $(filter yes,$(NO_PRE_BACKUP)),--no-pre-backup) $(if $(FILE),"$(FILE)")
