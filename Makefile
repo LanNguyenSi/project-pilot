@@ -1,4 +1,4 @@
-.PHONY: install setup dev dev-full dev-backend dev-frontend build clean docker-up docker-down db-generate db-push deploy
+.PHONY: install setup dev dev-full dev-backend dev-frontend build clean docker-up docker-down db-generate db-push deploy backup restore
 
 install:
 	npm install
@@ -63,3 +63,13 @@ deploy:
 		sleep $(HEALTH_INTERVAL); \
 	done; \
 	echo "deploy ok: backend healthy"
+
+# Backup and restore of the production database (docker-compose.prod.yml), run in the
+# checkout on the production host. Dumps go to $HOME/project-pilot-backups by default,
+# never into the checkout. See docs/configuration.md, "Backup and restore".
+backup:
+	scripts/backup.sh
+
+# Destructive. make restore FILE=<dump> CONFIRM=yes [NO_PRE_BACKUP=yes]
+restore:
+	scripts/restore.sh $(if $(filter yes,$(CONFIRM)),--yes) $(if $(filter yes,$(NO_PRE_BACKUP)),--no-pre-backup) $(FILE)

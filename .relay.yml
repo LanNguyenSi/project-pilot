@@ -7,6 +7,10 @@ post_update:
   # data (dropping a non-empty column or table, adding a UNIQUE constraint over
   # duplicate values) makes the push exit non-zero, so this step and the deploy
   # fail and nothing is dropped. Apply such a change deliberately by hand, with
-  # a database backup first (see docs/configuration.md).
+  # a database backup first (`make backup`; see "Backup and restore" in
+  # docs/configuration.md).
   - docker compose -f docker-compose.prod.yml exec -e HOME=/tmp backend npx prisma db push --schema=prisma/schema.prisma
+# rollback restores the code only: schema changes and rows already written stay in
+# the database. Restoring data needs a dump (see "Backup and restore" in
+# docs/configuration.md).
 rollback: true
