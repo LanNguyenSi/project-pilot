@@ -12,7 +12,7 @@ REPO="$(cd "$SCRIPT_DIR/.." && pwd)"
 unset BACKUP_DIR BACKUP_COMPOSE_FILE BACKUP_DB_SERVICE BACKUP_SKIP_ROTATION BACKUP_OFFHOST_HOOK KEEP_FILES KEEP_DAYS PG_USER PG_DB
 
 WORKDIR="$(mktemp -d)"
-trap 'rm -rf "$WORKDIR"' EXIT
+trap 'rm -rf "$WORKDIR"; rm -f "$REPO/.hardlink-compose.yml"' EXIT
 FAKE_BIN="$WORKDIR/bin"
 mkdir -p "$FAKE_BIN"
 
