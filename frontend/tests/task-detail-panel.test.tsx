@@ -95,6 +95,19 @@ describe("TaskDetailPanel", () => {
     expect(screen.queryByText("First")).not.toBeInTheDocument();
   });
 
+  it("clears a previous error when switching task", async () => {
+    const { rerender } = render(<TaskDetailPanel taskId="t1" open onClose={() => {}} />);
+    await act(async () => {
+      pending["t1"](Promise.reject(new Error("boom")));
+    });
+    expect(await screen.findByText("boom")).toBeInTheDocument();
+    rerender(<TaskDetailPanel taskId="t2" open onClose={() => {}} />);
+    expect(screen.queryByText("boom")).not.toBeInTheDocument();
+    await settle("t2", "Second");
+    expect(screen.getByRole("heading", { level: 2, name: "Second" })).toBeInTheDocument();
+    expect(screen.queryByText("boom")).not.toBeInTheDocument();
+  });
+
   it("shows the error and clears loading when the fetch fails", async () => {
     render(<TaskDetailPanel taskId="t1" open onClose={() => {}} />);
     mocked.mockReset();

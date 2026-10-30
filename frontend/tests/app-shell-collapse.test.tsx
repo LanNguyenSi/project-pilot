@@ -86,6 +86,18 @@ describe("AppShell collapsed flag", () => {
     expect(screen.getByRole("button")).toHaveTextContent("collapsed");
   });
 
+  it("removes its storage listener on unmount", () => {
+    const addSpy = vi.spyOn(window, "addEventListener");
+    const removeSpy = vi.spyOn(window, "removeEventListener");
+    const { unmount } = render(<AppShell>content</AppShell>);
+    const added = addSpy.mock.calls.find(([type]) => type === "storage");
+    expect(added).toBeDefined();
+    unmount();
+    expect(removeSpy).toHaveBeenCalledWith("storage", added![1]);
+    addSpy.mockRestore();
+    removeSpy.mockRestore();
+  });
+
   it("server-renders the expanded layout even when true is stored", () => {
     localStorage.setItem(KEY, "true");
     const html = renderToString(<AppShell>content</AppShell>);
