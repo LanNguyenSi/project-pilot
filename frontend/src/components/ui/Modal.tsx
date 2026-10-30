@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useId, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "./Button";
 import { useFocusTrap } from "./useFocusTrap";
+import { useMounted } from "./useMounted";
 
 interface ModalProps {
   open: boolean;
@@ -30,17 +31,14 @@ export function Modal({ open, onClose, children, title, showClose, size = "md" }
   const titleId = useId();
   const closeVisible = showClose ?? title != null;
 
-  // Only portal after mount so the server render and the first client render agree
-  // (both null). This avoids a hydration mismatch for a modal open on first paint
-  // and, critically, prevents touching document.body during SSR / static prerender
-  // where `document` is undefined.
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  // Only portal once mounted: the modal renders null during SSR and the hydration
+  // pass, then the client renders it. This avoids a hydration mismatch for a modal
+  // open on first paint and, critically, prevents touching document.body during
+  // SSR / static prerender where `document` is undefined.
+  const mounted = useMounted();
 
   // Gate the focus trap on `mounted` too, so it only activates once the panel
-  // actually exists (a conditionally-mounted `<Modal open .../>` would otherwise try
-  // to trap focus one tick before the panel renders). No-op for always-mounted
-  // consumers, where `mounted` is already true before `open` flips.
+  // exists (it renders null during SSR and the hydration pass).
   useFocusTrap(panelRef, open && mounted, onClose);
 
   // Render into document.body so the dialog's `fixed` positioning is relative to

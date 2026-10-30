@@ -25,3 +25,4 @@ export { FilterBar, PillToggleGroup } from "./FilterBar";
 export { Icon } from "./icons";
 export type { IconName } from "./icons";
 export { useFocusTrap } from "./useFocusTrap";
+export { useMounted } from "./useMounted";

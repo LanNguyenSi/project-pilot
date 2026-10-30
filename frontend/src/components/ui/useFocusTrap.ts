@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useCallback, useRef } from "react";
+import { useEffect, useLayoutEffect, useCallback, useRef } from "react";
 
 const FOCUSABLE_SELECTOR =
   'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
@@ -21,7 +21,11 @@ export function useFocusTrap(
   onClose: () => void,
 ) {
   const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
+  // Keep the latest onClose without re-subscribing the keydown listener.
+  // A layout effect runs in the commit, before the browser can dispatch a key event.
+  useLayoutEffect(() => {
+    onCloseRef.current = onClose;
+  });
 
   const handleKey = useCallback((e: KeyboardEvent) => {
     if (e.key === "Escape") {

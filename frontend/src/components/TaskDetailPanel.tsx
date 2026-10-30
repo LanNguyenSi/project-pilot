@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, useId } from "react";
 import { createPortal } from "react-dom";
 import { apiFetch } from "@/lib/api";
-import { Badge, Card, ErrorBanner, Icon, SkeletonBox, useFocusTrap } from "@/components/ui";
+import { Badge, Card, ErrorBanner, Icon, SkeletonBox, useFocusTrap, useMounted } from "@/components/ui";
 import { statusMap, priorityMap } from "@/lib/task-constants";
 
 interface TemplateData {
@@ -78,18 +78,27 @@ export function TaskDetailPanel({ taskId, open, onClose }: TaskDetailPanelProps)
   // rather than scoped to AppShell's <main>, which keeps a persistent transform from
   // animate-fade-in (fill-mode: both). Inline, that transform trapped the overlay in
   // <main>'s box: the backdrop did not cover the sidebar and the panel could not
-  // scroll to the bottom. The mounted flag keeps server + first client render null
-  // (no hydration mismatch, no document.body access during prerender).
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  // scroll to the bottom. The mounted flag keeps the panel null during SSR and the
+  // hydration pass (no hydration mismatch, no document.body access during prerender).
+  const mounted = useMounted();
 
   useFocusTrap(panelRef, open && mounted, onClose);
 
+  // Reset to the loading state during render when the loaded task changes or
+  // the panel (re)opens, so the skeleton shows instead of the previous task.
+  const loadKey = open && taskId ? taskId : null;
+  const [prevLoadKey, setPrevLoadKey] = useState<string | null>(null);
+  if (loadKey !== prevLoadKey) {
+    setPrevLoadKey(loadKey);
+    if (loadKey) {
+      setLoading(true);
+      setError("");
+      setTask(null);
+    }
+  }
+
   useEffect(() => {
     if (!open || !taskId) return;
-    setLoading(true);
-    setError("");
-    setTask(null);
 
     Promise.all([
       apiFetch<{ task: TaskDetail }>(`/api/tasks/${encodeURIComponent(taskId)}`),

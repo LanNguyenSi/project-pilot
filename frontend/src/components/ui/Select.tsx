@@ -48,13 +48,22 @@ export function Select({
     }
   }, []);
 
+  // Re-sync the highlighted option while open whenever the popover opens or the
+  // options or value change (adjust state during render, not in an effect).
+  const [synced, setSynced] = useState<{ open: boolean; options: typeof options; value: typeof value } | null>(null);
+  if (open && (!synced || !synced.open || synced.options !== options || synced.value !== value)) {
+    setSynced({ open, options, value });
+    setActiveIndex(options.findIndex((o) => o.value === value));
+  } else if (!open && synced && synced.open) {
+    setSynced({ open, options, value });
+  }
+
   useEffect(() => {
     if (open) {
       document.addEventListener("mousedown", handleClickOutside);
-      setActiveIndex(options.findIndex((o) => o.value === value));
       return () => document.removeEventListener("mousedown", handleClickOutside);
     }
-  }, [open, handleClickOutside, options, value]);
+  }, [open, handleClickOutside]);
 
   function handleKeyDown(e: React.KeyboardEvent) {
     if (disabled) return;

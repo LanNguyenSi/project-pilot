@@ -465,6 +465,29 @@ describe("InstallRelayWizard", () => {
     });
   });
 
+  describe("close mid-flow", () => {
+    it("aborts the in-flight install request and returns to the form when open turns false", async () => {
+      const user = userEvent.setup();
+      let capturedSignal: AbortSignal | undefined;
+      fetchMock.mockImplementationOnce((_url: string, init?: RequestInit) => {
+        capturedSignal = init?.signal ?? undefined;
+        return new Promise<never>(() => {});
+      });
+
+      const { rerender } = render(<InstallRelayWizard open onClose={noop} onSuccess={noop} />);
+      fillRequiredFields();
+      await user.click(screen.getByRole("button", { name: /skip & install/i }));
+      await waitFor(() => expect(screen.getByText(/installing relay/i)).toBeInTheDocument());
+      expect(capturedSignal?.aborted).toBe(false);
+
+      rerender(<InstallRelayWizard open={false} onClose={noop} onSuccess={noop} />);
+
+      expect(capturedSignal?.aborted).toBe(true);
+      rerender(<InstallRelayWizard open onClose={noop} onSuccess={noop} />);
+      expect(screen.queryByText(/installing relay/i)).not.toBeInTheDocument();
+    });
+  });
+
   describe("abort controller cleanup after install", () => {
     it("does not abort a finished install request when the wizard is unmounted afterwards", async () => {
       const user = userEvent.setup();
