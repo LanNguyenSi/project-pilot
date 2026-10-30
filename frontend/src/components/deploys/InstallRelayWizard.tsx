@@ -71,7 +71,11 @@ export function InstallRelayWizard({ open, onClose, onSuccess }: InstallRelayWiz
   const abortRef = useRef<AbortController | null>(null);
 
   // Reset all state (including sensitive fields) whenever the modal closes.
-  useEffect(() => {
+  // The state reset runs during render when `open` changes (adjust state on a
+  // prop change); the abort of an in-flight stream stays in an effect.
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (prevOpen !== open) {
+    setPrevOpen(open);
     if (!open) {
       setForm((f) => ({ ...f, sshPassword: "", sshPrivateKey: "", sshPassphrase: "" }));
       setStep("form");
@@ -81,10 +85,12 @@ export function InstallRelayWizard({ open, onClose, onSuccess }: InstallRelayWiz
       setFormError("");
       setProbeResult(null);
       setProbedHostKey(undefined);
-      if (abortRef.current) {
-        abortRef.current.abort();
-        abortRef.current = null;
-      }
+    }
+  }
+  useEffect(() => {
+    if (!open && abortRef.current) {
+      abortRef.current.abort();
+      abortRef.current = null;
     }
   }, [open]);
 

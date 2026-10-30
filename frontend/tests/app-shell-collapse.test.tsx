@@ -4,7 +4,7 @@
 // written back on toggle. Runs under jsdom (see vitest.config.ts).
 import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { renderToString } from "react-dom/server";
 
 vi.mock("next/navigation", () => ({ usePathname: () => "/dashboard" }));
@@ -62,6 +62,27 @@ describe("AppShell collapsed flag", () => {
     fireEvent.click(button);
     unmount();
     render(<AppShell>content</AppShell>);
+    expect(screen.getByRole("button")).toHaveTextContent("collapsed");
+  });
+
+  it("two toggles in one batch land on the value two flips away", () => {
+    render(<AppShell>content</AppShell>);
+    const button = screen.getByRole("button");
+    act(() => {
+      button.click();
+      button.click();
+    });
+    expect(localStorage.getItem(KEY)).toBe("false");
+    expect(button).toHaveTextContent("expanded");
+  });
+
+  it("follows a storage event from another tab", () => {
+    render(<AppShell>content</AppShell>);
+    expect(screen.getByRole("button")).toHaveTextContent("expanded");
+    act(() => {
+      localStorage.setItem(KEY, "true");
+      window.dispatchEvent(new StorageEvent("storage", { key: KEY }));
+    });
     expect(screen.getByRole("button")).toHaveTextContent("collapsed");
   });
 

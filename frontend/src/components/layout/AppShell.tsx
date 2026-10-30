@@ -15,8 +15,14 @@ const COLLAPSED_KEY = "sidebar-collapsed";
 const collapsedListeners = new Set<() => void>();
 function subscribeCollapsed(listener: () => void) {
   collapsedListeners.add(listener);
+  // Another tab writing the key re-renders this one too.
+  const onStorage = (e: StorageEvent) => {
+    if (e.key === COLLAPSED_KEY || e.key === null) listener();
+  };
+  window.addEventListener("storage", onStorage);
   return () => {
     collapsedListeners.delete(listener);
+    window.removeEventListener("storage", onStorage);
   };
 }
 function readCollapsed() {
@@ -39,7 +45,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   function toggleCollapsed() {
-    localStorage.setItem(COLLAPSED_KEY, String(!collapsed));
+    localStorage.setItem(COLLAPSED_KEY, String(!readCollapsed()));
     collapsedListeners.forEach((listener) => listener());
   }
 
