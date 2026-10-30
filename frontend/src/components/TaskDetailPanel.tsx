@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, useId } from "react";
 import { createPortal } from "react-dom";
 import { apiFetch } from "@/lib/api";
-import { Badge, Card, ErrorBanner, Icon, SkeletonBox, useFocusTrap } from "@/components/ui";
+import { Badge, Card, ErrorBanner, Icon, SkeletonBox, useFocusTrap, useMounted } from "@/components/ui";
 import { statusMap, priorityMap } from "@/lib/task-constants";
 
 interface TemplateData {
@@ -80,8 +80,7 @@ export function TaskDetailPanel({ taskId, open, onClose }: TaskDetailPanelProps)
   // <main>'s box: the backdrop did not cover the sidebar and the panel could not
   // scroll to the bottom. The mounted flag keeps server + first client render null
   // (no hydration mismatch, no document.body access during prerender).
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  const mounted = useMounted();
 
   useFocusTrap(panelRef, open && mounted, onClose);
 

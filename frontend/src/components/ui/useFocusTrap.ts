@@ -21,7 +21,11 @@ export function useFocusTrap(
   onClose: () => void,
 ) {
   const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
+  // Keep the latest onClose without re-subscribing the keydown listener.
+  // Updated after commit (not during render), which is before any key event.
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
 
   const handleKey = useCallback((e: KeyboardEvent) => {
     if (e.key === "Escape") {

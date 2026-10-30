@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useId, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "./Button";
 import { useFocusTrap } from "./useFocusTrap";
+import { useMounted } from "./useMounted";
 
 interface ModalProps {
   open: boolean;
@@ -34,8 +35,7 @@ export function Modal({ open, onClose, children, title, showClose, size = "md" }
   // (both null). This avoids a hydration mismatch for a modal open on first paint
   // and, critically, prevents touching document.body during SSR / static prerender
   // where `document` is undefined.
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  const mounted = useMounted();
 
   // Gate the focus trap on `mounted` too, so it only activates once the panel
   // actually exists (a conditionally-mounted `<Modal open .../>` would otherwise try

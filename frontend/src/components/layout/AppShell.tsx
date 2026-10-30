@@ -1,12 +1,30 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { usePathname } from "next/navigation";
 import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
 import { AuthProvider } from "@/lib/auth-context";
 
 const COLLAPSED_KEY = "sidebar-collapsed";
+
+// The collapsed flag lives in localStorage. Reading it through
+// useSyncExternalStore keeps the server render and the hydration pass on the
+// expanded layout (server snapshot false) and switches to the stored value
+// right after hydration, as the previous mount effect did.
+const collapsedListeners = new Set<() => void>();
+function subscribeCollapsed(listener: () => void) {
+  collapsedListeners.add(listener);
+  return () => {
+    collapsedListeners.delete(listener);
+  };
+}
+function readCollapsed() {
+  return localStorage.getItem(COLLAPSED_KEY) === "true";
+}
+function readCollapsedOnServer() {
+  return false;
+}
 
 // Routes that embed an external module via iframe and need the full viewport
 // width/height , the default max-w-6xl + px-6 py-6 wrapper letterboxes them.
@@ -17,20 +35,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const fullBleed = FULL_BLEED_ROUTES.some(
     (r) => pathname === r || pathname.startsWith(r + "/"),
   );
-  const [collapsed, setCollapsed] = useState(false);
+  const collapsed = useSyncExternalStore(subscribeCollapsed, readCollapsed, readCollapsedOnServer);
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  useEffect(() => {
-    const stored = localStorage.getItem(COLLAPSED_KEY);
-    if (stored === "true") setCollapsed(true);
-  }, []);
-
   function toggleCollapsed() {
-    setCollapsed((prev) => {
-      const next = !prev;
-      localStorage.setItem(COLLAPSED_KEY, String(next));
-      return next;
-    });
+    localStorage.setItem(COLLAPSED_KEY, String(!collapsed));
+    collapsedListeners.forEach((listener) => listener());
   }
 
   return (
