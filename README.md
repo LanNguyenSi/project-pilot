@@ -27,7 +27,7 @@ project-pilot aggregates three independent services, [project-forge](https://git
 
 ## Quick start
 
-Prerequisites: Node.js >=20, make, Docker with Compose v2 (for the Postgres container).
+Prerequisites: Node.js ^20.19.0, ^22.13.0 or >=24 (the range ESLint 10 supports), make, Docker with Compose v2 (for the Postgres container).
 
 ```bash
 git clone https://github.com/LanNguyenSi/project-pilot.git
