@@ -406,7 +406,7 @@ export default function DeploysPage() {
                     <button
                       onClick={() => void handleTestServer(s)}
                       disabled={testingServerId === s.id}
-                      className="inline-flex items-center gap-1 text-xs text-content-tertiary hover:text-content-primary transition-colors disabled:opacity-50"
+                      className="inline-flex items-center justify-center gap-1 min-h-6 min-w-6 -my-1 text-xs text-content-tertiary hover:text-content-primary transition-colors disabled:opacity-50"
                       aria-label={`Test connection to ${s.name}`}
                       aria-busy={testingServerId === s.id || undefined}
                     >
@@ -417,7 +417,7 @@ export default function DeploysPage() {
                     </button>
                     <button
                       onClick={() => setDeleteServerTarget(s)}
-                      className="text-xs text-content-tertiary hover:text-accent-red transition-colors"
+                      className="inline-flex items-center justify-center min-h-6 min-w-6 -my-1 text-xs text-content-tertiary hover:text-accent-red transition-colors"
                       aria-label={`Delete ${s.name}`}
                     >
                       Delete
