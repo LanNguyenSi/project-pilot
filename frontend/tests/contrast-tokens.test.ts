@@ -55,6 +55,10 @@ describe("globals.css contrast tokens", () => {
   });
 
   it("keeps --content-tertiary visibly dimmer than --content-secondary", () => {
+    // Minimum perceptual gap between the two text tiers (contrast ratio of one
+    // against the other), so the hierarchy cannot collapse unnoticed.
+    const MIN_TIER_GAP = 1.25;
+    expect(contrast(token("content-secondary"), token("content-tertiary"))).toBeGreaterThanOrEqual(MIN_TIER_GAP);
     expect(relLuminance(token("content-tertiary"))).toBeLessThan(
       relLuminance(token("content-secondary")),
     );
@@ -64,5 +68,17 @@ describe("globals.css contrast tokens", () => {
     const white = "#ffffff";
     expect(contrast(white, token("danger-solid"))).toBeGreaterThanOrEqual(AA_TEXT);
     expect(contrast(white, token("danger-solid-hover"))).toBeGreaterThanOrEqual(AA_TEXT);
+  });
+});
+
+describe("@theme maps the tokens the components use", () => {
+  it.each([
+    ["--color-danger-solid", "var(--danger-solid)"],
+    ["--color-danger-solid-hover", "var(--danger-solid-hover)"],
+    ["--color-content-tertiary", "var(--content-tertiary)"],
+  ])("%s: %s", (name, value) => {
+    const theme = css.match(/@theme[^{]*\{([\s\S]*?)\n\}/);
+    expect(theme, "@theme block").not.toBeNull();
+    expect(theme![1]).toMatch(new RegExp(`${name}:\\s*${value.replace(/[()]/g, "\\$&")};`));
   });
 });
