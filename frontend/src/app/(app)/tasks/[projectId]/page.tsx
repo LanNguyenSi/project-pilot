@@ -172,9 +172,9 @@ export default function ProjectTasksPage() {
               />
             </div>
           ) : (
-            <div />
+            <div className="hidden sm:block" />
           )}
-          <div className="flex gap-1 self-start border border-stroke-default rounded-button p-0.5">
+          <div className="flex gap-1 self-start sm:self-auto border border-stroke-default rounded-button p-0.5">
             <button
               onClick={() => { setView("list"); localStorage.setItem(VIEW_KEY, "list"); }}
               className={`px-2.5 py-1 text-xs font-medium rounded-button transition-colors ${view === "list" ? "bg-surface-overlay text-content-primary" : "text-content-tertiary hover:text-content-primary"}`}

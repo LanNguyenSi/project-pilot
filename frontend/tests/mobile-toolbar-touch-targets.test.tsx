@@ -60,8 +60,27 @@ describe("task detail toolbar", () => {
   it("keeps the List/Board toggle in the toolbar", async () => {
     render(<ProjectTasksPage />);
     const toggle = (await screen.findByRole("button", { name: "Board view" })).parentElement!;
+    // Left-aligned in the stacked layout, back to the row's centring from sm up.
     expect(classes(toggle)).toContain("self-start");
+    expect(classes(toggle)).toContain("sm:self-auto");
     expect(screen.getByRole("button", { name: "List view" }).parentElement).toBe(toggle);
+  });
+});
+
+describe("task toolbar in board view", () => {
+  it("keeps a placeholder only from sm up, so the stack has no empty row", async () => {
+    apiFetch.mockImplementation(async (url: string) =>
+      url === "/api/tasks/projects"
+        ? { projects: [{ id: "p1", name: "P", slug: "p", description: "" }] }
+        : { tasks: [{ id: "k1", title: "T", status: "open", priority: "MEDIUM", createdAt: "2026-01-01T00:00:00Z" }] },
+    );
+    render(<ProjectTasksPage />);
+    fireEvent.click(await screen.findByRole("button", { name: "Board view" }));
+    const toggle = screen.getByRole("button", { name: "Board view" }).parentElement!;
+    const placeholder = toggle.previousElementSibling as HTMLElement;
+    expect(placeholder).not.toBeNull();
+    expect(classes(placeholder)).toContain("hidden");
+    expect(classes(placeholder)).toContain("sm:block");
   });
 });
 
