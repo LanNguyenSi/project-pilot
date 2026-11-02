@@ -90,7 +90,7 @@ export const rawColors = {
   content: {
     primary:   "#f2f2f5",
     secondary: "#a8a8b3",
-    tertiary:  "#71717f",
+    tertiary:  "#8f8f9c",
   },
   accent: {
     blue:   "#5b8cff",
