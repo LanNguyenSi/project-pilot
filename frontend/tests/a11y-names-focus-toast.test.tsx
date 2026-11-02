@@ -44,6 +44,13 @@ afterEach(cleanup);
 
 const OPTS = [{ value: "a", label: "Alpha" }];
 
+// Compile-time guard, never rendered: a Select without label or aria-label
+// must stay a type error (typecheck:test fails on an unused @ts-expect-error).
+export function NamelessSelectIsATypeError() {
+  // @ts-expect-error a Select needs a label or an aria-label
+  return <Select options={OPTS} value="a" onChange={() => {}} />;
+}
+
 describe("Select accessible name", () => {
   it("uses aria-label when there is no visible label", () => {
     render(<Select options={OPTS} value="a" onChange={() => {}} aria-label="Sort tasks" />);
