@@ -396,6 +396,7 @@ export default function StyleguidePage() {
                 ]}
                 value="newest"
                 onChange={() => {}}
+                aria-label="Sort order"
                 className="w-40"
               />
             </FilterBar>

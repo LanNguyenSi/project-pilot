@@ -7,19 +7,22 @@ interface SelectOption {
   label: string;
 }
 
-interface SelectProps {
+// A Select needs an accessible name: a visible `label`, or an `aria-label`
+// when there is none. The union makes a nameless Select a type error.
+type SelectName =
+  | { label: string; "aria-label"?: string }
+  | { label?: undefined; "aria-label": string };
+
+type SelectProps = SelectName & {
   options: SelectOption[];
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
-  label?: string;
-  /** Accessible name when there is no visible `label`. */
-  "aria-label"?: string;
   hint?: string;
   error?: string;
   disabled?: boolean;
   className?: string;
-}
+};
 
 export function Select({
   options,
@@ -42,10 +45,6 @@ export function Select({
   const labelId = `${id}-label`;
   const descId = `${id}-desc`;
   const hasDesc = !!(error || hint);
-
-  if (process.env.NODE_ENV !== "production" && !label && !ariaLabel) {
-    console.warn("Select needs a `label` or `aria-label`: without one the combobox has no accessible name.");
-  }
 
   const selected = options.find((o) => o.value === value);
 

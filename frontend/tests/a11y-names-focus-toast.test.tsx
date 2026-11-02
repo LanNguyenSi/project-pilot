@@ -61,20 +61,6 @@ describe("Select accessible name", () => {
     fireEvent.click(screen.getByRole("combobox"));
     expect(screen.getByRole("listbox", { name: "Sort tasks" })).toBeInTheDocument();
   });
-
-  it("warns in development when neither label nor aria-label is set", () => {
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    render(<Select options={OPTS} value="a" onChange={() => {}} />);
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining("aria-label"));
-    warn.mockRestore();
-  });
-
-  it("does not warn when aria-label is set", () => {
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    render(<Select options={OPTS} value="a" onChange={() => {}} aria-label="Sort tasks" />);
-    expect(warn).not.toHaveBeenCalled();
-    warn.mockRestore();
-  });
 });
 
 describe("unlabelled Select call sites are named", () => {
@@ -129,6 +115,7 @@ describe("toast container", () => {
     const region = container.querySelector("[aria-live]") as HTMLElement;
     expect(region).toHaveAttribute("role", "status");
     expect(region).toHaveAttribute("aria-live", "polite");
+    expect(region).toHaveAttribute("aria-atomic", "false");
     expect(region).not.toHaveAttribute("aria-label");
   });
 });
@@ -180,6 +167,7 @@ describe("mobile navigation overlay", () => {
   it("closes on Escape and returns focus to the burger", () => {
     render(<Harness />);
     const burger = openNav();
+    expect(screen.getByRole("dialog").contains(document.activeElement)).toBe(true);
     act(() => {
       fireEvent.keyDown(document, { key: "Escape" });
     });
@@ -191,6 +179,7 @@ describe("mobile navigation overlay", () => {
     render(<Harness />);
     const burger = openNav();
     const dialog = screen.getByRole("dialog");
+    expect(dialog.contains(document.activeElement)).toBe(true);
     fireEvent.click(dialog.querySelector('[aria-hidden="true"].absolute') as HTMLElement);
     await waitFor(() => expect(document.activeElement).toBe(burger));
   });

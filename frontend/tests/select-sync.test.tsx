@@ -25,49 +25,49 @@ function active(): string | null {
 
 describe("Select highlighted option", () => {
   it("highlights nothing while closed", () => {
-    render(<Select options={OPTS} value="b" onChange={() => {}} />);
+    render(<Select aria-label="Choice" options={OPTS} value="b" onChange={() => {}} />);
     expect(active()).toBeNull();
   });
 
   it("highlights the selected option when opened", () => {
-    render(<Select options={OPTS} value="b" onChange={() => {}} />);
+    render(<Select aria-label="Choice" options={OPTS} value="b" onChange={() => {}} />);
     fireEvent.click(screen.getByRole("combobox"));
     expect(active()).toBe("1");
   });
 
   it("highlights nothing when the value is not in the options", () => {
-    render(<Select options={OPTS} value="zzz" onChange={() => {}} />);
+    render(<Select aria-label="Choice" options={OPTS} value="zzz" onChange={() => {}} />);
     fireEvent.click(screen.getByRole("combobox"));
     expect(active()).toBeNull();
   });
 
   it("re-syncs to the new value while open", () => {
-    const { rerender } = render(<Select options={OPTS} value="a" onChange={() => {}} />);
+    const { rerender } = render(<Select aria-label="Choice" options={OPTS} value="a" onChange={() => {}} />);
     fireEvent.click(screen.getByRole("combobox"));
     expect(active()).toBe("0");
-    rerender(<Select options={OPTS} value="c" onChange={() => {}} />);
+    rerender(<Select aria-label="Choice" options={OPTS} value="c" onChange={() => {}} />);
     expect(active()).toBe("2");
   });
 
   it("re-syncs when the options change while open", () => {
-    const { rerender } = render(<Select options={OPTS} value="b" onChange={() => {}} />);
+    const { rerender } = render(<Select aria-label="Choice" options={OPTS} value="b" onChange={() => {}} />);
     fireEvent.click(screen.getByRole("combobox"));
     expect(active()).toBe("1");
-    rerender(<Select options={[OPTS[1], OPTS[0], OPTS[2]]} value="b" onChange={() => {}} />);
+    rerender(<Select aria-label="Choice" options={[OPTS[1], OPTS[0], OPTS[2]]} value="b" onChange={() => {}} />);
     expect(active()).toBe("0");
   });
 
   it("keeps the hovered option across a re-render with the same props", () => {
-    const { rerender } = render(<Select options={OPTS} value="a" onChange={() => {}} />);
+    const { rerender } = render(<Select aria-label="Choice" options={OPTS} value="a" onChange={() => {}} />);
     fireEvent.click(screen.getByRole("combobox"));
     fireEvent.mouseEnter(screen.getAllByRole("option")[2]);
     expect(active()).toBe("2");
-    rerender(<Select options={OPTS} value="a" onChange={() => {}} />);
+    rerender(<Select aria-label="Choice" options={OPTS} value="a" onChange={() => {}} />);
     expect(active()).toBe("2");
   });
 
   it("resets to the selected option on the next open", () => {
-    render(<Select options={OPTS} value="a" onChange={() => {}} />);
+    render(<Select aria-label="Choice" options={OPTS} value="a" onChange={() => {}} />);
     const box = screen.getByRole("combobox");
     fireEvent.click(box);
     fireEvent.mouseEnter(screen.getAllByRole("option")[2]);
@@ -77,7 +77,7 @@ describe("Select highlighted option", () => {
   });
 
   it("closes on a mousedown outside", () => {
-    render(<Select options={OPTS} value="a" onChange={() => {}} />);
+    render(<Select aria-label="Choice" options={OPTS} value="a" onChange={() => {}} />);
     fireEvent.click(screen.getByRole("combobox"));
     expect(screen.getByRole("listbox")).toBeInTheDocument();
     fireEvent.mouseDown(document.body);
