@@ -53,7 +53,7 @@ export default function SecurityPage() {
             href={DEPSIGHT_URL}
             target="_blank"
             rel="noreferrer"
-            className="text-brand-300 hover:text-brand-200 hover:underline"
+            className="text-brand-300 underline underline-offset-2 hover:text-brand-200"
           >
             depsight in a new tab
           </a>{" "}

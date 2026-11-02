@@ -31,6 +31,8 @@
   --color-accent-amber: var(--accent-amber);
   --color-accent-red: var(--accent-red);
   --color-accent-purple: var(--accent-purple);
+  --color-danger-solid: var(--danger-solid);
+  --color-danger-solid-hover: var(--danger-solid-hover);
 
   --text-page-title: 1.75rem;
   --text-page-title--line-height: 2.25rem;
@@ -134,7 +136,12 @@
   /* Content (text) */
   --content-primary:   #f2f2f5;
   --content-secondary: #a8a8b3;
-  --content-tertiary:  #71717f;
+  --content-tertiary:  #8f8f9c;
+
+  /* Solid danger background (Button variant="danger") - white text needs
+     >= 4.5:1, so the light --accent-red cannot back white text. */
+  --danger-solid:        #dc2626;
+  --danger-solid-hover:  #b91c1c;
 
   /* Semantic accents - status only (blue = info, NOT the CTA) */
   --accent-blue:   #5b8cff;
