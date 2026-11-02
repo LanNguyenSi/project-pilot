@@ -13,6 +13,8 @@ interface SelectProps {
   onChange: (value: string) => void;
   placeholder?: string;
   label?: string;
+  /** Accessible name when there is no visible `label`. */
+  "aria-label"?: string;
   hint?: string;
   error?: string;
   disabled?: boolean;
@@ -25,6 +27,7 @@ export function Select({
   onChange,
   placeholder = "Select...",
   label,
+  "aria-label": ariaLabel,
   hint,
   error,
   disabled = false,
@@ -39,6 +42,10 @@ export function Select({
   const labelId = `${id}-label`;
   const descId = `${id}-desc`;
   const hasDesc = !!(error || hint);
+
+  if (process.env.NODE_ENV !== "production" && !label && !ariaLabel) {
+    console.warn("Select needs a `label` or `aria-label`: without one the combobox has no accessible name.");
+  }
 
   const selected = options.find((o) => o.value === value);
 
@@ -137,6 +144,7 @@ export function Select({
         aria-haspopup="listbox"
         aria-controls={open ? listboxId : undefined}
         aria-labelledby={label ? labelId : undefined}
+        aria-label={label ? undefined : ariaLabel}
         aria-activedescendant={open && activeIndex >= 0 ? `${id}-opt-${activeIndex}` : undefined}
         aria-invalid={error ? true : undefined}
         aria-describedby={hasDesc ? descId : undefined}
@@ -166,6 +174,7 @@ export function Select({
           role="listbox"
           id={listboxId}
           aria-labelledby={label ? labelId : undefined}
+          aria-label={label ? undefined : ariaLabel}
           className="absolute z-50 top-full mt-1 w-full bg-surface-elevated border border-stroke-strong rounded-card shadow-elevated py-1 max-h-60 overflow-auto animate-fade-in"
         >
           {options.length === 0 ? (

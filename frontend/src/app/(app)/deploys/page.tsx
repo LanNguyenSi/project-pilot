@@ -482,18 +482,21 @@ export default function DeploysPage() {
             <Select
               value={serverFilter}
               onChange={(v) => { setServerFilter(v); setDeployPage(0); }}
+              aria-label="Filter by server"
               options={serverOptions}
               className="w-36"
             />
             <Select
               value={appFilter}
               onChange={(v) => { setAppFilter(v); setDeployPage(0); }}
+              aria-label="Filter by app"
               options={appOptions}
               className="w-36"
             />
             <Select
               value={statusFilter}
               onChange={(v) => { setStatusFilter(v); setDeployPage(0); }}
+              aria-label="Filter by status"
               options={statusOptions}
               className="w-36"
             />

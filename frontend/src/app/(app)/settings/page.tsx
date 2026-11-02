@@ -161,6 +161,7 @@ export default function SettingsPage() {
               <div className="flex gap-2">
                 <Input
                   type="password"
+                  aria-label={`${label} token`}
                   placeholder={existing ? "Replace token..." : "Paste token..."}
                   value={tokens[key] || ""}
                   onChange={(e) => setTokens((prev) => ({ ...prev, [key]: e.target.value }))}

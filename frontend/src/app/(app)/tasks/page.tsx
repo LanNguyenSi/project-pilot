@@ -217,6 +217,7 @@ export default function TaskProjectsPage() {
               ) : (
                 <Select
                   value={syncTeamValue}
+                  aria-label="Sync from GitHub"
                   placeholder="Sync from GitHub..."
                   onChange={(v) => {
                     if (v) {

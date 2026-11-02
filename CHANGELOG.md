@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Accessibility: the mobile navigation overlay now traps focus, focuses its first link on open, closes on Escape and hands focus back to the burger button; `Select` takes an `aria-label` (used when there is no visible `label`, with a development warning when neither is set) and the Sync picker, the task sort and the three deploy history filters now have names; the three settings token fields are named after their service; the toast container uses `role="status"` instead of a prohibited `aria-label` on a role-less live region.
+
 ### Changed
 
 - Dependency updates: `renovate.json` extends the shared `github>LanNguyenSi/renovate-config` preset (weekly grouped patch/minor pull requests, 7-day minimum release age, no automerge, majors only through the Dependency Dashboard).
