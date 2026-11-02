@@ -7,17 +7,22 @@ interface SelectOption {
   label: string;
 }
 
-interface SelectProps {
+// A Select needs an accessible name: a visible `label`, or an `aria-label`
+// when there is none. The union makes a nameless Select a type error.
+type SelectName =
+  | { label: string; "aria-label"?: string }
+  | { label?: undefined; "aria-label": string };
+
+type SelectProps = SelectName & {
   options: SelectOption[];
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
-  label?: string;
   hint?: string;
   error?: string;
   disabled?: boolean;
   className?: string;
-}
+};
 
 export function Select({
   options,
@@ -25,6 +30,7 @@ export function Select({
   onChange,
   placeholder = "Select...",
   label,
+  "aria-label": ariaLabel,
   hint,
   error,
   disabled = false,
@@ -137,6 +143,7 @@ export function Select({
         aria-haspopup="listbox"
         aria-controls={open ? listboxId : undefined}
         aria-labelledby={label ? labelId : undefined}
+        aria-label={label ? undefined : ariaLabel}
         aria-activedescendant={open && activeIndex >= 0 ? `${id}-opt-${activeIndex}` : undefined}
         aria-invalid={error ? true : undefined}
         aria-describedby={hasDesc ? descId : undefined}
@@ -166,6 +173,7 @@ export function Select({
           role="listbox"
           id={listboxId}
           aria-labelledby={label ? labelId : undefined}
+          aria-label={label ? undefined : ariaLabel}
           className="absolute z-50 top-full mt-1 w-full bg-surface-elevated border border-stroke-strong rounded-card shadow-elevated py-1 max-h-60 overflow-auto animate-fade-in"
         >
           {options.length === 0 ? (

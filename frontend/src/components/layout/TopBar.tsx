@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Breadcrumbs } from "./Breadcrumbs";
+import { MOBILE_NAV_TRIGGER_ID } from "./Sidebar";
 import { Icon } from "@/components/ui/icons";
 import { apiFetch } from "@/lib/api";
 import { useAuth, type User } from "@/lib/auth-context";
@@ -72,6 +73,7 @@ export function TopBar({ onMenuClick }: TopBarProps) {
       <button
         onClick={onMenuClick}
         className="lg:hidden text-content-secondary hover:text-content-primary transition-colors duration-fast"
+        id={MOBILE_NAV_TRIGGER_ID}
         aria-label="Open navigation"
       >
         <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>

@@ -2,8 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useCallback, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { Icon } from "@/components/ui/icons";
+import { useFocusTrap } from "@/components/ui/useFocusTrap";
+
+// Id of the burger button in TopBar; focus returns here when the overlay closes.
+export const MOBILE_NAV_TRIGGER_ID = "mobile-nav-trigger";
 
 // Nav items for the main section of the sidebar.
 const navItems = [
@@ -36,22 +40,18 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
     onMobileClose();
   }, [pathname]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Escape key closes the mobile overlay.
-  const handleKey = useCallback(
-    (e: KeyboardEvent) => { if (e.key === "Escape") onMobileClose(); },
-    [onMobileClose],
-  );
+  // While the mobile overlay is open: trap Tab inside it, focus its first
+  // link, close on Escape and lock page scroll.
+  useFocusTrap(overlayRef, mobileOpen, onMobileClose);
 
+  // Hand focus back to the burger button when the overlay closes.
+  const wasOpen = useRef(false);
   useEffect(() => {
-    if (mobileOpen) {
-      document.addEventListener("keydown", handleKey);
-      document.body.style.overflow = "hidden";
-      return () => {
-        document.removeEventListener("keydown", handleKey);
-        document.body.style.overflow = "";
-      };
+    if (wasOpen.current && !mobileOpen) {
+      document.getElementById(MOBILE_NAV_TRIGGER_ID)?.focus();
     }
-  }, [mobileOpen, handleKey]);
+    wasOpen.current = mobileOpen;
+  }, [mobileOpen]);
 
   // Renders a single nav link with brand active state and a left accent bar.
   function navLink(item: { label: string; href: string; icon: typeof navItems[number]["icon"] | typeof settingsItem["icon"] }) {
@@ -84,7 +84,8 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
     );
   }
 
-  const nav = (
+  function renderNav(inOverlay: boolean) {
+    return (
     <nav aria-label="Main navigation" className="flex flex-col h-full">
       {/* Brand mark + wordmark */}
       <div className="h-topbar flex items-center px-4 border-b border-stroke-default shrink-0 gap-2.5">
@@ -112,7 +113,8 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
       <div className="border-t border-stroke-default py-3 px-2 space-y-0.5 shrink-0">
         {navLink(settingsItem)}
 
-        {/* Collapse toggle (desktop only) */}
+        {/* Collapse toggle (desktop only; left out of the overlay so the focus trap never lands on a hidden button) */}
+        {!inOverlay && (
         <button
           onClick={onToggle}
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
@@ -126,15 +128,17 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
           />
           {!collapsed && <span>Collapse</span>}
         </button>
+        )}
       </div>
     </nav>
-  );
+    );
+  }
 
   return (
     <>
       {/* Desktop sidebar */}
       <aside className="hidden lg:flex flex-col sticky top-0 h-screen bg-surface-secondary border-r border-stroke-default z-40 overflow-hidden">
-        {nav}
+        {renderNav(false)}
       </aside>
 
       {/* Mobile overlay */}
@@ -152,7 +156,7 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
             aria-hidden="true"
           />
           <aside className="relative w-sidebar h-full bg-surface-secondary border-r border-stroke-default">
-            {nav}
+            {renderNav(true)}
           </aside>
         </div>
       )}

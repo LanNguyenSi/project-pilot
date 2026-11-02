@@ -166,6 +166,7 @@ export default function ProjectTasksPage() {
                   setSortDir(dir);
                   setPage(0);
                 }}
+                aria-label="Sort tasks"
                 options={SORT_OPTIONS}
                 className="w-44"
               />
