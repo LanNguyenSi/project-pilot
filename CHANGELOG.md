@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - Dependency updates: `renovate.json` extends the shared `github>LanNguyenSi/renovate-config` preset (weekly grouped patch/minor pull requests, 7-day minimum release age, no automerge, majors only through the Dependency Dashboard).
 
+### Fixed
+
+- **Text and control contrast now meets WCAG AA on dark surfaces.** `--content-tertiary` was `#71717f` (4.07:1 on the app background, 3.00:1 on modals), below the 4.5:1 floor for its 12 px text (dashboard and deploys meta lines, `text-label`, input placeholders); it is now `#8f8f9c` (6.12 / 5.65 / 5.13 / 4.51 on the four surfaces) while staying dimmer than `--content-secondary`. The `danger` `Button` variant painted white on `--accent-red` `#f87171` (2.77:1); it now uses new tokens `--danger-solid` `#dc2626` (white 4.83:1) with `--danger-solid-hover` `#b91c1c` (6.47:1), while `--accent-red` keeps its role as red text and error borders. The depsight link in the security page's info banner was distinguished from the surrounding grey text by color alone (axe `link-in-text-block`); it now carries a permanent underline (`underline underline-offset-2`) and keeps its hover color. Pinned by `frontend/tests/contrast-tokens.test.ts` (parses `globals.css` and recomputes the WCAG ratios), `Button.test.tsx` and `security-banner-link.test.tsx`; axe reports no color-contrast or `link-in-text-block` violation left on /dashboard, /deploys, /security and /settings at 1280 and 390 px.
+
 ## [0.7.0] - 2026-11-01
 
 ### Added

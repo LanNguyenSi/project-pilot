@@ -8,7 +8,7 @@ const base =
 const variants = {
   primary:   "bg-brand-500 text-white hover:bg-brand-600 rounded-button shadow-sm",
   secondary: "border border-stroke-strong text-content-primary hover:bg-surface-overlay rounded-button",
-  danger:    "bg-accent-red text-white hover:bg-accent-red/90 rounded-button",
+  danger:    "bg-danger-solid text-white hover:bg-danger-solid-hover rounded-button",
   ghost:     "text-content-secondary hover:text-content-primary hover:bg-surface-overlay rounded-button",
 } as const;
 
