@@ -132,10 +132,10 @@ export default function ProjectTasksPage() {
 
       {/* Filter bar + View toggle */}
       {!loading && tasks.length > 0 && (
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
           {view === "list" ? (
-            <div className="flex items-center gap-3">
-              <div className="flex gap-1" role="toolbar" aria-label="Filter by status">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex flex-wrap gap-1" role="toolbar" aria-label="Filter by status">
                 {statusFilters.map((f) => (
                   <button
                     key={f.key}
@@ -174,7 +174,7 @@ export default function ProjectTasksPage() {
           ) : (
             <div />
           )}
-          <div className="flex gap-1 border border-stroke-default rounded-button p-0.5">
+          <div className="flex gap-1 self-start border border-stroke-default rounded-button p-0.5">
             <button
               onClick={() => { setView("list"); localStorage.setItem(VIEW_KEY, "list"); }}
               className={`px-2.5 py-1 text-xs font-medium rounded-button transition-colors ${view === "list" ? "bg-surface-overlay text-content-primary" : "text-content-tertiary hover:text-content-primary"}`}

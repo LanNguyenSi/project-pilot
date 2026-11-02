@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Mobile layout and touch targets: the task list toolbar on the project task page (status filters, sort, List/Board toggle) now stacks and wraps below the `sm` breakpoint, so it no longer makes the page scroll sideways at 390 px (scroll width was 667 px) and the List/Board toggle stays visible; the mobile navigation burger button and the server card Test and Delete buttons on the Deploys page now have a hit area of at least 24x24 px (WCAG 2.2 SC 2.5.8) without changing their visual size or the surrounding layout.
 - Accessibility: the mobile navigation overlay now traps focus, focuses its first link on open, closes on Escape and hands focus back to the burger button; `Select` takes an `aria-label` (used when there is no visible `label`, with a development warning when neither is set) and the Sync picker, the task sort and the three deploy history filters now have names; the three settings token fields are named after their service; the toast container uses `role="status"` instead of a prohibited `aria-label` on a role-less live region.
 
 ### Changed

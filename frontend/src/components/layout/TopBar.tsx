@@ -72,7 +72,7 @@ export function TopBar({ onMenuClick }: TopBarProps) {
       {/* Mobile hamburger */}
       <button
         onClick={onMenuClick}
-        className="lg:hidden text-content-secondary hover:text-content-primary transition-colors duration-fast"
+        className="lg:hidden -m-1 p-1 text-content-secondary hover:text-content-primary transition-colors duration-fast"
         id={MOBILE_NAV_TRIGGER_ID}
         aria-label="Open navigation"
       >
