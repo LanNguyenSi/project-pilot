@@ -2,6 +2,10 @@
 
 <!-- Add new entries at the top, newest first. -->
 
+- 2026-11-03T07:09:36Z, credential-trust-boundary and request-gating-and-sessions re-verified and
+  re-stamped after `backend/src/routes/oauth.ts` gained the public `GET /config` flag
+  and the unconfigured start redirect: twelve line citations re-pointed (the cited
+  text moved, unchanged); no claim in either doc covers the not-configured path.
 - 2026-10-26T13:53:12Z, request-gating-and-sessions re-verified and re-stamped after the CSP
   moved into `frontend/src/lib/csp.ts`: `connect-src` adds the http(s) origin of
   `NEXT_PUBLIC_API_URL`; the `next.config.ts` and `csp.ts` citations were re-pointed.
