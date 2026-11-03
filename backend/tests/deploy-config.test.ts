@@ -77,3 +77,25 @@ describe("dev compose schema step", () => {
     expect(backend).toMatch(/^\s{6}migrate:\s*\n\s{8}condition:\s*service_completed_successfully/m);
   });
 });
+
+describe("production compose project", () => {
+  const prod = code(read("docker-compose.prod.yml"));
+
+  // The project name decides the database volume (project-pilot_pgdata). An
+  // unpinned name follows the checkout directory, so a checkout under another
+  // name would start against a new, empty volume.
+  it("pins the project name to project-pilot", () => {
+    expect(prod).toMatch(/^name: project-pilot$/m);
+  });
+
+  it("the frontend image binds the standalone server to all interfaces", () => {
+    // Docker sets HOSTNAME to the container id; the image healthcheck probes
+    // localhost, so the server must not bind to that id alone.
+    expect(read("frontend/Dockerfile")).toMatch(/^ENV HOSTNAME=0\.0\.0\.0$/m);
+  });
+
+  it("guards POSTGRES_PASSWORD wherever it is interpolated", () => {
+    expect(prod).not.toMatch(/\$\{POSTGRES_PASSWORD\}/);
+    expect(countMatches(prod, /\$\{POSTGRES_PASSWORD:\?[^}]+\}/g)).toBeGreaterThanOrEqual(2);
+  });
+});

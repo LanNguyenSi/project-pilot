@@ -22,6 +22,10 @@ RUN npm run build --workspace=frontend
 FROM node:22-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
+# The Next.js standalone server listens on $HOSTNAME, and Docker sets HOSTNAME
+# to the container id, so without this the server is not reachable on the
+# container's addresses and the healthcheck below (localhost:3000) never passes.
+ENV HOSTNAME=0.0.0.0
 
 # With the lockfile at the repo root, Next traces from /app, so the standalone
 # server lands in frontend/ inside the standalone output.

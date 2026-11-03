@@ -1,3 +1,11 @@
+# Production stack. The project name is pinned so that a checkout in a
+# differently named directory still resolves the existing volume
+# project-pilot_pgdata instead of starting an empty database.
+# COMPOSE_PROJECT_NAME (shell or the shared .env) and -p override `name:` and
+# would then point this stack at another, empty volume, so never set them for
+# this file.
+name: project-pilot
+
 x-logging: &default-logging
   driver: json-file
   options:
@@ -13,7 +21,7 @@ services:
     mem_limit: 1g
     environment:
       POSTGRES_USER: project_pilot
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
       POSTGRES_DB: project_pilot
     volumes:
       - pgdata:/var/lib/postgresql/data
@@ -37,7 +45,7 @@ services:
       db:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql://project_pilot:${POSTGRES_PASSWORD}@db:5432/project_pilot
+      DATABASE_URL: postgresql://project_pilot:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@db:5432/project_pilot
       SESSION_SECRET: ${SESSION_SECRET}
       PORT: "3001"
       CORS_ORIGINS: https://project-pilot.opentriologue.ai
