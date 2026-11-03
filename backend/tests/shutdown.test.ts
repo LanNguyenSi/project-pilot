@@ -185,6 +185,22 @@ describe("createShutdownHandler", () => {
     expect(f.exit).toHaveBeenCalledWith(0);
   });
 
+  it("a server whose close() completes synchronously arms no drain tick", async () => {
+    // close() already finished, so a tick armed now would never be cancelled.
+    const closeIdleConnections = vi.fn();
+    const server: ClosableServer = {
+      close: (cb?: () => void) => {
+        if (cb) cb();
+      },
+      closeIdleConnections,
+    };
+    const f = createFakes({ server });
+    await createShutdownHandler(f.deps)();
+
+    expect(f.scheduleInterval).not.toHaveBeenCalled();
+    expect(f.exit).toHaveBeenCalledWith(0);
+  });
+
   it("cleanup rejection is logged and exit(0) is still reached", async () => {
     const error = new Error("prisma did not disconnect");
     const cleanup = vi.fn(async () => {
