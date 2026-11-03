@@ -22,12 +22,12 @@ The MCP server is a separate process and reads credentials from environment vari
 | `AGENT_TASKS_URL` | yes in production | https://agent-tasks.opentriologue.ai | Tasks API base URL. Required with `NODE_ENV=production` (missing or empty fails startup); outside production it falls back to this default with a warning |
 | `DEPLOY_PANEL_URL` | yes in production | https://deploy-panel.opentriologue.ai | Deploy API base URL. Required with `NODE_ENV=production` (missing or empty fails startup); outside production it falls back to this default with a warning |
 | `BACKEND_URL` | no | http://localhost:3001 | Public backend URL, used to build the OAuth redirect URI |
-| `GITHUB_CLIENT_ID` | no |  | GitHub OAuth app client ID. When unset (along with `GITHUB_CLIENT_SECRET`), the `/api/oauth/github/*` routes return 503. Enabling it forwards users' GitHub tokens to the three service URLs, see [GitHub sign-in](#github-sign-in) |
-| `GITHUB_CLIENT_SECRET` | no |  | GitHub OAuth app client secret. When unset (along with `GITHUB_CLIENT_ID`), the `/api/oauth/github/*` routes return 503. Enabling it forwards users' GitHub tokens to the three service URLs, see [GitHub sign-in](#github-sign-in) |
+| `GITHUB_CLIENT_ID` | no |  | GitHub OAuth app client ID. When unset (along with `GITHUB_CLIENT_SECRET`), the login page hides **Continue with GitHub** and `GET /api/oauth/github/start` redirects to the frontend's `/auth/error?reason=not_configured` page (the callback route answers 503). GitHub sign-in is on only when both values are set; one alone counts as unset. Enabling it forwards users' GitHub tokens to the three service URLs, see [GitHub sign-in](#github-sign-in) |
+| `GITHUB_CLIENT_SECRET` | no |  | GitHub OAuth app client secret. When unset (along with `GITHUB_CLIENT_ID`), GitHub sign-in is off, see `GITHUB_CLIENT_ID`. Enabling it forwards users' GitHub tokens to the three service URLs, see [GitHub sign-in](#github-sign-in) |
 
 ## GitHub sign-in
 
-When `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` are both set, the login page's **Continue with GitHub** button signs users in through a GitHub OAuth App, and the backend registers each user with the three downstream services.
+The login page asks the public `GET /api/oauth/config` endpoint, which answers `{"github": true|false}` (nothing else, no client id or callback URL), and shows the GitHub button only on `true`; while that request is pending or fails, the button stays hidden. When `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` are both set, the login page's **Continue with GitHub** button signs users in through a GitHub OAuth App, and the backend registers each user with the three downstream services.
 
 - Register `<BACKEND_URL>/api/oauth/github/callback` as the OAuth App's callback URL.
 - The requested scopes are `read:user user:email read:org repo workflow`. `repo` lets the downstream services read the user's repositories; `workflow` lets project-forge push scaffolds that contain `.github/workflows`.

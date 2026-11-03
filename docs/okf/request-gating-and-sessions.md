@@ -3,7 +3,7 @@ type: invariant
 title: Request gating and session model
 description: Global CORS and security headers, CSRF registered per route prefix in app.ts, requireAuth registered per router, opaque hashed session tokens with SameSite Strict for password sign-in and Lax for GitHub sign-in, per-process rate limits on four public auth endpoints keyed on the last X-Forwarded-For entry, and a CSP that only the frontend sets.
 tags: [auth, sessions, csrf, cors, rate-limit, headers, csp]
-timestamp: 2026-10-26T13:53:12Z
+timestamp: 2026-11-03T07:09:36Z
 sources:
   - backend/src/app.ts
   - backend/src/middleware/auth.ts
@@ -90,7 +90,7 @@ A session token is 32 random bytes, hex-encoded
 (`backend/src/services/auth.ts:48-49#"update(token)"`). Password sign-in and
 GitHub sign-in create the row the same way, with a 30-day expiry
 (`backend/src/routes/auth.ts:51-57#"data: { tokenHash, userId, expiresAt },"`,
-`backend/src/routes/oauth.ts:48-55#"return token;"`). The expiry is fixed at
+`backend/src/routes/oauth.ts:50-57#"return token;"`). The expiry is fixed at
 creation; `requireAuth` does not extend it.
 
 The two flows differ in the cookie's `SameSite` attribute:
@@ -99,7 +99,7 @@ The two flows differ in the cookie's `SameSite` attribute:
   (`backend/src/routes/auth.ts:41-47#"maxAge: SESSION_MAX_AGE,"`).
 - The GitHub callback sets `SameSite=Lax`, because the browser reaches the
   frontend through a cross-site redirect chain that a Strict cookie would not
-  survive (`backend/src/routes/oauth.ts:213-224#"maxAge: SESSION_MAX_AGE,"`).
+  survive (`backend/src/routes/oauth.ts:219-230#"maxAge: SESSION_MAX_AGE,"`).
 
 Both cookies are `httpOnly`, and `Secure` only when `NODE_ENV` is
 `production`. The comment on the CSRF middleware names both settings, Strict for password
@@ -112,9 +112,9 @@ password reset, which deletes every session of that user
 (`backend/src/routes/auth.ts:165-168#"prisma.session.deleteMany({ where: { userId: reset.userId } }),"`).
 
 The OAuth `state` cookie is separate: Lax, ten minutes
-(`backend/src/routes/oauth.ts:70-77#"maxAge: STATE_COOKIE_MAX_AGE,"`), always
+(`backend/src/routes/oauth.ts:76-83#"maxAge: STATE_COOKIE_MAX_AGE,"`), always
 cleared in the callback, and compared with the `state` query parameter
-(`backend/src/routes/oauth.ts:92-100#"state_mismatch"`).
+(`backend/src/routes/oauth.ts:98-106#"state_mismatch"`).
 
 ## CSRF header check
 

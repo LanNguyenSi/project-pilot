@@ -19,6 +19,10 @@ const MESSAGES: Record<string, { title: string; body: string }> = {
     title: "Account already exists",
     body: "An account already uses this email. Sign in with your email and password, then link GitHub from Settings.",
   },
+  not_configured: {
+    title: "GitHub sign-in unavailable",
+    body: "GitHub sign-in is not set up on this instance. Sign in with your email and password instead.",
+  },
   server_error: {
     title: "Something went wrong",
     body: "We hit an unexpected error while completing your sign-in. Please try again in a moment.",

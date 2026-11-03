@@ -20,10 +20,11 @@ The backend exposes a Hono HTTP API at `:3001/api/*`. All `POST`/`PUT` JSON bodi
 
 ## OAuth
 
+- `GET /api/oauth/config` public, unauthenticated: `{"github": boolean}`, whether GitHub OAuth is configured (both `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` set). The login page shows its GitHub button only on `true`.
 - `GET /api/oauth/github/start` begin GitHub OAuth flow (redirects to GitHub)
 - `GET /api/oauth/github/callback` GitHub OAuth callback: checks the state cookie, exchanges the code, creates or links the user, registers the user with each downstream service, sets the session cookie and redirects to `/dashboard`. See [GitHub sign-in](configuration.md#github-sign-in).
 
-Both routes return `503` unless `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` are set in the backend env (see [configuration.md](configuration.md)).
+Without `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` in the backend env (see [configuration.md](configuration.md)), `start` redirects to the frontend's `/auth/error?reason=not_configured` page and `callback` returns `503`.
 
 ## Service credentials
 

@@ -3,7 +3,7 @@ type: invariant
 title: Credential and identity trust boundaries
 description: SESSION_SECRET is the only key material for stored service credentials and nothing else reads it; the GitHub access token is used for sign-in, forwarded once to the three module hosts and never stored; a failed module registration still signs the user in; the MCP server never touches the credential store.
 tags: [credentials, encryption, oauth, identity, mcp]
-timestamp: 2026-10-25T06:19:11Z
+timestamp: 2026-11-03T07:09:36Z
 sources:
   - backend/src/lib/crypto.ts
   - backend/src/config/index.ts
@@ -122,17 +122,17 @@ secret. Sessions are unaffected, because they never involved the secret.
 
 The module header states the contract: project-pilot is an identity broker,
 never persists the GitHub token, and stores only the module tokens it gets
-back (`backend/src/routes/oauth.ts:8-11#"API tokens which we then store encrypted."`).
+back (`backend/src/routes/oauth.ts:10-13#"API tokens which we then store encrypted."`).
 
 1. The callback exchanges the code and uses the token to read the GitHub user
    and the primary verified email
-   (`backend/src/routes/oauth.ts:105-108#"fetchPrimaryVerifiedEmail(tokenResponse.access_token);"`).
+   (`backend/src/routes/oauth.ts:111-114#"fetchPrimaryVerifiedEmail(tokenResponse.access_token);"`).
    The token carries the scopes `read:user user:email read:org repo workflow`
    (`backend/src/services/github-oauth.ts:40#"read:user user:email read:org repo workflow"`).
 2. The user row receives identity fields only, no token
-   (`backend/src/routes/oauth.ts:164-170#"email: resolvedEmail,"`).
+   (`backend/src/routes/oauth.ts:170-176#"email: resolvedEmail,"`).
 3. `registerUserWithAllModules` gets the token
-   (`backend/src/routes/oauth.ts:189-193#"githubUser.login,"`) and posts it in
+   (`backend/src/routes/oauth.ts:195-199#"githubUser.login,"`) and posts it in
    the request body to `/api/auth/register-from-project-pilot`
    (`backend/src/services/module-registration.ts:23#"/api/auth/register-from-project-pilot"`)
    on all three modules in parallel
@@ -157,14 +157,14 @@ without echoing the response body
 ### Identity matching
 
 The callback first looks the user up by `githubId`
-(`backend/src/routes/oauth.ts:121#"where: { githubId }"`). Only when that
+(`backend/src/routes/oauth.ts:127#"where: { githubId }"`). Only when that
 misses does it fall back to the primary verified email, which
 `fetchPrimaryVerifiedEmail` returns lower-cased or as null
 (`backend/src/services/github-oauth.ts:127-129#"match.email.toLowerCase()"`).
 An email match is refused with `email_collision` when that row is already
 linked to a different `githubId` or is a password account without a
 `githubId`
-(`backend/src/routes/oauth.ts:129-147#"user = byEmail;"`).
+(`backend/src/routes/oauth.ts:135-153#"user = byEmail;"`).
 
 ### Partial registration still signs the user in
 
@@ -172,9 +172,9 @@ linked to a different `githubId` or is a password account without a
 unparsable body or a missing `apiToken` into an `ok: false` result, and the
 callback only logs the failed services. A thrown error from the orchestrator
 is caught and logged as well
-(`backend/src/routes/oauth.ts:195-203#"module registration orchestrator threw"`).
+(`backend/src/routes/oauth.ts:201-209#"module registration orchestrator threw"`).
 The session is created afterwards, whatever the registration outcome
-(`backend/src/routes/oauth.ts:206-208#"sessionToken = await createSession(user.id);"`).
+(`backend/src/routes/oauth.ts:212-214#"sessionToken = await createSession(user.id);"`).
 The `upsertCredential` call is the one step inside `registerWithModule`
 without its own error handling, so a database error there rejects the whole
 `Promise.all`; tokens already stored for the other modules stay stored, and
