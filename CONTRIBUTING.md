@@ -26,6 +26,16 @@ Thanks for your interest. project-pilot is the unified control plane for the ful
 
    # frontend
    npm run typecheck:test --workspace=frontend
+   # Forbid next/font/google (the exact CI font guard; see .github/workflows/ci.yml)
+   rc=0
+   grep -rn --include='*.ts' --include='*.tsx' --include='*.mts' --include='*.cts' --include='*.js' --include='*.jsx' --include='*.mjs' --include='*.cjs' --exclude-dir=node_modules --exclude-dir=.next 'next/font/google' frontend || rc=$?
+   if [ "$rc" -eq 0 ]; then
+     echo "next/font/google is forbidden, vendor the font and use next/font/local" >&2
+     exit 1
+   elif [ "$rc" -ne 1 ]; then
+     echo "font guard: grep failed (exit $rc)" >&2
+     exit 1
+   fi
    npm run build --workspace=frontend
    npm run test:coverage --workspace=frontend
 
