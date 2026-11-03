@@ -39,6 +39,13 @@ FROM node:22-alpine AS runner
 RUN apk add --no-cache openssl
 WORKDIR /app/backend
 
+# Production is the image's default environment: the placeholder-secret and
+# downstream-service-URL checks in src/config only run with NODE_ENV=production,
+# so a bare `docker run` of this image (no compose file) cannot skip them. A
+# compose service `environment:` overrides an image ENV, so the development
+# stack's NODE_ENV=development still wins there.
+ENV NODE_ENV=production
+
 # node_modules holds the backend's production dependencies only. The prisma CLI
 # the schema step (`prisma db push`, run in this image) needs is already among
 # them: the lockfile marks prisma and @prisma/engines devOptional (optional peer of @prisma/client), which

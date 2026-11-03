@@ -1,23 +1,58 @@
-# Build context is the repo root (see docker-compose*.yml). Keep secrets,
-# VCS data and host-built artifacts out of it.
-.git
-.github
-.ai
-.claude
+# Build context is the repo root for both images (docker build -f
+# backend/Dockerfile . and -f frontend/Dockerfile ., see docker-compose*.yml).
+# Allow list: `*` excludes everything, then one `!` entry per path the two
+# Dockerfiles read, so a file dropped anywhere else in the checkout (a key, a
+# dump, an agent scratch dir, docs) never reaches the daemon. The entries mirror
+# the COPY lines of backend/Dockerfile and frontend/Dockerfile and the files
+# those builds read: npm ci needs the root lockfile and all three workspace
+# manifests, the backend build needs tsconfig.json + src + prisma, the frontend
+# build needs tsconfig.json, next.config.ts, postcss.config.mjs, eslint.config.mjs,
+# src and public. BuildKit matches parent paths too, so a `!dir` entry covers
+# everything below that directory and the paired `!dir/**` entries are
+# belt-and-braces, not required; a `!` entry only survives what comes after it,
+# so the excludes below stay a second layer that prunes inside the allow list
+# (nothing here ships a .env at all, so `.env.example` is not excepted: no
+# Dockerfile copies it).
+*
+
+!package.json
+!package-lock.json
+
+!backend/package.json
+!backend/tsconfig.json
+!backend/prisma
+!backend/prisma/**
+!backend/src
+!backend/src/**
+
+!frontend/package.json
+!frontend/tsconfig.json
+!frontend/next.config.ts
+!frontend/postcss.config.mjs
+!frontend/eslint.config.mjs
+!frontend/public
+!frontend/public/**
+!frontend/src
+!frontend/src/**
+
+!mcp/package.json
+
+# Second layer: keep secrets and host-built artifacts out even under an entry
+# above (they are matched anywhere in the tree, so a key committed inside a
+# source directory stays out of the context too). This keeps every exclude of
+# the old denylist that can appear inside an allowed directory; the rest are
+# covered by the allow list itself: .git, .github, .ai, .claude and docs are
+# top-level paths no `!` entry names, and the only tests directories in the
+# checkout (backend/tests, frontend/tests, mcp/tests) sit outside the allowed
+# directories.
+**/.env*
+**/*.pem
+**/*.key
+**/.npmrc
 **/node_modules
 **/.next
 **/dist
 **/coverage
 **/*.tsbuildinfo
-.env
-.env.*
-**/.env
-**/.env.*
-!**/.env.example
 **/*.db
 **/*.db-journal
-**/*.pem
-**/*.key
-**/.npmrc
-docs
-**/tests

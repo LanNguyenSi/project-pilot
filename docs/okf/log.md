@@ -2,6 +2,12 @@
 
 <!-- Add new entries at the top, newest first. -->
 
+- 2026-11-03T16:42:38Z, credential-trust-boundary and request-gating-and-sessions re-verified and
+  re-stamped after `backend/src/config/index.ts` (placeholder secret compared trimmed and
+  lower-cased) and `backend/src/routes/health.ts` (reads the `User` table, 503 `schema_missing`)
+  changed: the cited lines `config/index.ts:5`, `:33`, `:42` and `health.ts:7` are unchanged, the
+  production refusal still holds (now also for padded or upper-case copies) and `GET /api/health`
+  still has no auth check.
 - 2026-11-03T07:09:36Z, credential-trust-boundary and request-gating-and-sessions re-verified and
   re-stamped after `backend/src/routes/oauth.ts` gained the public `GET /config` flag
   and the unconfigured start redirect: twelve line citations re-pointed (the cited

@@ -24,7 +24,11 @@ vi.mock("../src/config/index.js", () => ({
 }));
 
 vi.mock("../src/lib/prisma.js", () => ({
-  prisma: { $queryRaw: vi.fn().mockResolvedValue([{ "?column?": 1 }]) },
+  prisma: {
+    $queryRaw: vi.fn().mockResolvedValue([{ "?column?": 1 }]),
+    // The health route also reads the User table to prove the schema is there.
+    user: { findFirst: vi.fn().mockResolvedValue({ id: "user-a" }) },
+  },
 }));
 
 // Imported after vi.mock so the app receives the mocked config and prisma.

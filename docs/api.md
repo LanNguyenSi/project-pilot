@@ -81,7 +81,7 @@ Project and claimable-task counts come from agent-tasks; server, online-server, 
 
 ## Health
 
-- `GET /api/health` health check with DB status
+- `GET /api/health` health check with DB status: `200 {"status":"ok","db":"connected"}` after `SELECT 1` and a read of the `User` table, `503 {"status":"degraded","db":"disconnected"}` when the database does not answer, `503 {"status":"degraded","db":"schema_missing"}` when it answers but the table is not there (no schema applied). The Docker healthcheck, the relay health gate and `make deploy` poll this route, so an unapplied schema is not a green deploy.
 
 ## Validation surface
 
