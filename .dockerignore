@@ -7,10 +7,12 @@
 # those builds read: npm ci needs the root lockfile and all three workspace
 # manifests, the backend build needs tsconfig.json + src + prisma, the frontend
 # build needs tsconfig.json, next.config.ts, postcss.config.mjs, eslint.config.mjs,
-# src and public. A directory needs both its own entry and its `/**` entry, and
-# a `!` entry only survives what comes after it, so the secret excludes below
-# stay a second layer that prunes inside the allow list (nothing here ships a
-# .env at all, so `.env.example` is not excepted: no Dockerfile copies it).
+# src and public. BuildKit matches parent paths too, so a `!dir` entry covers
+# everything below that directory and the paired `!dir/**` entries are
+# belt-and-braces, not required; a `!` entry only survives what comes after it,
+# so the excludes below stay a second layer that prunes inside the allow list
+# (nothing here ships a .env at all, so `.env.example` is not excepted: no
+# Dockerfile copies it).
 *
 
 !package.json
@@ -37,7 +39,12 @@
 
 # Second layer: keep secrets and host-built artifacts out even under an entry
 # above (they are matched anywhere in the tree, so a key committed inside a
-# source directory stays out of the context too).
+# source directory stays out of the context too). This keeps every exclude of
+# the old denylist that can appear inside an allowed directory; the rest are
+# covered by the allow list itself: .git, .github, .ai, .claude and docs are
+# top-level paths no `!` entry names, and the only tests directories in the
+# checkout (backend/tests, frontend/tests, mcp/tests) sit outside the allowed
+# directories.
 **/.env*
 **/*.pem
 **/*.key
@@ -45,3 +52,7 @@
 **/node_modules
 **/.next
 **/dist
+**/coverage
+**/*.tsbuildinfo
+**/*.db
+**/*.db-journal

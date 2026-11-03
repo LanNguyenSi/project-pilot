@@ -19,7 +19,11 @@
 //    node_modules directory);
 // 5. a pruned directory is re-entered when a later `!` pattern addresses it or
 //    something below it, which is what makes `*` plus a `!backend/src/...` entry
-//    work.
+//    work;
+// 6. parent matching, as in Docker's pattern matcher (measured with BuildKit):
+//    a `!` pattern whose glob matches an ancestor directory also matches every
+//    path below it, so `*` plus a lone `!backend/src` includes all of
+//    backend/src and a paired `!dir/**` entry is belt-and-braces, not needed.
 //
 // The check for the COPY lines is deliberately two-sided: every file a Dockerfile
 // COPYs from the context must be in the context, and a list of the files those
@@ -83,10 +87,27 @@ function parseDockerignore(text: string): Rule[] {
   return rules;
 }
 
+/**
+ * Docker's pattern matcher also matches parent paths: a `!` pattern whose glob
+ * matches an ancestor of the path matches the whole subtree below it. Plain
+ * (excluding) patterns do not need this here, the ancestor pruning below
+ * models their subtree effect.
+ */
+function ruleMatches(rule: Rule, path: string): boolean {
+  if (rule.re.test(path)) return true;
+  if (rule.negate) {
+    const parts = path.split("/");
+    for (let i = 1; i < parts.length; i++) {
+      if (rule.re.test(parts.slice(0, i).join("/"))) return true;
+    }
+  }
+  return false;
+}
+
 function lastMatching(path: string, rules: Rule[]): number {
   let index = -1;
   rules.forEach((rule, i) => {
-    if (rule.re.test(path)) index = i;
+    if (ruleMatches(rule, path)) index = i;
   });
   return index;
 }
@@ -185,11 +206,11 @@ describe("matcher for .dockerignore semantics (fixture)", () => {
     expect(at("id_rsa")).toBe(false);
     expect(at("docs/README.md")).toBe(true);
     expect(at("docs/other.md")).toBe(false);
-    // A `!dir` entry alone re-enters the directory but does not list its
-    // contents: each nested path still needs its own entry.
+    // Parent matching (rule 6): a `!dir` entry covers everything below the
+    // directory, no `/**` twin needed; a nested path outside it stays out.
     expect(at("a/b/c")).toBe(true);
     expect(at("a/b/c/d.ts")).toBe(true);
-    expect(at("a/b/c/other.ts")).toBe(false);
+    expect(at("a/b/c/other.ts")).toBe(true);
     expect(at("a/b/x.ts")).toBe(false);
   });
 
@@ -241,15 +262,18 @@ describe("build context of both images contains what the Dockerfiles COPY", () =
     }
   });
 
-  it("every `dir/**` allow-list entry is paired with a `!dir` entry", () => {
+  it("every `dir/**` allow-list entry is paired with a `!dir` entry (style)", () => {
+    // Parent matching (rule 6) makes the `/**` twin belt-and-braces, not
+    // required, so this is a style check that keeps the two forms paired.
     const negated = rules.filter((rule) => rule.negate);
     for (const rule of negated) {
       if (!rule.pattern.endsWith("/**")) continue;
       const dir = rule.pattern.slice(0, -"/**".length);
       expect(
         negated.some((other) => other.pattern === dir),
-        `${rule.pattern} has no !${dir} entry, so a builder that prunes excluded ` +
-          "directories never descends into it",
+        `${rule.pattern} has no !${dir} entry; the /** twin is belt-and-braces ` +
+          "(BuildKit includes the whole subtree of a !dir entry on its own), " +
+          "but the allow list pairs the two forms by style",
       ).toBe(true);
     }
   });
@@ -285,6 +309,16 @@ describe("build context of both images stays free of secrets and host junk", () 
     "backend/src/node_modules/left-pad/index.js",
     "backend/dist/server.js",
     "frontend/src/.next/cache/lock",
+    "backend/coverage/lcov.info",
+    // A coverage directory inside an allowed directory: only the second layer
+    // keeps it out there (the allow list alone would include it).
+    "frontend/src/coverage/lcov.info",
+    "frontend/src/x.tsbuildinfo",
+    // Databases and journal files (the old denylist had these, the second
+    // layer keeps them out inside the allowed directories).
+    "backend/prisma/dev.db",
+    "backend/prisma/dev.db-journal",
+    "frontend/public/x.db",
   ])("%s is excluded", (path) => {
     expect(inContext(path)).toBe(false);
   });
