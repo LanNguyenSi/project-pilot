@@ -124,6 +124,56 @@ describe("SESSION_SECRET placeholder rejection", () => {
   });
 });
 
+// The known placeholder is the value, not one spelling of it: padding and
+// letter case are not protection against a publicly known key, so each of them
+// is its own case in both environments (and a real secret stays accepted).
+describe("placeholder comparison ignores padding and case", () => {
+  // PLACEHOLDER is only set once beforeAll has imported the config module, i.e.
+  // after this describe body ran, so the variants are built inside each case.
+  const VARIANTS = ["as shipped", "padded", "upper case", "mixed case"] as const;
+  const secretFor = (variant: (typeof VARIANTS)[number]) => {
+    if (variant === "padded") return `  ${PLACEHOLDER}  `;
+    if (variant === "upper case") return PLACEHOLDER.toUpperCase();
+    if (variant === "mixed case") {
+      return PLACEHOLDER.split("-")
+        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+        .join("-");
+    }
+    return PLACEHOLDER;
+  };
+
+  it.each(VARIANTS.map((variant) => ({ variant })))(
+    "production + $variant placeholder throws",
+    ({ variant }) => {
+      expect(() =>
+        parseConfig(
+          envWith({ NODE_ENV: "production", SESSION_SECRET: secretFor(variant) }),
+        ),
+      ).toThrow(/placeholder/i);
+    },
+  );
+
+  it("production + real secret that no normalisation turns into a placeholder is accepted", () => {
+    const config = parseConfig(
+      envWith({ NODE_ENV: "production", SESSION_SECRET: `  ${REAL_SECRET}` }),
+    );
+    expect(config.SESSION_SECRET).toBe(`  ${REAL_SECRET}`);
+    expect(warnSpy.mock.calls).toHaveLength(0);
+  });
+
+  it.each(VARIANTS.map((variant) => ({ variant })))(
+    "development + $variant placeholder is accepted with a warning and keeps the value as set",
+    ({ variant }) => {
+      const secret = secretFor(variant);
+      const config = parseConfig(
+        envWith({ NODE_ENV: "development", SESSION_SECRET: secret }),
+      );
+      expect(config.SESSION_SECRET).toBe(secret);
+      expect(warnText()).toMatch(/placeholder/i);
+    },
+  );
+});
+
 describe("placeholders shipped in the templates are rejected in production", () => {
   it("backend/.env.example literally ships change-me-to-something-secure", () => {
     expect(ENV_EXAMPLE_SECRET).toBe("change-me-to-something-secure");

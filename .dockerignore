@@ -1,23 +1,47 @@
-# Build context is the repo root (see docker-compose*.yml). Keep secrets,
-# VCS data and host-built artifacts out of it.
-.git
-.github
-.ai
-.claude
-**/node_modules
-**/.next
-**/dist
-**/coverage
-**/*.tsbuildinfo
-.env
-.env.*
-**/.env
-**/.env.*
-!**/.env.example
-**/*.db
-**/*.db-journal
+# Build context is the repo root for both images (docker build -f
+# backend/Dockerfile . and -f frontend/Dockerfile ., see docker-compose*.yml).
+# Allow list: `*` excludes everything, then one `!` entry per path the two
+# Dockerfiles read, so a file dropped anywhere else in the checkout (a key, a
+# dump, an agent scratch dir, docs) never reaches the daemon. The entries mirror
+# the COPY lines of backend/Dockerfile and frontend/Dockerfile and the files
+# those builds read: npm ci needs the root lockfile and all three workspace
+# manifests, the backend build needs tsconfig.json + src + prisma, the frontend
+# build needs tsconfig.json, next.config.ts, postcss.config.mjs, eslint.config.mjs,
+# src and public. A directory needs both its own entry and its `/**` entry, and
+# a `!` entry only survives what comes after it, so the secret excludes below
+# stay a second layer that prunes inside the allow list (nothing here ships a
+# .env at all, so `.env.example` is not excepted: no Dockerfile copies it).
+*
+
+!package.json
+!package-lock.json
+
+!backend/package.json
+!backend/tsconfig.json
+!backend/prisma
+!backend/prisma/**
+!backend/src
+!backend/src/**
+
+!frontend/package.json
+!frontend/tsconfig.json
+!frontend/next.config.ts
+!frontend/postcss.config.mjs
+!frontend/eslint.config.mjs
+!frontend/public
+!frontend/public/**
+!frontend/src
+!frontend/src/**
+
+!mcp/package.json
+
+# Second layer: keep secrets and host-built artifacts out even under an entry
+# above (they are matched anywhere in the tree, so a key committed inside a
+# source directory stays out of the context too).
+**/.env*
 **/*.pem
 **/*.key
 **/.npmrc
-docs
-**/tests
+**/node_modules
+**/.next
+**/dist

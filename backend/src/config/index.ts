@@ -74,9 +74,13 @@ export function parseConfig(env: NodeJS.ProcessEnv): Config {
   const isProduction = data.NODE_ENV === "production";
   const errors: string[] = [];
 
+  // Surrounding whitespace and letter case are not protection: a secret that
+  // only differs from a placeholder that way is still the publicly known key,
+  // so both are normalised away before the comparison.
+  const normalizedSecret = data.SESSION_SECRET.trim().toLowerCase();
   const isPlaceholder = (
     PLACEHOLDER_SESSION_SECRETS as readonly string[]
-  ).includes(data.SESSION_SECRET);
+  ).some((placeholder) => placeholder.toLowerCase() === normalizedSecret);
   if (isPlaceholder) {
     if (isProduction) {
       errors.push(
