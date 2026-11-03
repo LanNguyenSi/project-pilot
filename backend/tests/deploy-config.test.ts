@@ -88,6 +88,12 @@ describe("production compose project", () => {
     expect(prod).toMatch(/^name: project-pilot$/m);
   });
 
+  it("the frontend image binds the standalone server to all interfaces", () => {
+    // Docker sets HOSTNAME to the container id; the image healthcheck probes
+    // localhost, so the server must not bind to that id alone.
+    expect(read("frontend/Dockerfile")).toMatch(/^ENV HOSTNAME=0\.0\.0\.0$/m);
+  });
+
   it("guards POSTGRES_PASSWORD wherever it is interpolated", () => {
     expect(prod).not.toMatch(/\$\{POSTGRES_PASSWORD\}/);
     expect(countMatches(prod, /\$\{POSTGRES_PASSWORD:\?[^}]+\}/g)).toBeGreaterThanOrEqual(2);
