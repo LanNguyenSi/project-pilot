@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Changed
 
 - Dependency updates: `renovate.json` extends the shared `github>LanNguyenSi/renovate-config` preset (weekly grouped patch/minor pull requests, 7-day minimum release age, no automerge, majors only through the Dependency Dashboard).
-
+- Removed the `GHSA-vfj7-8cjw-p6xm` (braces) entry from `.github/audit-allowlist.json`: GitHub withdrew the advisory on 2026-10-23, and `npm audit` no longer reports it in this repo's lockfile tree(s), so the gate stays CLEAN with an empty `entries` list. `scripts/audit-gate.mjs` is unchanged.
 
 ## [0.7.0] - 2026-11-01
 
