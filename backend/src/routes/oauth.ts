@@ -1,6 +1,8 @@
 /**
  * GitHub OAuth routes — identity-broker entry point.
  *
+ *   GET /api/oauth/config           — public {github: boolean}: is GitHub OAuth
+ *                                     configured (drives the login button)
  *   GET /api/oauth/github/start     — redirect to GitHub with CSRF state
  *   GET /api/oauth/github/callback  — verify code, upsert user, orchestrate
  *                                     module registration, set session cookie
@@ -55,16 +57,20 @@ async function createSession(userId: string): Promise<string> {
   return token;
 }
 
+// Public and unauthenticated by design: the login page needs it before any
+// session exists. Exposes only the boolean, never the client id, secret or
+// callback URL. Same predicate as buildOAuthConfig (both values required).
+oauth.get("/config", (c) => {
+  c.header("Cache-Control", "no-store");
+  return c.json({ github: hasGitHubOAuthConfigured });
+});
+
 oauth.get("/github/start", (c) => {
   const cfg = buildOAuthConfig();
   if (!cfg) {
-    return c.json(
-      {
-        error: "not_configured",
-        message: "GitHub OAuth is not configured on this instance",
-      },
-      503,
-    );
+    // A visitor with an old bookmark or link: land on the friendly error page
+    // instead of raw JSON.
+    return c.redirect(`${config.FRONTEND_URL}/auth/error?reason=not_configured`);
   }
 
   const state = generateState();
