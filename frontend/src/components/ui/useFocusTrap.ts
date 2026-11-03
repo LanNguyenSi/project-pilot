@@ -6,6 +6,25 @@ const FOCUSABLE_SELECTOR =
   'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
 
 /**
+ * Focusable descendants that are actually rendered.
+ *
+ * An element in a `display: none` subtree has no client rects and cannot be
+ * focused, so keeping it in the list makes the trap wrap to a control that
+ * swallows the focus: `last.focus()` on a hidden last element leaves the focus
+ * where it was and Tab stops cycling.
+ *
+ * jsdom has no layout engine, so it reports no client rects for *anything*
+ * (a plain button included). That signal is meaningless rather than "hidden",
+ * so an entirely rect-less document falls back to the unfiltered list; real
+ * browsers lay out, filter, and stay on the filtered path.
+ */
+function getFocusable(container: HTMLElement): HTMLElement[] {
+  const all = Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
+  const rendered = all.filter((el) => el.getClientRects().length > 0);
+  return rendered.length > 0 ? rendered : all;
+}
+
+/**
  * Traps Tab focus inside `containerRef` and closes on Escape.
  *
  * Extracted from Modal.tsx and TaskDetailPanel.tsx (both had identical logic).
@@ -33,7 +52,7 @@ export function useFocusTrap(
       return;
     }
     if (e.key === "Tab" && containerRef.current) {
-      const focusable = containerRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR);
+      const focusable = getFocusable(containerRef.current);
       if (focusable.length === 0) return;
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
@@ -51,9 +70,9 @@ export function useFocusTrap(
     if (!active) return;
     document.addEventListener("keydown", handleKey);
     document.body.style.overflow = "hidden";
-    // Focus first focusable element
+    // Focus first focusable element (skipping hidden ones, same list as Tab)
     requestAnimationFrame(() => {
-      const el = containerRef.current?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
+      const el = containerRef.current ? getFocusable(containerRef.current)[0] : undefined;
       el?.focus();
     });
     return () => {

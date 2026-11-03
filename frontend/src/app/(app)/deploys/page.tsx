@@ -348,7 +348,7 @@ export default function DeploysPage() {
         title="Deploys"
         description="Manage servers, applications, and deployment history."
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Button size="sm" variant="secondary" onClick={() => setInstallRelayOpen(true)}>
               <Icon name="rocket" size={16} className="mr-1" />
               Install relay

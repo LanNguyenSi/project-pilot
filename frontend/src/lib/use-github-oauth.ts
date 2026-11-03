@@ -4,24 +4,33 @@ import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
 
 /**
- * Whether the backend has GitHub OAuth configured. Fails closed: false while
- * loading and when the request fails, so the login page never offers a button
- * that leads to a dead end.
+ * `pending` while the config request is in flight, so a caller can reserve the
+ * space of whatever it would render for `enabled` instead of letting the layout
+ * jump when the answer arrives.
  */
-export function useGitHubOAuthEnabled(): boolean {
-  const [enabled, setEnabled] = useState(false);
+export type GitHubOAuthStatus = "pending" | "enabled" | "disabled";
+
+/**
+ * Whether the backend has GitHub OAuth configured. Fails closed: `pending`
+ * while loading and `disabled` when the request fails, so the login page never
+ * offers a button that leads to a dead end. `pending` is reported separately
+ * from `disabled` only so the login card can hold its height across the
+ * pending -> enabled transition.
+ */
+export function useGitHubOAuthStatus(): GitHubOAuthStatus {
+  const [status, setStatus] = useState<GitHubOAuthStatus>("pending");
   useEffect(() => {
     let cancelled = false;
     apiFetch<{ github?: unknown }>("/api/oauth/config")
       .then((res) => {
-        if (!cancelled) setEnabled(res?.github === true);
+        if (!cancelled) setStatus(res?.github === true ? "enabled" : "disabled");
       })
       .catch(() => {
-        if (!cancelled) setEnabled(false);
+        if (!cancelled) setStatus("disabled");
       });
     return () => {
       cancelled = true;
     };
   }, []);
-  return enabled;
+  return status;
 }

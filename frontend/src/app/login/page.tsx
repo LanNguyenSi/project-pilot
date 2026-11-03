@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { API_URL, apiFetch } from "@/lib/api";
-import { useGitHubOAuthEnabled } from "@/lib/use-github-oauth";
+import { useGitHubOAuthStatus } from "@/lib/use-github-oauth";
 import { Button, Card, Input } from "@/components/ui";
 
 /** Shared brand mark used on all auth pages. */
@@ -21,9 +21,28 @@ function BrandMark() {
   );
 }
 
+/**
+ * Box of the GitHub call to action: the sizing classes shared by the real link
+ * and by the placeholder below, so the placeholder reserves exactly the height
+ * of what appears when the OAuth config request resolves as configured.
+ */
+const GITHUB_CTA_BOX =
+  "w-full flex items-center justify-center gap-2 py-2 mb-4 rounded-button border text-sm font-medium";
+
+/** "or" divider between the GitHub call to action and the email form. */
+function GitHubDivider() {
+  return (
+    <div className="flex items-center gap-2 mb-4">
+      <div className="flex-1 h-px bg-stroke-subtle" />
+      <span className="text-xs text-content-tertiary">or</span>
+      <div className="flex-1 h-px bg-stroke-subtle" />
+    </div>
+  );
+}
+
 export default function LoginPage() {
   const router = useRouter();
-  const githubEnabled = useGitHubOAuthEnabled();
+  const githubOAuth = useGitHubOAuthStatus();
   const [isRegister, setIsRegister] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -68,14 +87,26 @@ export default function LoginPage() {
             </p>
           </div>
 
-          {githubEnabled && (
+          {githubOAuth === "pending" && (
+            /* The block that a "configured" answer renders, held open in advance
+               so the centred card does not jump when the answer arrives. It is
+               invisible (nothing painted, nothing focusable), aria-hidden (no
+               accessible node) and plain divs, never a link or a button. A
+               "not configured" answer renders nothing here instead. */
+            <div aria-hidden="true" className="invisible">
+              <div className={GITHUB_CTA_BOX}>Continue with GitHub</div>
+              <GitHubDivider />
+            </div>
+          )}
+
+          {githubOAuth === "enabled" && (
             <>
               {/* GitHub OAuth - full-page navigation so the browser follows the
                   302 redirect dance. The callback lands back on /dashboard (or
                   /auth/error on failure). */}
               <a
                 href={`${API_URL}/api/oauth/github/start`}
-                className="w-full flex items-center justify-center gap-2 py-2 mb-4 rounded-button bg-[#24292e] hover:bg-[#1a1e22] border border-stroke-strong text-sm font-medium text-white transition-colors duration-fast focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-brand-500/60"
+                className={`${GITHUB_CTA_BOX} bg-[#24292e] hover:bg-[#1a1e22] border-stroke-strong text-white transition-colors duration-fast focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-brand-500/60`}
               >
                 <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true">
                   <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" />
@@ -83,11 +114,7 @@ export default function LoginPage() {
                 Continue with GitHub
               </a>
 
-              <div className="flex items-center gap-2 mb-4">
-                <div className="flex-1 h-px bg-stroke-subtle" />
-                <span className="text-xs text-content-tertiary">or</span>
-                <div className="flex-1 h-px bg-stroke-subtle" />
-              </div>
+              <GitHubDivider />
             </>
           )}
 
