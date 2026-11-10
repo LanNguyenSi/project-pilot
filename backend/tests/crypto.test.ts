@@ -145,15 +145,12 @@ describe("crypto (AES-256-GCM)", () => {
       await expect(decrypt(legacy)).resolves.toBe("legacy-token");
     });
 
-    it("decrypts a fixed fixture written by the synchronous implementation", async () => {
+    it("decrypts a literal fixture written by the synchronous implementation", async () => {
+      // Produced once with scryptSync, salt 00112233445566778899aabbccddeeff, iv
+      // aabbccddeeff001122334455 and the test SESSION_SECRET, plaintext "fixed".
       const fixture =
         "00112233445566778899aabbccddeeff:aabbccddeeff001122334455:" +
-        (() => {
-          const key = scryptSync("test-session-secret-must-be-32chars!!", Buffer.from("00112233445566778899aabbccddeeff", "hex"), 32);
-          const c = createCipheriv("aes-256-gcm", key, Buffer.from("aabbccddeeff001122334455", "hex"));
-          const ct = c.update("fixed", "utf8", "hex") + c.final("hex");
-          return `${c.getAuthTag().toString("hex")}:${ct}`;
-        })();
+        "e4f9b9195ec1ca039b65909ef3540e0b:cd5380e410";
       await expect(decrypt(fixture)).resolves.toBe("fixed");
     });
   });
@@ -208,6 +205,21 @@ describe("crypto (AES-256-GCM)", () => {
       await expect(decrypt(enc)).rejects.toThrow("scrypt failed");
       expect(keyCacheSize()).toBe(0);
       await expect(decrypt(enc)).resolves.toBe("retry");
+      expect(scryptControl.calls).toBe(2);
+    });
+
+    it("a late rejection does not delete a newer derivation of the same salt", async () => {
+      const enc = await encrypt("newer");
+      clearKeyCache();
+      scryptControl.calls = 0;
+      scryptControl.failNext = true;
+      const failing = decrypt(enc); // rejects on the next tick
+      clearKeyCache(); // the failing derivation is no longer the cached entry
+      const fresh = decrypt(enc); // inserts a new pending derivation for the same salt
+      await expect(failing).rejects.toThrow("scrypt failed");
+      expect(keyCacheSize()).toBe(1);
+      await expect(fresh).resolves.toBe("newer");
+      await expect(decrypt(enc)).resolves.toBe("newer");
       expect(scryptControl.calls).toBe(2);
     });
   });
