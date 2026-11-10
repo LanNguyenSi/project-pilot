@@ -33,10 +33,7 @@ credentials.get("/", async (c) => {
 
 // Per user, in addition to the per-IP bucket the middleware always applies.
 // requireAuth ran before this, so the user id is in the context.
-const userKey = (c: Context<AppEnv>) => {
-  const userId = c.get("userId");
-  return userId ? `user:${userId}` : undefined;
-};
+const userKey = (c: Context<AppEnv>) => `user:${c.get("userId")!}`;
 
 // PUT /credentials — upsert a service credential, 10 writes per minute
 credentials.put("/", rateLimit({ max: 10, windowMs: 60_000, keyGenerator: userKey }), zValidate("json", upsertSchema), async (c) => {
