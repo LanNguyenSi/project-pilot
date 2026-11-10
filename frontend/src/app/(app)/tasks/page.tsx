@@ -254,6 +254,7 @@ export default function TaskProjectsPage() {
               <div className="flex items-center gap-3 mb-4">
                 <Input
                   type="text"
+                  aria-label="Search projects"
                   placeholder="Search projects..."
                   value={search}
                   onChange={(e) => { setSearch(e.target.value); setPage(0); }}
