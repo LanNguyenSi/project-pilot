@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import { Badge, Button, Card, EmptyState, ErrorBanner, Icon, Select, SkeletonRow } from "@/components/ui";
@@ -55,6 +55,7 @@ export default function ProjectTasksPage() {
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [page, setPage] = useState(0);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const openerRef = useRef<HTMLElement | null>(null);
   const [view, setView] = useState<ViewMode>(() => {
     if (typeof window !== "undefined") {
       return (localStorage.getItem(VIEW_KEY) as ViewMode) || "list";
@@ -84,6 +85,19 @@ export default function ProjectTasksPage() {
       })
       .finally(() => setLoading(false));
   }, [projectId, router]);
+
+  const openTask = useCallback((e: MouseEvent<HTMLElement>, id: string) => {
+    openerRef.current = e.currentTarget;
+    setSelectedTaskId(id);
+  }, []);
+
+  // Hand focus back to the card that opened the panel once it has closed.
+  useEffect(() => {
+    if (selectedTaskId !== null) return;
+    const opener = openerRef.current;
+    openerRef.current = null;
+    if (opener?.isConnected) opener.focus();
+  }, [selectedTaskId]);
 
   const filtered = filter === "all" ? tasks : tasks.filter((t) => t.status === filter);
 
@@ -174,17 +188,19 @@ export default function ProjectTasksPage() {
           ) : (
             <div className="hidden sm:block" />
           )}
-          <div className="flex gap-1 self-start sm:self-auto border border-stroke-default rounded-button p-0.5">
+          <div role="group" aria-label="View" className="flex gap-1 self-start sm:self-auto border border-stroke-default rounded-button p-0.5">
             <button
               onClick={() => { setView("list"); localStorage.setItem(VIEW_KEY, "list"); }}
-              className={`px-2.5 py-1 text-xs font-medium rounded-button transition-colors ${view === "list" ? "bg-surface-overlay text-content-primary" : "text-content-tertiary hover:text-content-primary"}`}
+              aria-pressed={view === "list"}
+              className={`px-2.5 py-1 text-xs rounded-button transition-colors duration-fast focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-brand-500/60 ${view === "list" ? "bg-surface-overlay text-content-primary font-bold" : "font-medium text-content-tertiary hover:text-content-primary"}`}
               aria-label="List view"
             >
               List
             </button>
             <button
               onClick={() => { setView("board"); setFilter("all"); localStorage.setItem(VIEW_KEY, "board"); }}
-              className={`px-2.5 py-1 text-xs font-medium rounded-button transition-colors ${view === "board" ? "bg-surface-overlay text-content-primary" : "text-content-tertiary hover:text-content-primary"}`}
+              aria-pressed={view === "board"}
+              className={`px-2.5 py-1 text-xs rounded-button transition-colors duration-fast focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-brand-500/60 ${view === "board" ? "bg-surface-overlay text-content-primary font-bold" : "font-medium text-content-tertiary hover:text-content-primary"}`}
               aria-label="Board view"
             >
               Board
@@ -229,7 +245,7 @@ export default function ProjectTasksPage() {
                         key={t.id}
                         noPadding
                         className="overflow-hidden cursor-pointer hover:border-stroke-strong transition-colors"
-                        onClick={() => setSelectedTaskId(t.id)}
+                        onClick={(e) => openTask(e, t.id)}
                       >
                         <div className="flex">
                           <div className={`w-1 shrink-0 ${barColor}`} />
@@ -264,7 +280,7 @@ export default function ProjectTasksPage() {
               const status = statusMap[t.status] || { label: t.status, variant: "neutral" as const };
               const barColor = priorityBar[t.priority] || "bg-surface-overlay";
               return (
-                <Card key={t.id} noPadding className="overflow-hidden cursor-pointer hover:border-stroke-strong transition-colors" onClick={() => setSelectedTaskId(t.id)}>
+                <Card key={t.id} noPadding className="overflow-hidden cursor-pointer hover:border-stroke-strong transition-colors" onClick={(e) => openTask(e, t.id)}>
                   <div className="flex">
                     <div className={`w-1 shrink-0 ${barColor}`} />
                     <div className="flex-1 p-4 flex items-center gap-4 min-w-0">
