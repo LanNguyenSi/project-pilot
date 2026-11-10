@@ -139,6 +139,10 @@ export default function DeploysPage() {
   const hasActiveDeploys = deploys.some((d) => d.status === "running" || d.status === "deploying");
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // WAI-ARIA tabs: roving focus needs a handle on each tab button so the arrow
+  // keys can move DOM focus (not just selection) to the newly selected tab.
+  const tabRefs = useRef<Partial<Record<Tab, HTMLButtonElement | null>>>({});
+
   useEffect(() => {
     if (hasActiveDeploys) {
       pollRef.current = setInterval(() => {
@@ -324,6 +328,33 @@ export default function DeploysPage() {
     { key: "history", label: "History", count: deployTotal },
   ];
 
+  // Roving-tabindex tablist keyboard model: arrow keys move selection AND focus
+  // (wrapping at both ends); Home/End jump to the first/last tab. Selection and
+  // focus move together, so the newly selected tab is the focused one.
+  function selectTabByIndex(index: number) {
+    const wrapped = (index + tabs.length) % tabs.length;
+    const key = tabs[wrapped].key;
+    setTab(key);
+    tabRefs.current[key]?.focus();
+  }
+
+  function onTabKeyDown(e: React.KeyboardEvent) {
+    const current = tabs.findIndex((t) => t.key === tab);
+    if (e.key === "ArrowRight") {
+      e.preventDefault();
+      selectTabByIndex(current + 1);
+    } else if (e.key === "ArrowLeft") {
+      e.preventDefault();
+      selectTabByIndex(current - 1);
+    } else if (e.key === "Home") {
+      e.preventDefault();
+      selectTabByIndex(0);
+    } else if (e.key === "End") {
+      e.preventDefault();
+      selectTabByIndex(tabs.length - 1);
+    }
+  }
+
   // Select options derived from loaded data
   const serverOptions = [
     { value: "", label: "All servers" },
@@ -374,8 +405,15 @@ export default function DeploysPage() {
             <button
               key={t.key}
               role="tab"
+              id={`deploys-tab-${t.key}`}
               aria-selected={tab === t.key}
+              aria-controls={`deploys-panel-${t.key}`}
+              tabIndex={tab === t.key ? 0 : -1}
               onClick={() => setTab(t.key)}
+              onKeyDown={onTabKeyDown}
+              ref={(el) => {
+                tabRefs.current[t.key] = el;
+              }}
               className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors duration-fast -mb-px ${
                 tab === t.key
                   ? "text-content-primary border-brand-500"
@@ -391,12 +429,12 @@ export default function DeploysPage() {
 
       {/* Servers tab */}
       {tab === "servers" && (
-        <div role="tabpanel" aria-label="Servers">
+        <div role="tabpanel" id="deploys-panel-servers" aria-labelledby="deploys-tab-servers" tabIndex={0}>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {servers.map((s) => (
               <Card key={s.id}>
                 <div className="flex items-center justify-between mb-2 gap-2">
-                  <h3 className="font-medium text-sm text-content-primary truncate" title={s.name}>{s.name}</h3>
+                  <h2 className="font-medium text-sm text-content-primary truncate" title={s.name}>{s.name}</h2>
                   <Badge variant={statusBadge[s.status] || "neutral"} dot>{s.status}</Badge>
                 </div>
                 <p className="text-xs text-content-tertiary font-mono truncate" title={s.host}>{s.host}</p>
@@ -443,7 +481,7 @@ export default function DeploysPage() {
 
       {/* Apps tab */}
       {tab === "apps" && (
-        <div role="tabpanel" aria-label="Applications" className="space-y-2">
+        <div role="tabpanel" id="deploys-panel-apps" aria-labelledby="deploys-tab-apps" tabIndex={0} className="space-y-2">
           {apps.map((a) => {
             const appLower = a.name.toLowerCase();
             const linkedProject = tasksProjects.find((tp) => tp.slug.toLowerCase() === appLower || tp.name.toLowerCase() === appLower);
@@ -476,7 +514,7 @@ export default function DeploysPage() {
 
       {/* History tab */}
       {tab === "history" && (
-        <div role="tabpanel" aria-label="History">
+        <div role="tabpanel" id="deploys-panel-history" aria-labelledby="deploys-tab-history" tabIndex={0}>
           {/* Filters */}
           <div className="flex items-center gap-2 mb-4 flex-wrap">
             <Select

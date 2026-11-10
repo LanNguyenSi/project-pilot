@@ -153,36 +153,52 @@ export default function CreateProjectPage() {
         description="Configure, preview, and publish a new scaffolded project."
       />
 
-      {/* Step indicator */}
-      <div className="flex items-center gap-0 mb-8 max-w-md">
-        {steps.map((step, i) => (
-          <div key={step.key} className="flex items-center flex-1">
-            <div className="flex items-center gap-2">
-              <div
-                className={`h-7 w-7 rounded-full flex items-center justify-center text-xs font-medium transition-colors ${
-                  i < currentStep
-                    ? "bg-accent-green text-white"
-                    : i === currentStep
-                      ? "bg-brand-500 text-white"
-                      : "bg-surface-overlay text-content-tertiary"
-                }`}
-              >
-                {i < currentStep ? (
-                  <Icon name="check" size={14} />
-                ) : (
-                  i + 1
-                )}
+      {/* Step indicator: an ordered list so the step order and the current step
+          are exposed to assistive tech. Each <li> names itself after its visible
+          label (and the sr-only "completed" for finished steps) via
+          aria-labelledby, so the accessible name is derived from real text.
+          Tailwind preflight already resets list styles; list-none is the explicit
+          reset so the visual is identical to the previous flex-of-divs. */}
+      <ol className="flex items-center gap-0 mb-8 max-w-md list-none" aria-label="Progress">
+        {steps.map((step, i) => {
+          const isCompleted = i < currentStep;
+          const labelId = `forge-step-${step.key}-label`;
+          const stateId = `forge-step-${step.key}-state`;
+          return (
+            <li
+              key={step.key}
+              className="flex items-center flex-1 list-none"
+              aria-current={i === currentStep ? "step" : undefined}
+              aria-labelledby={isCompleted ? `${labelId} ${stateId}` : labelId}
+            >
+              <div className="flex items-center gap-2">
+                <div
+                  className={`h-7 w-7 rounded-full flex items-center justify-center text-xs font-medium transition-colors ${
+                    i < currentStep
+                      ? "bg-accent-green text-white"
+                      : i === currentStep
+                        ? "bg-brand-500 text-white"
+                        : "bg-surface-overlay text-content-tertiary"
+                  }`}
+                >
+                  {i < currentStep ? (
+                    <Icon name="check" size={14} aria-hidden="true" />
+                  ) : (
+                    i + 1
+                  )}
+                </div>
+                <span id={labelId} className={`text-xs font-medium ${i <= currentStep ? "text-content-primary" : "text-content-tertiary"}`}>
+                  {step.label}
+                </span>
+                {isCompleted && <span id={stateId} className="sr-only">completed</span>}
               </div>
-              <span className={`text-xs font-medium ${i <= currentStep ? "text-content-primary" : "text-content-tertiary"}`}>
-                {step.label}
-              </span>
-            </div>
-            {i < steps.length - 1 && (
-              <div className={`flex-1 h-px mx-3 ${i < currentStep ? "bg-accent-green" : "bg-surface-overlay"}`} />
-            )}
-          </div>
-        ))}
-      </div>
+              {i < steps.length - 1 && (
+                <div className={`flex-1 h-px mx-3 ${i < currentStep ? "bg-accent-green" : "bg-surface-overlay"}`} />
+              )}
+            </li>
+          );
+        })}
+      </ol>
 
       {error && (
         <div className="mb-6 max-w-2xl">
@@ -197,7 +213,7 @@ export default function CreateProjectPage() {
             <svg className="h-5 w-5 text-accent-purple" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456z" />
             </svg>
-            <h3 className="text-sm font-semibold text-accent-purple">AI Magic Fill</h3>
+            <h2 className="text-sm font-semibold text-accent-purple">AI Magic Fill</h2>
           </div>
           <p className="text-xs text-content-tertiary mb-3">
             Describe your project idea in one sentence. AI will fill the form.

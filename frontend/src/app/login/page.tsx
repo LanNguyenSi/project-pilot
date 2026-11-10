@@ -14,9 +14,9 @@ function BrandMark() {
       <div className="h-12 w-12 rounded-2xl bg-brand-500 flex items-center justify-center shadow-elevated">
         <span className="text-white text-xl font-bold font-display leading-none">P</span>
       </div>
-      <span className="text-lg font-semibold font-display text-content-primary tracking-tight">
+      <h1 className="text-lg font-semibold font-display text-content-primary tracking-tight">
         project-pilot
-      </span>
+      </h1>
     </div>
   );
 }

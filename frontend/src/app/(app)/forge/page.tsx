@@ -197,7 +197,7 @@ export default function ForgePage() {
                 className="group relative animate-fade-in"
                 style={{ "--delay": `${i * 40}ms` } as React.CSSProperties}
               >
-                <h3 className="font-medium text-sm text-content-primary">{p.projectName}</h3>
+                <h2 className="font-medium text-sm text-content-primary">{p.projectName}</h2>
                 {p.description && (
                   <p className="text-xs text-content-secondary mt-1 line-clamp-2">{p.description}</p>
                 )}

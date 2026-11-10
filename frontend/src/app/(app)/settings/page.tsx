@@ -126,7 +126,7 @@ export default function SettingsPage() {
             <Card key={key}>
               <div className="flex items-center justify-between mb-3">
                 <div>
-                  <h3 className="font-medium text-sm text-content-primary">{label}</h3>
+                  <h2 className="font-medium text-sm text-content-primary">{label}</h2>
                   <p className="text-xs text-content-tertiary">{hint}</p>
                 </div>
                 {existing && (
