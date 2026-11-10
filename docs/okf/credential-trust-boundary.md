@@ -47,11 +47,16 @@ third, separate trust domain with its own keys.
 
 ## Stored credentials: one key root
 
-`deriveKey` runs scrypt over `config.SESSION_SECRET` with a per-ciphertext
-salt (`backend/src/lib/crypto.ts:15#"scryptSync(config.SESSION_SECRET, salt, 32)"`).
+The key derivation runs scrypt over `config.SESSION_SECRET` with a
+per-ciphertext salt, asynchronously on the libuv thread pool so a write or a
+read does not block the event loop
+(`backend/src/lib/crypto.ts:21#"scrypt(config.SESSION_SECRET, salt, KEY_LENGTH"`).
 `encrypt` draws a fresh salt and IV for every call and stores AES-256-GCM
 output as `salt:iv:tag:ciphertext`
-(`backend/src/lib/crypto.ts:21-24#"const iv = randomBytes(IV_LENGTH);"`).
+(`backend/src/lib/crypto.ts:50-51#"const iv = randomBytes(IV_LENGTH);"`).
+Only `decrypt` caches derived keys, at most 256 salts, oldest evicted first,
+and concurrent decrypts of one salt share a single derivation
+(`backend/src/lib/crypto.ts:39#"while (keyCache.size > KEY_CACHE_MAX)"`).
 The config schema requires the secret to be at least 16 characters
 (`backend/src/config/index.ts:5#"SESSION_SECRET: z.string().min(16),"`),
 and with `NODE_ENV=production` the backend also refuses to start on the
@@ -70,13 +75,13 @@ model.
 and the column holds only ciphertext
 (`backend/prisma/schema.prisma:82-87#"// encrypted"`). `getCredential` is the
 only decrypting reader
-(`backend/src/services/credentials.ts:43-50#"return decrypt(cred.token);"`).
+(`backend/src/services/credentials.ts:43-50#"return await decrypt(cred.token);"`).
 
 ### What a `SESSION_SECRET` rotation does
 
 `decrypt` derives the key from the current secret, so a ciphertext written
 under the old one fails the GCM tag check and throws
-(`backend/src/lib/crypto.ts:48-52#"decrypted += decipher.final("`).
+(`backend/src/lib/crypto.ts:78-79#"decrypted += decipher.final("`).
 `getCredential` catches that error and throws `CredentialUnreadableError`
 instead
 (`backend/src/services/credentials.ts:49-53#"throw new CredentialUnreadableError(service);"`),
@@ -84,7 +89,7 @@ and its callers call it before their own `try` blocks:
 
 - `POST /api/credentials/validate`, which catches the error itself and answers
   `{ valid: false }` with the re-enter message
-  (`backend/src/routes/credentials.ts:76-80#"return c.json({ valid: false, error: err.message });"`),
+  (`backend/src/routes/credentials.ts:92-96#"return c.json({ valid: false, error: err.message });"`),
 - `callService` behind the downstream calls of the dashboard summary
   (`backend/src/services/downstream.ts:22-27#"const token = await getCredential(userId, service);"`).
   The summary route is the exception to the pattern: it pre-checks readability

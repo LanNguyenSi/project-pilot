@@ -1,7 +1,8 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { z } from "zod";
 import { config } from "../config/index.js";
 import { requireAuth } from "../middleware/auth.js";
+import { rateLimit } from "../middleware/rate-limit.js";
 import { zValidate } from "../lib/validate.js";
 import { upsertCredential, listCredentials, deleteCredential, getCredential, isValidService, CredentialUnreadableError } from "../services/credentials.js";
 import { isUpstreamTimeout } from "../lib/upstream-timeout.js";
@@ -11,10 +12,16 @@ const credentials = new Hono<AppEnv>();
 
 credentials.use("*", requireAuth);
 
+const TOKEN_MAX_LENGTH = 4096;
+const LABEL_MAX_LENGTH = 200;
+
 const upsertSchema = z.object({
   service: z.enum(["project-forge", "agent-tasks", "deploy-panel"]),
-  token: z.string().min(1),
-  label: z.string().optional(),
+  // Upstream tokens of the three services are well under 200 characters; 4096
+  // leaves room for any realistic JWT while keeping a request from feeding
+  // megabytes into the cipher and the database.
+  token: z.string().min(1).max(TOKEN_MAX_LENGTH),
+  label: z.string().max(LABEL_MAX_LENGTH).optional(),
 });
 
 // GET /credentials — list all (no tokens returned)
@@ -24,8 +31,15 @@ credentials.get("/", async (c) => {
   return c.json({ credentials: creds });
 });
 
-// PUT /credentials — upsert a service credential
-credentials.put("/", zValidate("json", upsertSchema), async (c) => {
+// Per user, in addition to the per-IP bucket the middleware always applies.
+// requireAuth ran before this, so the user id is in the context.
+const userKey = (c: Context<AppEnv>) => {
+  const userId = c.get("userId");
+  return userId ? `user:${userId}` : undefined;
+};
+
+// PUT /credentials — upsert a service credential, 10 writes per minute
+credentials.put("/", rateLimit({ max: 10, windowMs: 60_000, keyGenerator: userKey }), zValidate("json", upsertSchema), async (c) => {
   const userId = c.get("userId")!;
   const { service, token, label } = c.req.valid("json");
 

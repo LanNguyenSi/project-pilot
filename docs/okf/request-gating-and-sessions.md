@@ -1,7 +1,7 @@
 ---
 type: invariant
 title: Request gating and session model
-description: Global CORS and security headers, CSRF registered per route prefix in app.ts, requireAuth registered per router, opaque hashed session tokens with SameSite Strict for password sign-in and Lax for GitHub sign-in, per-process rate limits on four public auth endpoints keyed on the last X-Forwarded-For entry, and a CSP that only the frontend sets.
+description: Global CORS and security headers, CSRF registered per route prefix in app.ts, requireAuth registered per router, opaque hashed session tokens with SameSite Strict for password sign-in and Lax for GitHub sign-in, per-process rate limits on four public auth endpoints and the credential write keyed on the last X-Forwarded-For entry, and a CSP that only the frontend sets.
 tags: [auth, sessions, csrf, cors, rate-limit, headers, csp]
 timestamp: 2026-11-03T16:42:38Z
 sources:
@@ -72,7 +72,7 @@ success it sets `userId` on the context
 (`backend/src/middleware/auth.ts:28#"session.user.id"`).
 
 Each protected router registers it itself:
-`backend/src/routes/credentials.ts:12#"credentials.use("`,
+`backend/src/routes/credentials.ts:13#"credentials.use("`,
 `backend/src/routes/dashboard.ts:20#"dashboard.use("`,
 `backend/src/routes/forge.ts:18#"forge.use("`,
 `backend/src/routes/tasks.ts:38#"tasks.use("`, and
@@ -128,12 +128,15 @@ frontend's `apiFetch` sends the header on every call, together with
 
 ## Rate limits
 
-Only four routes are limited, each per minute:
+Five routes are limited, each per minute:
 
 - register, 5 (`backend/src/routes/auth.ts:64#"rateLimit({ max: 5, windowMs: 60_000 })"`),
 - login, 10, also per email (`backend/src/routes/auth.ts:78#"keyGenerator: emailKey"`),
 - forgot-password, 3, also per email (`backend/src/routes/auth.ts:115#"max: 3"`),
-- reset-password, 5 (`backend/src/routes/auth.ts:149#"rateLimit({ max: 5, windowMs: 60_000 })"`).
+- reset-password, 5 (`backend/src/routes/auth.ts:149#"rateLimit({ max: 5, windowMs: 60_000 })"`),
+- `PUT /api/credentials`, 10, also per signed-in user id, so an account that
+  writes from many addresses is still capped
+  (`backend/src/routes/credentials.ts:42#"keyGenerator: userKey"`).
 
 The limiter counts one bucket per client address and path
 (`backend/src/middleware/rate-limit.ts:74#"ip:${ip}:${c.req.path}"`) and,
