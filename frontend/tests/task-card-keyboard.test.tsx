@@ -116,6 +116,32 @@ describe("Card", () => {
     expect(el).toHaveAttribute("role", "button");
     expect(el).toHaveAttribute("tabindex", "0");
   });
+
+  it("Enter or Space on a control nested inside the card does not activate the card", () => {
+    const onCard = vi.fn();
+    const onInner = vi.fn();
+    render(
+      <Card data-testid="c" onClick={onCard}>
+        <button type="button" onKeyDown={onInner}>inner</button>
+      </Card>,
+    );
+    const inner = screen.getByText("inner");
+    fireEvent.keyDown(inner, { key: "Enter" });
+    fireEvent.keyDown(inner, { key: " " });
+    expect(onInner).toHaveBeenCalledTimes(2);
+    expect(onCard).not.toHaveBeenCalled();
+  });
+
+  it("an onKeyDown that prevents the default suppresses activation", () => {
+    const onCard = vi.fn();
+    render(
+      <Card data-testid="c" onClick={onCard} onKeyDown={(e) => e.preventDefault()}>
+        x
+      </Card>,
+    );
+    fireEvent.keyDown(screen.getByTestId("c"), { key: "Enter" });
+    expect(onCard).not.toHaveBeenCalled();
+  });
 });
 
 describe("List/Board toggle", () => {
