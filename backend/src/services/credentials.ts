@@ -30,7 +30,7 @@ export interface CredentialSummary {
 }
 
 export async function upsertCredential(userId: string, service: ServiceName, token: string, label?: string) {
-  const encrypted = encrypt(token);
+  const encrypted = await encrypt(token);
 
   return prisma.serviceCredential.upsert({
     where: { userId_service: { userId, service } },
@@ -47,7 +47,7 @@ export async function getCredential(userId: string, service: ServiceName): Promi
 
   if (!cred) return null;
   try {
-    return decrypt(cred.token);
+    return await decrypt(cred.token);
   } catch {
     throw new CredentialUnreadableError(service);
   }

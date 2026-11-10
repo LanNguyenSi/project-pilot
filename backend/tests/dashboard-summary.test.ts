@@ -33,7 +33,7 @@ const UNREADABLE_TOKEN = "not-encrypted";
 
 /**
  * Seed the credential store: one stored row per key of `tokens`; the value
- * is the token as it sits in the database (use encrypt() for a readable
+ * is the token as it sits in the database (use await encrypt() for a readable
  * credential, any foreign string for an unreadable one).
  */
 function storedCredentials(tokens: Record<string, string>) {
@@ -96,7 +96,7 @@ describe("GET /api/dashboard/summary with unreadable credentials", () => {
     storedCredentials({
       "project-forge": UNREADABLE_TOKEN,
       "agent-tasks": UNREADABLE_TOKEN,
-      "deploy-panel": encrypt("deploy-token"),
+      "deploy-panel": await encrypt("deploy-token"),
     });
     const fetchMock = stubDownstream();
 
@@ -148,8 +148,8 @@ describe("GET /api/dashboard/summary with unreadable credentials", () => {
 
   it("leaves unreadable absent or false when every credential decrypts", async () => {
     storedCredentials({
-      "agent-tasks": encrypt("tasks-token"),
-      "deploy-panel": encrypt("deploy-token"),
+      "agent-tasks": await encrypt("tasks-token"),
+      "deploy-panel": await encrypt("deploy-token"),
     });
     stubDownstream();
 
@@ -171,7 +171,7 @@ describe("GET /api/dashboard/summary with unreadable credentials", () => {
 
   it("answers 200: an unreadable deploy-panel credential is flagged, agent-tasks still reports its data", async () => {
     storedCredentials({
-      "agent-tasks": encrypt("tasks-token"),
+      "agent-tasks": await encrypt("tasks-token"),
       "deploy-panel": UNREADABLE_TOKEN,
     });
     const fetchMock = stubDownstream();
@@ -216,7 +216,7 @@ describe("GET /api/dashboard/summary with unreadable credentials", () => {
     // reached if the route swallows the error) return a readable credential.
     (prisma.serviceCredential.findUnique as any)
       .mockRejectedValueOnce(new Error("generic lookup failure"))
-      .mockResolvedValue({ token: encrypt("deploy-token") });
+      .mockResolvedValue({ token: await encrypt("deploy-token") });
     stubDownstream();
 
     const res = await app.request("/api/dashboard/summary");

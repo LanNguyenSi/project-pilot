@@ -199,7 +199,7 @@ describe("services/credentials — getCredential (decrypt round-trip)", () => {
     // Use the real encrypt function (real crypto + mocked SESSION_SECRET from config mock)
     const { encrypt } = await import("../src/lib/crypto.js");
     const plaintext = "round-trip-token-value";
-    const encrypted = encrypt(plaintext);
+    const encrypted = await encrypt(plaintext);
 
     mockSC.findUnique.mockResolvedValue({ token: encrypted });
 
@@ -439,7 +439,7 @@ describe("POST /credentials/validate — downstream connection check", () => {
 
   it("returns {valid:true} when the downstream service responds 200", async () => {
     const { encrypt } = await import("../src/lib/crypto.js");
-    mockSC.findUnique.mockResolvedValue({ token: encrypt("real-api-token") });
+    mockSC.findUnique.mockResolvedValue({ token: await encrypt("real-api-token") });
 
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
       new Response("{}", { status: 200 }) as unknown as Response,
@@ -455,7 +455,7 @@ describe("POST /credentials/validate — downstream connection check", () => {
 
   it("tests project-forge with the X-API-Key header against /api/v1/projects", async () => {
     const { encrypt } = await import("../src/lib/crypto.js");
-    mockSC.findUnique.mockResolvedValue({ token: encrypt("pf_valid") });
+    mockSC.findUnique.mockResolvedValue({ token: await encrypt("pf_valid") });
 
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
       new Response("{}", { status: 200 }) as unknown as Response,
@@ -492,7 +492,7 @@ describe("POST /credentials/validate — downstream connection check", () => {
 
   it("returns {valid:false, error:'Invalid token'} when downstream returns 401", async () => {
     const { encrypt } = await import("../src/lib/crypto.js");
-    mockSC.findUnique.mockResolvedValue({ token: encrypt("bad-token") });
+    mockSC.findUnique.mockResolvedValue({ token: await encrypt("bad-token") });
 
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
       new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -510,7 +510,7 @@ describe("POST /credentials/validate — downstream connection check", () => {
 
   it("returns {valid:false, error:'Invalid token'} when downstream returns 403", async () => {
     const { encrypt } = await import("../src/lib/crypto.js");
-    mockSC.findUnique.mockResolvedValue({ token: encrypt("tok") });
+    mockSC.findUnique.mockResolvedValue({ token: await encrypt("tok") });
 
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
       new Response("{}", { status: 403 }) as unknown as Response,
@@ -526,7 +526,7 @@ describe("POST /credentials/validate — downstream connection check", () => {
 
   it("returns {valid:false, error:'Service rejected the request'} for non-auth upstream error", async () => {
     const { encrypt } = await import("../src/lib/crypto.js");
-    mockSC.findUnique.mockResolvedValue({ token: encrypt("tok") });
+    mockSC.findUnique.mockResolvedValue({ token: await encrypt("tok") });
 
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
       new Response("{}", { status: 500 }) as unknown as Response,
@@ -542,7 +542,7 @@ describe("POST /credentials/validate — downstream connection check", () => {
 
   it("returns {valid:false, error:'Service timed out'} on AbortError", async () => {
     const { encrypt } = await import("../src/lib/crypto.js");
-    mockSC.findUnique.mockResolvedValue({ token: encrypt("tok") });
+    mockSC.findUnique.mockResolvedValue({ token: await encrypt("tok") });
 
     const abortErr = new DOMException("Aborted", "AbortError");
     const fetchSpy = vi
@@ -559,7 +559,7 @@ describe("POST /credentials/validate — downstream connection check", () => {
 
   it("returns {valid:false, error:'Service timed out'} when AbortSignal.timeout() rejects with a TimeoutError DOMException", async () => {
     const { encrypt } = await import("../src/lib/crypto.js");
-    mockSC.findUnique.mockResolvedValue({ token: encrypt("tok") });
+    mockSC.findUnique.mockResolvedValue({ token: await encrypt("tok") });
 
     // Real Node 26 message for an AbortSignal.timeout() rejection.
     const timeoutErr = new DOMException("The operation was aborted due to timeout", "TimeoutError");
@@ -577,7 +577,7 @@ describe("POST /credentials/validate — downstream connection check", () => {
 
   it("returns {valid:false, error:'Service unreachable'} on generic network error", async () => {
     const { encrypt } = await import("../src/lib/crypto.js");
-    mockSC.findUnique.mockResolvedValue({ token: encrypt("tok") });
+    mockSC.findUnique.mockResolvedValue({ token: await encrypt("tok") });
 
     const fetchSpy = vi
       .spyOn(globalThis, "fetch")

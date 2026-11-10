@@ -2,6 +2,12 @@
 
 <!-- Add new entries at the top, newest first. -->
 
+- 2026-11-10T07:01:02Z, credential-trust-boundary and request-gating-and-sessions re-verified and
+  re-stamped after `backend/src/lib/crypto.ts` (async scrypt, decrypt-only key cache bounded to
+  256 salts, shared pending derivations) and `backend/src/routes/credentials.ts` (token and
+  label bounds, `PUT` limited to 10 per minute per IP and per user) changed: eight line
+  citations re-pointed, the key-derivation paragraph now names the async derivation and the
+  cache, and the rate-limit section lists five limited routes instead of four.
 - 2026-11-03T16:42:38Z, credential-trust-boundary and request-gating-and-sessions re-verified and
   re-stamped after `backend/src/config/index.ts` (placeholder secret compared trimmed and
   lower-cased) and `backend/src/routes/health.ts` (reads the `User` table, 503 `schema_missing`)

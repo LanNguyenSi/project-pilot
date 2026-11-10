@@ -6,7 +6,7 @@ The backend exposes a Hono HTTP API at `:3001/api/*`. All `POST`/`PUT` JSON bodi
 
 - Session: register, login and GitHub sign-in set an httpOnly `session` cookie that lasts 30 days and is `Secure` when `NODE_ENV=production`. It is `SameSite=Strict` after register or password login and `SameSite=Lax` after GitHub sign-in. Every route except `GET /api/health`, `/api/oauth/*` and the auth endpoints `register`, `login`, `logout`, `forgot-password` and `reset-password` returns `401` without a valid session.
 - CSRF: `POST`, `PUT`, `PATCH` and `DELETE` requests under `/api/auth`, `/api/credentials`, `/api/dashboard`, `/api/forge`, `/api/tasks` and `/api/deploy` must send `X-Requested-With: XMLHttpRequest`, or they get `403` with `csrf_failed`.
-- Rate limits: per minute, per client IP and path: `register` 5, `login` 10, `forgot-password` 3, `reset-password` 5. `login` and `forgot-password` are also limited per submitted email. A breach returns `429` with `Retry-After`. The client IP is the last `X-Forwarded-For` entry (the socket address when the header is absent), so deploy behind exactly one reverse proxy. Counters are kept in memory per backend process.
+- Rate limits: per minute, per client IP and path: `register` 5, `login` 10, `forgot-password` 3, `reset-password` 5, `PUT /api/credentials` 10. `login` and `forgot-password` are also limited per submitted email, `PUT /api/credentials` per signed-in user. A breach returns `429` with `Retry-After`. The client IP is the last `X-Forwarded-For` entry (the socket address when the header is absent), so deploy behind exactly one reverse proxy. Counters are kept in memory per backend process.
 - CORS: only origins listed in `CORS_ORIGINS`, with credentials.
 
 ## Auth
@@ -29,7 +29,7 @@ Without `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` in the backend env (see [c
 ## Service credentials
 
 - `GET    /api/credentials` list configured services
-- `PUT    /api/credentials` add/update service token
+- `PUT    /api/credentials` add/update service token (`token` 1 to 4096 characters, optional `label` up to 200; longer values get `400`)
 - `DELETE /api/credentials/:service` remove token
 - `POST   /api/credentials/validate` test connection to a service
 
