@@ -153,36 +153,52 @@ export default function CreateProjectPage() {
         description="Configure, preview, and publish a new scaffolded project."
       />
 
-      {/* Step indicator */}
-      <div className="flex items-center gap-0 mb-8 max-w-md">
-        {steps.map((step, i) => (
-          <div key={step.key} className="flex items-center flex-1">
-            <div className="flex items-center gap-2">
-              <div
-                className={`h-7 w-7 rounded-full flex items-center justify-center text-xs font-medium transition-colors ${
-                  i < currentStep
-                    ? "bg-accent-green text-white"
-                    : i === currentStep
-                      ? "bg-brand-500 text-white"
-                      : "bg-surface-overlay text-content-tertiary"
-                }`}
-              >
-                {i < currentStep ? (
-                  <Icon name="check" size={14} />
-                ) : (
-                  i + 1
-                )}
+      {/* Step indicator: an ordered list so the step order and the current step
+          are exposed to assistive tech. Each <li> names itself after its visible
+          label (and the sr-only "completed" for finished steps) via
+          aria-labelledby, so the accessible name is derived from real text.
+          Tailwind preflight already resets list styles; list-none is the explicit
+          reset so the visual is identical to the previous flex-of-divs. */}
+      <ol className="flex items-center gap-0 mb-8 max-w-md list-none" aria-label="Progress">
+        {steps.map((step, i) => {
+          const isCompleted = i < currentStep;
+          const labelId = `forge-step-${step.key}-label`;
+          const stateId = `forge-step-${step.key}-state`;
+          return (
+            <li
+              key={step.key}
+              className="flex items-center flex-1 list-none"
+              aria-current={i === currentStep ? "step" : undefined}
+              aria-labelledby={isCompleted ? `${labelId} ${stateId}` : labelId}
+            >
+              <div className="flex items-center gap-2">
+                <div
+                  className={`h-7 w-7 rounded-full flex items-center justify-center text-xs font-medium transition-colors ${
+                    i < currentStep
+                      ? "bg-accent-green text-white"
+                      : i === currentStep
+                        ? "bg-brand-500 text-white"
+                        : "bg-surface-overlay text-content-tertiary"
+                  }`}
+                >
+                  {i < currentStep ? (
+                    <Icon name="check" size={14} aria-hidden="true" />
+                  ) : (
+                    i + 1
+                  )}
+                </div>
+                <span id={labelId} className={`text-xs font-medium ${i <= currentStep ? "text-content-primary" : "text-content-tertiary"}`}>
+                  {step.label}
+                </span>
+                {isCompleted && <span id={stateId} className="sr-only">completed</span>}
               </div>
-              <span className={`text-xs font-medium ${i <= currentStep ? "text-content-primary" : "text-content-tertiary"}`}>
-                {step.label}
-              </span>
-            </div>
-            {i < steps.length - 1 && (
-              <div className={`flex-1 h-px mx-3 ${i < currentStep ? "bg-accent-green" : "bg-surface-overlay"}`} />
-            )}
-          </div>
-        ))}
-      </div>
+              {i < steps.length - 1 && (
+                <div className={`flex-1 h-px mx-3 ${i < currentStep ? "bg-accent-green" : "bg-surface-overlay"}`} />
+              )}
+            </li>
+          );
+        })}
+      </ol>
 
       {error && (
         <div className="mb-6 max-w-2xl">
