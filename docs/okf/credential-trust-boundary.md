@@ -89,7 +89,7 @@ and its callers call it before their own `try` blocks:
 
 - `POST /api/credentials/validate`, which catches the error itself and answers
   `{ valid: false }` with the re-enter message
-  (`backend/src/routes/credentials.ts:92-96#"return c.json({ valid: false, error: err.message });"`),
+  (`backend/src/routes/credentials.ts:89-93#"return c.json({ valid: false, error: err.message });"`),
 - `callService` behind the downstream calls of the dashboard summary
   (`backend/src/services/downstream.ts:22-27#"const token = await getCredential(userId, service);"`).
   The summary route is the exception to the pattern: it pre-checks readability

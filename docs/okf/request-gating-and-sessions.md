@@ -136,7 +136,7 @@ Five routes are limited, each per minute:
 - reset-password, 5 (`backend/src/routes/auth.ts:149#"rateLimit({ max: 5, windowMs: 60_000 })"`),
 - `PUT /api/credentials`, 10, also per signed-in user id, so an account that
   writes from many addresses is still capped
-  (`backend/src/routes/credentials.ts:42#"keyGenerator: userKey"`).
+  (`backend/src/routes/credentials.ts:39#"keyGenerator: userKey"`).
 
 The limiter counts one bucket per client address and path
 (`backend/src/middleware/rate-limit.ts:74#"ip:${ip}:${c.req.path}"`) and,
