@@ -396,3 +396,131 @@ describe("PilotClient — request bodies", () => {
     });
   });
 });
+
+// A model-controlled id that would break out of its path segment if it were
+// interpolated raw: `../` traverses, `?`/`#` truncate the path, a space breaks
+// the URL. encodeURIComponent collapses all of them into one segment.
+const HOSTILE = "../a b?c#d";
+const HOSTILE_SEG = "..%2Fa%20b%3Fc%23d";
+
+// The id must arrive as a single, fully encoded segment: the requested URL is
+// exactly the expected string, and none of the structural characters survive
+// as literals (so the id cannot add a segment, a query or a fragment).
+function expectOneEncodedSegment(url: string, expected: string) {
+  expect(url).toBe(expected);
+  expect(url).not.toContain("../");
+  expect(url).not.toContain("?");
+  expect(url).not.toContain("#");
+  expect(url).not.toContain(" ");
+}
+
+describe("PilotClient — model-controlled ids are encoded into one path segment", () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+  let client: PilotClient;
+
+  beforeEach(() => {
+    fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    client = new PilotClient(testConfig);
+  });
+
+  it("listTasks encodes projectId into one segment", async () => {
+    fetchMock.mockResolvedValue(makeOkResponse({ tasks: [] }));
+    await client.listTasks(HOSTILE);
+    const [url] = fetchMock.mock.calls[0] as [string];
+    // GUARD (seg encoding) — mutation: return id unchanged → `../a b?c#d` leaks → fails
+    expectOneEncodedSegment(url, `https://tasks.test/api/projects/${HOSTILE_SEG}/tasks`);
+  });
+
+  it("createTask encodes projectId into one segment", async () => {
+    fetchMock.mockResolvedValue(makeOkResponse({ task: {} }));
+    await client.createTask(HOSTILE, { title: "x" });
+    const [url] = fetchMock.mock.calls[0] as [string];
+    expectOneEncodedSegment(url, `https://tasks.test/api/projects/${HOSTILE_SEG}/tasks`);
+  });
+
+  it("getTaskInstructions encodes taskId into one segment", async () => {
+    fetchMock.mockResolvedValue(makeOkResponse({}));
+    await client.getTaskInstructions(HOSTILE);
+    const [url] = fetchMock.mock.calls[0] as [string];
+    expectOneEncodedSegment(url, `https://tasks.test/api/tasks/${HOSTILE_SEG}/instructions`);
+  });
+
+  it("claimTask encodes taskId into one segment", async () => {
+    fetchMock.mockResolvedValue(makeOkResponse({}));
+    await client.claimTask(HOSTILE);
+    const [url] = fetchMock.mock.calls[0] as [string];
+    expectOneEncodedSegment(url, `https://tasks.test/api/tasks/${HOSTILE_SEG}/claim`);
+  });
+
+  it("transitionTask encodes taskId into one segment", async () => {
+    fetchMock.mockResolvedValue(makeOkResponse({}));
+    await client.transitionTask(HOSTILE, "done");
+    const [url] = fetchMock.mock.calls[0] as [string];
+    expectOneEncodedSegment(url, `https://tasks.test/api/tasks/${HOSTILE_SEG}/transition`);
+  });
+
+  it("getDeployStatus encodes deployId into one segment", async () => {
+    fetchMock.mockResolvedValue(makeOkResponse({ deploy: {} }));
+    await client.getDeployStatus(HOSTILE);
+    const [url] = fetchMock.mock.calls[0] as [string];
+    expectOneEncodedSegment(url, `https://deploy.test/api/v1/deploy/${HOSTILE_SEG}`);
+  });
+});
+
+describe("PilotClient — query parameters are encoded by URLSearchParams", () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+  let client: PilotClient;
+
+  beforeEach(() => {
+    fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    client = new PilotClient(testConfig);
+  });
+
+  it("listApps encodes server_id so `&` and `=` cannot create a second parameter", async () => {
+    fetchMock.mockResolvedValue(makeOkResponse({ apps: [] }));
+    await client.listApps("a&b=c");
+    const [url] = fetchMock.mock.calls[0] as [string];
+    // GUARD (URLSearchParams) — mutation: `?server_id=${serverId}` → raw `&` splits → fails
+    expect(url).toBe("https://deploy.test/api/v1/apps?server_id=a%26b%3Dc");
+    expect(url.slice(url.indexOf("?") + 1).split("&")).toHaveLength(1);
+  });
+
+  it("listApps encodes an id containing a query-looking value as one parameter", async () => {
+    fetchMock.mockResolvedValue(makeOkResponse({ apps: [] }));
+    await client.listApps("x?y=1#z");
+    const [url] = fetchMock.mock.calls[0] as [string];
+    expect(url).toBe("https://deploy.test/api/v1/apps?server_id=x%3Fy%3D1%23z");
+    expect(url).not.toContain("#");
+    expect(url.slice(url.indexOf("?") + 1).split("&")).toHaveLength(1);
+  });
+});
+
+describe("PilotClient — empty id refused before the request", () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+  let client: PilotClient;
+
+  beforeEach(() => {
+    fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    client = new PilotClient(testConfig);
+  });
+
+  const cases: Array<[string, () => Promise<unknown>, RegExp]> = [
+    ["listTasks", () => client.listTasks(""), /projectId must not be empty/],
+    ["createTask", () => client.createTask("", { title: "x" }), /projectId must not be empty/],
+    ["getTaskInstructions", () => client.getTaskInstructions(""), /taskId must not be empty/],
+    ["claimTask", () => client.claimTask(""), /taskId must not be empty/],
+    ["transitionTask", () => client.transitionTask("", "done"), /taskId must not be empty/],
+    ["getDeployStatus", () => client.getDeployStatus(""), /deployId must not be empty/],
+  ];
+
+  for (const [name, call, msg] of cases) {
+    it(`${name} rejects an empty id and never calls fetch`, async () => {
+      // GUARD (empty check) — mutation: drop the `value === ""` throw → empty segment reaches fetch → fails
+      await expect(call()).rejects.toThrow(msg);
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+  }
+});
