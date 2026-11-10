@@ -1,5 +1,26 @@
 import type { Config } from "./config.js";
 
+// One path segment from a caller-supplied id, so an id cannot leave its
+// segment: a `/` would traverse and a `?` or `#` would truncate, a blank id
+// would empty the segment, and `.` or `..` would survive encodeURIComponent
+// verbatim and be resolved away as dot-segments by the URL, dropping the
+// segments around them. Refuses a blank id and either dot segment before any
+// request is made and encodes everything else whole (a literal `%2e%2e`
+// becomes `%252e%252e` and stays one inert segment), matching the
+// encodeURIComponent pattern in backend/src/routes/tasks.ts.
+function seg(value: string, label: string): string {
+  if (value.trim() === "") {
+    throw new Error(`${label} must not be empty`);
+  }
+  if (value === ".") {
+    throw new Error(`${label} must not be a dot segment`);
+  }
+  if (value === "..") {
+    throw new Error(`${label} must not be a dot segment`);
+  }
+  return encodeURIComponent(value);
+}
+
 export class PilotClient {
   private readonly config: Config;
 
@@ -58,7 +79,7 @@ export class PilotClient {
   }
 
   async listTasks(projectId: string) {
-    return this.tasksRequest<{ tasks: Array<{ id: string; title: string; status: string; priority: string }> }>("GET", `/api/projects/${projectId}/tasks`);
+    return this.tasksRequest<{ tasks: Array<{ id: string; title: string; status: string; priority: string }> }>("GET", `/api/projects/${seg(projectId, "projectId")}/tasks`);
   }
 
   async claimableTask() {
@@ -66,19 +87,19 @@ export class PilotClient {
   }
 
   async getTaskInstructions(taskId: string) {
-    return this.tasksRequest<unknown>("GET", `/api/tasks/${taskId}/instructions`);
+    return this.tasksRequest<unknown>("GET", `/api/tasks/${seg(taskId, "taskId")}/instructions`);
   }
 
   async claimTask(taskId: string) {
-    return this.tasksRequest<unknown>("POST", `/api/tasks/${taskId}/claim`);
+    return this.tasksRequest<unknown>("POST", `/api/tasks/${seg(taskId, "taskId")}/claim`);
   }
 
   async createTask(projectId: string, input: { title: string; priority?: string; description?: string; template?: Record<string, unknown> }) {
-    return this.tasksRequest<{ task: Record<string, unknown> }>("POST", `/api/projects/${projectId}/tasks`, input);
+    return this.tasksRequest<{ task: Record<string, unknown> }>("POST", `/api/projects/${seg(projectId, "projectId")}/tasks`, input);
   }
 
   async transitionTask(taskId: string, status: string) {
-    return this.tasksRequest<unknown>("POST", `/api/tasks/${taskId}/transition`, { status });
+    return this.tasksRequest<unknown>("POST", `/api/tasks/${seg(taskId, "taskId")}/transition`, { status });
   }
 
   // ── Deploy ─────────────────────────────────────────────────────────────────
@@ -88,7 +109,7 @@ export class PilotClient {
   }
 
   async listApps(serverId?: string) {
-    const qs = serverId ? `?server_id=${serverId}` : "";
+    const qs = serverId ? `?${new URLSearchParams({ server_id: serverId })}` : "";
     return this.deployRequest<{ apps: Array<{ id: string; name: string; status: string; server: { name: string } }> }>("GET", `/api/v1/apps${qs}`);
   }
 
@@ -97,7 +118,7 @@ export class PilotClient {
   }
 
   async getDeployStatus(deployId: string) {
-    return this.deployRequest<{ deploy: unknown }>("GET", `/api/v1/deploy/${deployId}`);
+    return this.deployRequest<{ deploy: unknown }>("GET", `/api/v1/deploy/${seg(deployId, "deployId")}`);
   }
 
   async preflight(server: string, app: string) {
@@ -109,6 +130,7 @@ export class PilotClient {
   }
 
   async deployHistory(limit = 20) {
-    return this.deployRequest<{ deploys: unknown[] }>("GET", `/api/v1/deploys?limit=${limit}`);
+    const qs = new URLSearchParams({ limit: String(limit) });
+    return this.deployRequest<{ deploys: unknown[] }>("GET", `/api/v1/deploys?${qs}`);
   }
 }

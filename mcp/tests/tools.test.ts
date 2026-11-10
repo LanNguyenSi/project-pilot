@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { PilotClient } from "../src/client.js";
+import { PilotClient } from "../src/client.js";
 import { registerTools } from "../src/tools.js";
 
 /**
@@ -534,5 +534,32 @@ describe("registerTools — dashboard_summary (Guard G: Promise.allSettled degra
     const result = await captured["dashboard_summary"]!({});
 
     expect(isErrorResult(result)).toBe(true);
+  });
+});
+
+describe("registerTools - with the real PilotClient (empty id never reaches fetch)", () => {
+  it("tasks_claim with an empty taskId returns error() naming the empty id and never calls fetch", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      const client = new PilotClient({
+        forgeUrl: "https://forge.test",
+        forgeApiKey: "forge-key-123",
+        tasksUrl: "https://tasks.test",
+        tasksToken: "tasks-token-456",
+        deployUrl: "https://deploy.test",
+        deployApiKey: "deploy-key-789",
+      });
+      const s = makeServer();
+      registerTools(s.server as never, client);
+
+      const result = await s.captured["tasks_claim"]!({ taskId: "" });
+
+      expect(isErrorResult(result)).toBe(true);
+      expect((parseText(result) as { error: string }).error).toContain("must not be empty");
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
