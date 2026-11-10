@@ -42,6 +42,19 @@ function renderWizard() {
   );
 }
 
+describe("forge wizard headings", () => {
+  it("with AI magic fill enabled, its card title follows the page h1 as an h2", async () => {
+    apiFetch.mockImplementation(async (url?: string) => {
+      if (url?.includes("capabilities")) return { enabled: true, features: { magicFill: true } };
+      return {};
+    });
+    renderWizard();
+    await screen.findByRole("heading", { name: "AI Magic Fill" });
+    const levels = screen.getAllByRole("heading").map((h) => Number(h.tagName.slice(1)));
+    expect(levels).toEqual([1, 2]);
+  });
+});
+
 describe("forge wizard stepper", () => {
   it("marks the active step with aria-current=step in an ordered list", async () => {
     renderWizard();

@@ -3,7 +3,7 @@
 // The Deploys page tab bar follows the WAI-ARIA tabs pattern: the tablist has
 // `role="tablist"`, the selected tab is the only one in the tab order
 // (tabIndex 0, the rest -1), ArrowLeft/ArrowRight move selection AND focus with
-// wrap-around, Home/End jump to the first/last tab, each tab's `aria-controls`
+// wrap-around, Home/End jump to the first/last tab, the selected tab's `aria-controls`
 // points at the visible tabpanel id, and that panel is labelled by the tab
 // (`aria-labelledby`). Before the change every tab was tabbable with no arrow
 // keys.
@@ -46,9 +46,10 @@ function selected() {
   return screen.getAllByRole("tab").find((t) => t.getAttribute("aria-selected") === "true")!;
 }
 
+/** Returns false when the handler called preventDefault (fireEvent semantics). */
 function press(key: string) {
   const active = document.activeElement as HTMLElement;
-  fireEvent.keyDown(active, { key });
+  return fireEvent.keyDown(active, { key });
 }
 
 /** Model "Tab landed on the selected tab": focus the single tabbable tab. */
@@ -117,5 +118,17 @@ describe("Deploys tab keyboard pattern", () => {
     expect(panel).toHaveAttribute("aria-labelledby", serversTab.id);
     // Only one panel is mounted at a time and it is the controlled one.
     expect(screen.getAllByRole("tabpanel")).toHaveLength(1);
+    // The panel is a tab stop of its own (WAI-ARIA tabs pattern).
+    expect(panel).toHaveAttribute("tabindex", "0");
+  });
+
+  it("ArrowLeft, ArrowRight, Home and End prevent the default so the page does not scroll", async () => {
+    await renderTabs();
+    focusSelectedTab();
+    for (const key of ["ArrowRight", "ArrowLeft", "End", "Home"]) {
+      expect(press(key), key).toBe(false);
+    }
+    // Other keys keep their default.
+    expect(press("a")).toBe(true);
   });
 });
