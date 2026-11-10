@@ -518,9 +518,98 @@ describe("PilotClient — empty id refused before the request", () => {
 
   for (const [name, call, msg] of cases) {
     it(`${name} rejects an empty id and never calls fetch`, async () => {
-      // GUARD (empty check) — mutation: drop the `value === ""` throw → empty segment reaches fetch → fails
+      // GUARD (empty check) - mutation: `value.trim() === ""` back to `value === ""` → empty segment reaches fetch → fails
       await expect(call()).rejects.toThrow(msg);
       expect(fetchMock).not.toHaveBeenCalled();
+    });
+  }
+});
+
+describe("PilotClient - blank id refused before the request", () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+  let client: PilotClient;
+
+  beforeEach(() => {
+    fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    client = new PilotClient(testConfig);
+  });
+
+  const cases: Array<[string, (id: string) => Promise<unknown>, RegExp]> = [
+    ["listTasks", (id) => client.listTasks(id), /projectId must not be empty/],
+    ["createTask", (id) => client.createTask(id, { title: "x" }), /projectId must not be empty/],
+    ["getTaskInstructions", (id) => client.getTaskInstructions(id), /taskId must not be empty/],
+    ["claimTask", (id) => client.claimTask(id), /taskId must not be empty/],
+    ["transitionTask", (id) => client.transitionTask(id, "done"), /taskId must not be empty/],
+    ["getDeployStatus", (id) => client.getDeployStatus(id), /deployId must not be empty/],
+  ];
+
+  for (const [name, call, msg] of cases) {
+    for (const blank of ["  ", "\t"]) {
+      it(`${name} rejects the blank id ${JSON.stringify(blank)} and never calls fetch`, async () => {
+        // GUARD (trim) - mutation: `value.trim() === ""` back to `value === ""` → blank segment reaches fetch → fails
+        await expect(call(blank)).rejects.toThrow(msg);
+        expect(fetchMock).not.toHaveBeenCalled();
+      });
+    }
+  }
+});
+
+describe("PilotClient - dot-segment ids refused before the request", () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+  let client: PilotClient;
+
+  beforeEach(() => {
+    fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    client = new PilotClient(testConfig);
+  });
+
+  const cases: Array<[string, (id: string) => Promise<unknown>, string]> = [
+    ["listTasks", (id) => client.listTasks(id), "projectId"],
+    ["createTask", (id) => client.createTask(id, { title: "x" }), "projectId"],
+    ["getTaskInstructions", (id) => client.getTaskInstructions(id), "taskId"],
+    ["claimTask", (id) => client.claimTask(id), "taskId"],
+    ["transitionTask", (id) => client.transitionTask(id, "done"), "taskId"],
+    ["getDeployStatus", (id) => client.getDeployStatus(id), "deployId"],
+  ];
+
+  // `encodeURIComponent` passes "." and ".." through verbatim, and URL
+  // resolution then resolves them as dot-segments: claimTask("..") would
+  // request /api/claim and drop the /tasks/ segment. seg() refuses both.
+  for (const [name, call, label] of cases) {
+    for (const dot of [".", ".."]) {
+      it(`${name} rejects the dot-segment id "${dot}" and never calls fetch`, async () => {
+        // GUARD (dot-segment check) - mutation: drop one of the `value === "."` / `value === ".."` throws → dot-segment reaches fetch → fails
+        await expect(call(dot)).rejects.toThrow(`${label} must not be a dot segment`);
+        expect(fetchMock).not.toHaveBeenCalled();
+      });
+    }
+  }
+});
+
+describe("PilotClient - dot-looking ids that are not dot-segments are allowed", () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+  let client: PilotClient;
+
+  beforeEach(() => {
+    fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    client = new PilotClient(testConfig);
+  });
+
+  const cases: Array<[string, () => Promise<unknown>, string]> = [
+    ['claimTask("...")', () => client.claimTask("..."), "https://tasks.test/api/tasks/.../claim"],
+    ['getDeployStatus("a..b")', () => client.getDeployStatus("a..b"), "https://deploy.test/api/v1/deploy/a..b"],
+  ];
+
+  for (const [name, call, expectedUrl] of cases) {
+    it(`${name} is one segment, not a dot-segment, and reaches fetch`, async () => {
+      fetchMock.mockResolvedValue(makeOkResponse({}));
+      // GUARD (dot-segment check scope) - mutation: reject any id containing "." → this request never happens → fails
+      await call();
+      const [url] = fetchMock.mock.calls[0] as [string];
+      expect(url).toBe(expectedUrl);
     });
   }
 });

@@ -201,7 +201,7 @@ the environment and exits when one is missing
 `FORGE_URL`, `TASKS_URL` and `DEPLOY_URL`
 (`mcp/src/config.ts:26-32#"deployApiKey,"`). `PilotClient` sends the forge key
 as `X-API-Key` and the other two as Bearer tokens
-(`mcp/src/client.ts:24-34#"this.config.deployApiKey"`). Nothing under
+(`mcp/src/client.ts:33-43#"this.config.deployApiKey"`). Nothing under
 `mcp/src` imports backend code, Prisma or `SESSION_SECRET`, so tokens a user
 stored in the web UI are not available to MCP clients, and keys given to the
 MCP server never reach the database.

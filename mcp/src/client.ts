@@ -1,13 +1,22 @@
 import type { Config } from "./config.js";
 
-// One path segment from a caller-supplied id. Model-controlled ids must not be
-// able to break out of their segment (a `/` traverses, a `?` or `#` truncates)
-// or collapse the path (an empty id doubles the slash). Encodes the whole value
-// and refuses an empty id before any request is made, matching the
+// One path segment from a caller-supplied id, so an id cannot leave its
+// segment: a `/` would traverse and a `?` or `#` would truncate, a blank id
+// would empty the segment, and `.` or `..` would survive encodeURIComponent
+// verbatim and be resolved away as dot-segments by the URL, dropping the
+// segments around them. Refuses a blank id and either dot segment before any
+// request is made and encodes everything else whole (a literal `%2e%2e`
+// becomes `%252e%252e` and stays one inert segment), matching the
 // encodeURIComponent pattern in backend/src/routes/tasks.ts.
 function seg(value: string, label: string): string {
-  if (value === "") {
+  if (value.trim() === "") {
     throw new Error(`${label} must not be empty`);
+  }
+  if (value === ".") {
+    throw new Error(`${label} must not be a dot segment`);
+  }
+  if (value === "..") {
+    throw new Error(`${label} must not be a dot segment`);
   }
   return encodeURIComponent(value);
 }
