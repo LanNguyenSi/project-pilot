@@ -2,6 +2,13 @@
 
 <!-- Add new entries at the top, newest first. -->
 
+- 2026-11-10T08:19:40Z, credential-trust-boundary re-verified and re-stamped after `backend/src/routes/credentials.ts`
+  (per-user rate-limit key without the unreachable branch, three lines shorter),
+  `backend/src/services/credentials.ts` and `backend/src/lib/crypto.ts` (squash of the async
+  scrypt change) and `mcp/src/client.ts` (ids encoded into one path segment, blank and
+  dot-segment ids refused): every citation into these files re-read at HEAD, the
+  `credentials.ts` unreadable-credential range narrowed to end on its anchor; the claims
+  (encrypted at rest, decrypt-only key cache, the three request helpers' auth headers) still hold.
 - 2026-11-10T07:01:02Z, credential-trust-boundary and request-gating-and-sessions re-verified and
   re-stamped after `backend/src/lib/crypto.ts` (async scrypt, decrypt-only key cache bounded to
   256 salts, shared pending derivations) and `backend/src/routes/credentials.ts` (token and
