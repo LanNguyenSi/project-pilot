@@ -88,6 +88,39 @@ count_dumps() { { find "$1" -maxdepth 1 -name 'project-pilot-*.dump' 2>/dev/null
 count_tmp() { { find "$1" -maxdepth 1 -name '.*.tmp' 2>/dev/null || true; } | wc -l | tr -d ' '; }
 # make_old <dir> <name> <touch -t stamp>: an existing dump with a given age
 make_old() { echo old > "$1/$2"; touch -t "$3" "$1/$2"; }
+# minutes_ago_touch <minutes>: a touch -t stamp for that many minutes before now
+# (BSD date first, GNU date as the fallback).
+minutes_ago_touch() {
+  if date -v-1M +%Y%m%d%H%M >/dev/null 2>&1; then
+    date -v-"$1"M +%Y%m%d%H%M
+  else
+    date -d "-$1 minutes" +%Y%m%d%H%M
+  fi
+}
+# run_check <dir> <hours> [VAR=value ...]: --check-fresh only; hours "-" omits the
+# argument. Sets rc, out_text; a run must never touch the fake docker.
+run_check() {
+  local dir="$1"; shift
+  local hours="$1"; shift
+  : > "$FAKE_DOCKER_LOG"
+  rc=0
+  if [ "$hours" = "-" ]; then
+    out_text="$(env PATH="$FAKE_BIN:$PATH" BACKUP_COMPOSE_FILE="$COMPOSE_FILE" BACKUP_DIR="$dir" "$@" "$BACKUP_SCRIPT" --check-fresh 2>&1)" || rc=$?
+  else
+    out_text="$(env PATH="$FAKE_BIN:$PATH" BACKUP_COMPOSE_FILE="$COMPOSE_FILE" BACKUP_DIR="$dir" "$@" "$BACKUP_SCRIPT" --check-fresh "$hours" 2>&1)" || rc=$?
+  fi
+}
+# run_script_args <dir-or-empty> [VAR=value ...] -- <script args...>: raw runner for
+# argument-handling cases; sets rc, out_text.
+run_script_args() {
+  local dir="$1"; shift
+  local envs=()
+  while [ "$#" -gt 0 ] && [ "$1" != "--" ]; do envs+=("$1"); shift; done
+  shift
+  : > "$FAKE_DOCKER_LOG"
+  rc=0
+  out_text="$(env PATH="$FAKE_BIN:$PATH" BACKUP_COMPOSE_FILE="$COMPOSE_FILE" BACKUP_DIR="$dir" "${envs[@]+"${envs[@]}"}" "$BACKUP_SCRIPT" "$@" 2>&1)" || rc=$?
+}
 
 # (a) success: published, mode 600/700, exact command lines, content intact
 {
@@ -457,6 +490,209 @@ done
     pass "(q) docker-compose.yml (the dev stack) is refused, also via .. , a symlink to the directory, a file symlink and a hardlink"
   else
     fail "(q) dev stack file: $r1 docker=$u1 $r2 $r3 file-symlink=$r4 hardlink=$r5"
+  fi
+}
+
+# (r) a successful run writes the freshness stamp: one line (UTC time, dump file
+#     name), mode 600, and nothing else new in the directory
+{
+  d="$WORKDIR/r"
+  run_backup "$d"
+  stamp="$d/.last-success"
+  f="$(find "$d" -maxdepth 1 -name 'project-pilot-*.dump' | head -1)"
+  mode_s="$(stat -c %a "$stamp" 2>/dev/null || stat -f %Lp "$stamp")"
+  lines="$(wc -l < "$stamp" | tr -d ' ')"
+  words="$(wc -w < "$stamp" | tr -d ' ')"
+  ts_part="$(cut -d' ' -f1 "$stamp")"
+  name_part="$(cut -d' ' -f2 "$stamp")"
+  if [ "$rc" -eq 0 ] && [ -f "$stamp" ] && [ "$mode_s" = 600 ] && [ "$lines" = 1 ] && [ "$words" = 2 ] \
+    && grep -Eq '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$' <<< "$ts_part" \
+    && [ "$name_part" = "$(basename "$f")" ]; then
+    pass "(r) success writes .last-success: one line of UTC time + dump name, mode 600"
+  else
+    fail "(r) success stamp: rc=$rc mode=$mode_s lines=$lines words=$words content=$(cat "$stamp" 2>/dev/null)"
+  fi
+}
+
+# (s2) the dump is published but the stamp cannot be written (the hook makes
+#     BACKUP_DIR read-only after the dump): exit 1, a message that says the dump is
+#     published, the dump stays, and no stamp temp file is left behind
+{
+  d="$WORKDIR/s4"; mkdir -p "$d"
+  hook="$WORKDIR/hook_ro_s4.sh"
+  # The hook body is written literally; $1 expands when the hook runs.
+  # shellcheck disable=SC2016
+  printf '#!/bin/sh\nchmod 500 "$(dirname "$1")"\n' > "$hook"
+  chmod +x "$hook"
+  run_backup "$d" BACKUP_OFFHOST_HOOK="$hook"; r=$rc
+  chmod 700 "$d"
+  n="$(count_dumps "$d")"; left="$(count_tmp "$d")"; w=0; [ -e "$d/.last-success" ] && w=1
+  if [ "$r" = 1 ] && [ "$n" = 1 ] && [ "$w" = 0 ] && [ "$left" = 0 ] && grep -q "is published, but the last-success stamp" <<< "$out_text"; then
+    pass "(s2) stamp write failure after a published dump: exit 1, says the dump is published, no temp left"
+  else
+    fail "(s2) stamp write failure: rc=$r dumps=$n stamp=$w tmp=$left out='$out_text'"
+  fi
+}
+
+# (s3) the stamp temp file is written but the mv onto the stamp fails (a PATH-first
+#     mv stub): exit 1 and the temp file is removed by the cleanup; and a directory
+#     in place of the stamp is a failed stamp write, not a silent success
+{
+  d="$WORKDIR/s5"; mkdir -p "$d"
+  stub="$WORKDIR/mvstub"; mkdir -p "$stub"
+  real_mv="$(command -v mv)"
+  printf '#!/bin/sh\ncase "$*" in *.last-success*) exit 1 ;; esac\nexec %s "$@"\n' "$real_mv" > "$stub/mv"
+  chmod +x "$stub/mv"
+  run_backup "$d" PATH="$stub:$FAKE_BIN:$PATH"; r1=$rc
+  left="$(count_tmp "$d")"
+  d2="$WORKDIR/s6"; mkdir -p "$d2/.last-success"
+  run_backup "$d2"; r2=$rc
+  inner="$(find "$d2/.last-success" -type f | wc -l | tr -d ' ')"
+  if [ "$r1" = 1 ] && [ "$left" = 0 ] && [ "$r2" = 1 ] && [ "$inner" = 0 ]; then
+    pass "(s3) failed stamp mv: exit 1, temp file cleaned; a directory as stamp: exit 1, nothing moved into it"
+  else
+    fail "(s3) stamp mv/dir: rc=$r1 tmp=$left dir-rc=$r2 inner=$inner"
+  fi
+}
+
+# (s) no stamp after a failing run: exit 1 (pg_dump), exit 2 (db not running) and
+#     exit 3 (hook failure: a published dump is not a success for the stamp)
+{
+  d="$WORKDIR/s1"; run_backup "$d" FAKE_MODE=fail; r1=$rc
+  w1=0; [ -e "$d/.last-success" ] && w1=1
+  d="$WORKDIR/s2"; run_backup "$d" FAKE_RUNNING=backend; r2=$rc
+  w2=0; [ -e "$d/.last-success" ] && w2=1
+  d="$WORKDIR/s3"; mkdir -p "$d"
+  hook="$WORKDIR/hook_fail_s3.sh"; printf '#!/bin/sh\nexit 7\n' > "$hook"; chmod +x "$hook"
+  run_backup "$d" BACKUP_OFFHOST_HOOK="$hook"; r3=$rc
+  w3=0; [ -e "$d/.last-success" ] && w3=1
+  if [ "$r1" = 1 ] && [ "$w1" = 0 ] && [ "$r2" = 2 ] && [ "$w2" = 0 ] && [ "$r3" = 3 ] && [ "$w3" = 0 ]; then
+    pass "(s) no stamp after exit 1, exit 2 or exit 3 (exit 3 does not count as success)"
+  else
+    fail "(s) stamp on failure: $r1/$w1 $r2/$w2 $r3/$w3"
+  fi
+}
+
+# (t) --check-fresh with a fresh stamp: exit 0, exactly one ok: line holding the
+#     stamp content; a missing compose file is not even noticed and docker is
+#     never called
+{
+  d="$WORKDIR/t"
+  run_backup "$d"
+  stamp_content="$(cat "$d/.last-success")"
+  run_check "$d" "-" BACKUP_COMPOSE_FILE="$WORKDIR/definitely-missing.yml"
+  n_ok="$(grep -c '^ok: ' <<< "$out_text" || true)"
+  if [ "$rc" -eq 0 ] && [ "$out_text" = "ok: $stamp_content" ] && [ "$n_ok" = 1 ] && [ ! -s "$FAKE_DOCKER_LOG" ]; then
+    pass "(t) --check-fresh with a fresh stamp -> exit 0, one ok: line, no docker call, no compose file needed"
+  else
+    fail "(t) check-fresh fresh: rc=$rc out='$out_text'"
+  fi
+}
+
+# (t2) --check-fresh: a missing stamp -> 1 naming the problem; an empty stamp -> 1
+{
+  d="$WORKDIR/t2"; mkdir -p "$d"
+  run_check "$d" "-"; r1=$rc; m1=0; grep -q "no last-success stamp" <<< "$out_text" && m1=1
+  : > "$d/.last-success"
+  run_check "$d" "-"; r2=$rc; m2=0; grep -q "is empty" <<< "$out_text" && m2=1
+  if [ "$r1" = 1 ] && [ "$m1" = 1 ] && [ "$r2" = 1 ] && [ "$m2" = 1 ]; then
+    pass "(t2) --check-fresh: missing stamp -> 1, empty stamp -> 1"
+  else
+    fail "(t2) check-fresh missing/empty: $r1(m$m1) $r2(m$m2)"
+  fi
+}
+
+# (t3) --check-fresh with a stamp older than the threshold -> 1, naming the problem
+#     and the stamp content
+{
+  d="$WORKDIR/t3"; mkdir -p "$d"
+  echo "2020-01-01T00:00:00Z project-pilot-20200101_000000.dump" > "$d/.last-success"
+  touch -t 202001010000 "$d/.last-success"
+  run_check "$d" "-"
+  if [ "$rc" = 1 ] && grep -q "older than 26 hour" <<< "$out_text" \
+    && grep -q "project-pilot-20200101_000000.dump" <<< "$out_text"; then
+    pass "(t3) --check-fresh: a stamp older than the default -> 1 with the stamp content"
+  else
+    fail "(t3) check-fresh old: rc=$rc out='$out_text'"
+  fi
+}
+
+# (t4) the hours argument and the default 26: a stamp 1550 minutes (25 h 50 min)
+#     old passes the default 26 (1560 min) but fails an explicit 25; a fresh stamp
+#     passes 25 too (the argument works in both directions)
+{
+  d="$WORKDIR/t4"; mkdir -p "$d"
+  echo "2026-01-01T00:00:00Z project-pilot-x.dump" > "$d/.last-success"
+  touch -t "$(minutes_ago_touch 1550)" "$d/.last-success"
+  run_check "$d" "-"; r1=$rc
+  run_check "$d" 25; r2=$rc
+  touch "$d/.last-success"
+  run_check "$d" 25; r3=$rc
+  run_check "$d" 999999; r4=$rc
+  if [ "$r1" = 0 ] && [ "$r2" = 1 ] && [ "$r3" = 0 ] && [ "$r4" = 0 ]; then
+    pass "(t4) --check-fresh: default 26 accepts a 25 h 50 min stamp, explicit 25 refuses it, fresh passes 25 and the 6-digit maximum 999999"
+  else
+    fail "(t4) hours boundary: $r1 $r2 $r3 $r4"
+  fi
+}
+
+# (t5) --check-fresh with invalid hours -> 2, before any docker call: zero, leading
+#     zero, non-numeric, 7 digits, and an empty hours argument
+{
+  d="$WORKDIR/t5"; mkdir -p "$d"
+  echo "2026-01-01T00:00:00Z project-pilot-x.dump" > "$d/.last-success"
+  run_check "$d" 0; r1=$rc
+  run_check "$d" 01; r2=$rc
+  run_check "$d" abc; r3=$rc
+  run_check "$d" 1234567; r4=$rc
+  run_check "$d" ""; r5=$rc
+  u=0; [ -s "$FAKE_DOCKER_LOG" ] && u=1
+  if [ "$r1" = 2 ] && [ "$r2" = 2 ] && [ "$r3" = 2 ] && [ "$r4" = 2 ] && [ "$r5" = 2 ] && [ "$u" = 0 ]; then
+    pass "(t5) --check-fresh: hours 0, 01, abc, 1234567 and empty are all usage errors (exit 2)"
+  else
+    fail "(t5) invalid hours: $r1 $r2 $r3 $r4 $r5 docker=$u"
+  fi
+}
+
+# (t6) argument handling: an extra argument after --check-fresh [hours], an unknown
+#     argument, and an argument with no option are all usage errors (exit 2) with no
+#     docker call and no dump; the near-miss --check is refused too
+{
+  d="$WORKDIR/t6"; mkdir -p "$d"
+  echo "2026-01-01T00:00:00Z project-pilot-x.dump" > "$d/.last-success"
+  run_script_args "$d" -- --check-fresh 2 extra; r1=$rc
+  run_script_args "$d" -- --check-fresh extra; r2=$rc
+  run_script_args "$d" -- --frobnicate; r3=$rc
+  run_script_args "$d" -- extra; r4=$rc
+  run_script_args "$d" -- --check; r5=$rc
+  u=0; [ -s "$FAKE_DOCKER_LOG" ] && u=1
+  if [ "$r1" = 2 ] && [ "$r2" = 2 ] && [ "$r3" = 2 ] && [ "$r4" = 2 ] && [ "$r5" = 2 ] \
+    && [ "$u" = 0 ] && [ "$(count_dumps "$d")" = 0 ]; then
+    pass "(t6) extra, unknown and near-miss arguments are usage errors (exit 2), nothing runs"
+  else
+    fail "(t6) arguments: $r1 $r2 $r3 $r4 $r5 docker=$u dumps=$(count_dumps "$d")"
+  fi
+}
+
+# (t7) the check reads exactly what the backup writes and follows BACKUP_DIR like
+#     the backup does: empty BACKUP_DIR checks the $HOME default the empty-BACKUP_DIR
+#     backup wrote, a directory inside the checkout is refused (exit 2), and HOME
+#     unset with no BACKUP_DIR is the check failing (exit 1) - never a docker call
+{
+  def="$HOME/project-pilot-backups"
+  rm -rf "$def"
+  run_backup ""; r0=$rc
+  run_check "" "-"; r1=$rc; m1=0; grep -q '^ok: ' <<< "$out_text" && m1=1
+  run_check "$REPO/backups" "-"; r2=$rc; m2=0; grep -q "inside the checkout" <<< "$out_text" && m2=1
+  rc=0
+  out_text="$(env -u HOME PATH="$FAKE_BIN:$PATH" BACKUP_COMPOSE_FILE="$COMPOSE_FILE" "$BACKUP_SCRIPT" --check-fresh 2>&1)" || rc=$?
+  r3=$rc; m3=0; grep -q "cannot resolve BACKUP_DIR" <<< "$out_text" && m3=1
+  u=0; [ -s "$FAKE_DOCKER_LOG" ] && u=1
+  if [ "$r0" = 0 ] && [ "$r1" = 0 ] && [ "$m1" = 1 ] && [ "$r2" = 2 ] && [ "$m2" = 1 ] \
+    && [ "$r3" = 1 ] && [ "$m3" = 1 ] && [ "$u" = 0 ]; then
+    pass "(t7) --check-fresh uses the BACKUP_DIR default, refuses the checkout (2) and HOME unset (1)"
+  else
+    fail "(t7) check BACKUP_DIR: $r0 $r1(m$m1) $r2(m$m2) $r3(m$m3) docker=$u"
   fi
 }
 

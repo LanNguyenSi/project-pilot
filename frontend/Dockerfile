@@ -13,6 +13,10 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY package.json package-lock.json ./
 COPY frontend ./frontend
+# NEXT_PUBLIC_* values are inlined into the client bundle at build time: a build
+# without these --build-arg flags bakes the defaults below into a production
+# image silently, and the running container cannot change them afterwards.
+# docker-compose.prod.yml passes both; a manual `docker build` must too.
 ARG NEXT_PUBLIC_API_URL=http://localhost:3001
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ARG NEXT_PUBLIC_DEPSIGHT_URL=https://depsight.opentriologue.ai
