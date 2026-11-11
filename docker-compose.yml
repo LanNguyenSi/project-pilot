@@ -61,7 +61,8 @@ services:
       FRONTEND_URL: http://localhost:3000
       NODE_ENV: development
     ports:
-      - "3001:3001"
+      # Loopback only: the dev backend runs with a placeholder SESSION_SECRET.
+      - "127.0.0.1:3001:3001"
 
   frontend:
     build:
@@ -73,7 +74,8 @@ services:
     depends_on:
       - backend
     ports:
-      - "3000:3000"
+      # Loopback only: it serves the UI for that dev backend.
+      - "127.0.0.1:3000:3000"
 
 volumes:
   pgdata:

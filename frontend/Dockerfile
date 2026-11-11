@@ -33,6 +33,13 @@ COPY --from=builder /app/frontend/.next/standalone ./
 COPY --from=builder /app/frontend/.next/static ./frontend/.next/static
 COPY --from=builder /app/frontend/public ./frontend/public
 
+# Run as the image's unprivileged `node` user (uid 1000), not root. The copied
+# files stay root-owned and read-only for it. The one place the standalone
+# server writes at runtime is .next/cache (the image optimizer's cache), so
+# that directory alone is created here and owned by `node`.
+RUN mkdir -p frontend/.next/cache && chown node:node frontend/.next/cache
+USER node
+
 EXPOSE 3000
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s \

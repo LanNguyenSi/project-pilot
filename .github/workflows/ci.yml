@@ -124,11 +124,12 @@ jobs:
 
   compose-isolation:
     # Guards against the dev compose file resolving to the same pgdata volume
-    # as the production file, however the compose project name is overridden.
+    # as the production file, however the compose project name is overridden,
+    # and against a dev service publishing a port on all interfaces.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - name: Dev and prod pgdata volumes differ
+      - name: Dev and prod pgdata volumes differ, dev ports on loopback
         env:
           POSTGRES_PASSWORD: dummy
           SESSION_SECRET: dummy
@@ -151,8 +152,9 @@ jobs:
               | if ($src | length) == 1 then (.volumes[$src[0]].name // "") else "" end'
           }
           # Checks on one dev render: the db volume differs from prod, no dev
-          # volume carries the production name, and no service borrows another
-          # container's volumes (volumes_from container:...).
+          # volume carries the production name, no service borrows another
+          # container's volumes (volumes_from container:...), and every
+          # published port is bound to 127.0.0.1.
           check_dev() {
             local label="$1" dev_json="$2" dev rc
             dev=$(printf '%s' "$dev_json" | db_volume)
@@ -172,6 +174,15 @@ jobs:
             printf '%s' "$dev_json" | jq -e '[.services[]?.volumes_from[]?] | length > 0' >/dev/null || rc=$?
             if [ "$rc" -ne 1 ]; then
               echo "a dev service uses volumes_from, or the check failed (jq exit $rc, $label)" >&2
+              exit 1
+            fi
+            # Every published dev port is bound to 127.0.0.1: the dev stack
+            # runs with placeholder credentials. A bare "3001:3001" renders
+            # without a host_ip and fails here.
+            rc=0
+            printf '%s' "$dev_json" | jq -e '[.services[]?.ports[]? | select((.host_ip // "") != "127.0.0.1")] | length > 0' >/dev/null || rc=$?
+            if [ "$rc" -ne 1 ]; then
+              echo "a dev service publishes a port that is not bound to 127.0.0.1, or the check failed (jq exit $rc, $label)" >&2
               exit 1
             fi
           }
