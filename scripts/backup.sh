@@ -20,7 +20,9 @@
 #          scripts/backup.sh --check-fresh [hours]  (freshness check only, see below)
 #          Any other argument is a usage error (exit 2).
 # Cron:    17 3 * * * cd /path/to/project-pilot && scripts/backup.sh >> "$HOME/project-pilot-backup.log" 2>&1
-#          17 4 * * * cd /path/to/project-pilot && scripts/backup.sh --check-fresh 2 >> "$HOME/project-pilot-backup.log" 2>&1
+#          17 4 * * * cd /path/to/project-pilot && scripts/backup.sh --check-fresh 2 >> "$HOME/project-pilot-backup.log"
+#          (no 2>&1 on the check: its failure message goes to stderr, which cron mails
+#          when MAILTO or a local mail setup is configured; a log nobody reads is no alert)
 #          (the log lives under $HOME: /var/log is not writable for the docker-group
 #          user that runs the job, and a redirect that cannot open its file means the
 #          script never runs at all)
@@ -59,7 +61,9 @@
 #
 # Exit codes (backup run; for --check-fresh see Freshness):
 #   0  dump written and validated (hook, if set, succeeded; rotation done; stamp written)
-#   1  pg_dump failed or the dump failed validation (nothing published, no stamp)
+#   1  pg_dump failed or the dump failed validation (nothing published, no stamp), or
+#      the dump is published but the last-success stamp could not be written (the
+#      message says so; --check-fresh will then report the stamp as stale)
 #   2  refused before dumping: bad configuration, BACKUP_DIR inside the checkout, compose
 #      file missing or the dev stack file, the db service is not running, or a usage
 #      error (unknown argument, bad --check-fresh hours)
@@ -190,7 +194,7 @@ out="$BACKUP_DIR/project-pilot-$ts.dump"
 # each other.
 if [ -e "$out" ]; then out="$BACKUP_DIR/project-pilot-$ts-$$.dump"; fi
 
-cleanup() { rm -f "$tmp"; }
+cleanup() { rm -f "$tmp" "${stamp_tmp:-}"; }
 trap cleanup EXIT
 trap 'exit 1' HUP INT TERM
 
@@ -228,8 +232,11 @@ fi
 # above it, so a failed night never refreshes the stamp --check-fresh reads.
 stamp="$BACKUP_DIR/.last-success"
 stamp_tmp="$stamp.$$.tmp"
-printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$(basename "$out")" > "$stamp_tmp"
-mv -f "$stamp_tmp" "$stamp"
+if ! { printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$(basename "$out")" > "$stamp_tmp" \
+  && mv -f "$stamp_tmp" "$stamp"; } 2>/dev/null; then
+  echo "backup: dump $out is published, but the last-success stamp $stamp could not be written; --check-fresh will report it as stale" >&2
+  exit 1
+fi
 echo "backup: last-success stamp updated ($stamp)"
 
 if [ -n "$SKIP_ROTATION" ]; then

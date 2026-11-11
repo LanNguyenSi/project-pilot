@@ -514,6 +514,26 @@ done
   fi
 }
 
+# (s2) the dump is published but the stamp cannot be written (the hook makes
+#     BACKUP_DIR read-only after the dump): exit 1, a message that says the dump is
+#     published, the dump stays, and no stamp temp file is left behind
+{
+  d="$WORKDIR/s4"; mkdir -p "$d"
+  hook="$WORKDIR/hook_ro_s4.sh"
+  # The hook body is written literally; $1 expands when the hook runs.
+  # shellcheck disable=SC2016
+  printf '#!/bin/sh\nchmod 500 "$(dirname "$1")"\n' > "$hook"
+  chmod +x "$hook"
+  run_backup "$d" BACKUP_OFFHOST_HOOK="$hook"; r=$rc
+  chmod 700 "$d"
+  n="$(count_dumps "$d")"; left="$(count_tmp "$d")"; w=0; [ -e "$d/.last-success" ] && w=1
+  if [ "$r" = 1 ] && [ "$n" = 1 ] && [ "$w" = 0 ] && [ "$left" = 0 ] && grep -q "is published, but the last-success stamp" <<< "$out_text"; then
+    pass "(s2) stamp write failure after a published dump: exit 1, says the dump is published, no temp left"
+  else
+    fail "(s2) stamp write failure: rc=$r dumps=$n stamp=$w tmp=$left out='$out_text'"
+  fi
+}
+
 # (s) no stamp after a failing run: exit 1 (pg_dump), exit 2 (db not running) and
 #     exit 3 (hook failure: a published dump is not a success for the stamp)
 {
@@ -587,10 +607,11 @@ done
   run_check "$d" 25; r2=$rc
   touch "$d/.last-success"
   run_check "$d" 25; r3=$rc
-  if [ "$r1" = 0 ] && [ "$r2" = 1 ] && [ "$r3" = 0 ]; then
-    pass "(t4) --check-fresh: default 26 accepts a 25 h 50 min stamp, explicit 25 refuses it, fresh passes 25"
+  run_check "$d" 999999; r4=$rc
+  if [ "$r1" = 0 ] && [ "$r2" = 1 ] && [ "$r3" = 0 ] && [ "$r4" = 0 ]; then
+    pass "(t4) --check-fresh: default 26 accepts a 25 h 50 min stamp, explicit 25 refuses it, fresh passes 25 and the 6-digit maximum 999999"
   else
-    fail "(t4) hours boundary: $r1 $r2 $r3"
+    fail "(t4) hours boundary: $r1 $r2 $r3 $r4"
   fi
 }
 
