@@ -232,8 +232,10 @@ fi
 # above it, so a failed night never refreshes the stamp --check-fresh reads.
 stamp="$BACKUP_DIR/.last-success"
 stamp_tmp="$stamp.$$.tmp"
-if ! { printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$(basename "$out")" > "$stamp_tmp" \
-  && mv -f "$stamp_tmp" "$stamp"; } 2>/dev/null; then
+# A directory in place of the stamp would swallow the temp file (mv moves it inside
+# and returns 0), so it counts as a failed stamp write too.
+if [ -d "$stamp" ] || ! { printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$(basename "$out")" > "$stamp_tmp" \
+  && mv -f "$stamp_tmp" "$stamp"; }; then
   echo "backup: dump $out is published, but the last-success stamp $stamp could not be written; --check-fresh will report it as stale" >&2
   exit 1
 fi

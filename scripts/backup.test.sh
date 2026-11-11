@@ -534,6 +534,27 @@ done
   fi
 }
 
+# (s3) the stamp temp file is written but the mv onto the stamp fails (a PATH-first
+#     mv stub): exit 1 and the temp file is removed by the cleanup; and a directory
+#     in place of the stamp is a failed stamp write, not a silent success
+{
+  d="$WORKDIR/s5"; mkdir -p "$d"
+  stub="$WORKDIR/mvstub"; mkdir -p "$stub"
+  real_mv="$(command -v mv)"
+  printf '#!/bin/sh\ncase "$*" in *.last-success*) exit 1 ;; esac\nexec %s "$@"\n' "$real_mv" > "$stub/mv"
+  chmod +x "$stub/mv"
+  run_backup "$d" PATH="$stub:$FAKE_BIN:$PATH"; r1=$rc
+  left="$(count_tmp "$d")"
+  d2="$WORKDIR/s6"; mkdir -p "$d2/.last-success"
+  run_backup "$d2"; r2=$rc
+  inner="$(find "$d2/.last-success" -type f | wc -l | tr -d ' ')"
+  if [ "$r1" = 1 ] && [ "$left" = 0 ] && [ "$r2" = 1 ] && [ "$inner" = 0 ]; then
+    pass "(s3) failed stamp mv: exit 1, temp file cleaned; a directory as stamp: exit 1, nothing moved into it"
+  else
+    fail "(s3) stamp mv/dir: rc=$r1 tmp=$left dir-rc=$r2 inner=$inner"
+  fi
+}
+
 # (s) no stamp after a failing run: exit 1 (pg_dump), exit 2 (db not running) and
 #     exit 3 (hook failure: a published dump is not a success for the stamp)
 {
