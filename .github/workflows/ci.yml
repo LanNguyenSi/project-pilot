@@ -176,16 +176,31 @@ jobs:
               echo "a dev service uses volumes_from, or the check failed (jq exit $rc, $label)" >&2
               exit 1
             fi
-            # Every published dev port is bound to 127.0.0.1: the dev stack
-            # runs with placeholder credentials. A bare "3001:3001" renders
-            # without a host_ip and fails here.
-            rc=0
+            check_ports "$label" "$dev_json"
+          }
+          # Every published dev port is bound to 127.0.0.1: the dev stack
+          # runs with placeholder credentials. A bare "3001:3001" renders
+          # without a host_ip and fails here.
+          check_ports() {
+            local label="$1" dev_json="$2" rc=0
             printf '%s' "$dev_json" | jq -e '[.services[]?.ports[]? | select((.host_ip // "") != "127.0.0.1")] | length > 0' >/dev/null || rc=$?
             if [ "$rc" -ne 1 ]; then
               echo "a dev service publishes a port that is not bound to 127.0.0.1, or the check failed (jq exit $rc, $label)" >&2
               exit 1
             fi
           }
+          # Self-test: the port check must reject an unbound and a wildcard
+          # port and accept a loopback one, so a filter that matches nothing
+          # cannot pass silently.
+          for bad in '{"services":{"a":{"ports":[{"target":3001,"published":"3001"}]}}}' \
+                     '{"services":{"a":{"ports":[{"host_ip":"0.0.0.0","target":3001,"published":"3001"}]}}}'; do
+            if (check_ports self-test "$bad") 2>/dev/null; then
+              echo "port check self-test: a non-loopback port was accepted" >&2
+              exit 1
+            fi
+          done
+          check_ports self-test '{"services":{"a":{"ports":[{"host_ip":"127.0.0.1","target":3001,"published":"3001"}]}}}' \
+            || { echo "port check self-test: a loopback port was rejected" >&2; exit 1; }
           check() {
             label="$1"; shift
             prod_json=$(render -f docker-compose.prod.yml)
