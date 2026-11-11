@@ -64,7 +64,10 @@ The MCP server exposes 18 tools (forge, tasks, deploy, plus `dashboard_summary`)
       "env": {
         "FORGE_API_KEY": "pf_...",
         "TASKS_TOKEN":   "at_...",
-        "DEPLOY_API_KEY":"dp_..."
+        "DEPLOY_API_KEY":"dp_...",
+        "FORGE_URL":     "https://forge.internal.example.com",
+        "TASKS_URL":     "https://tasks.internal.example.com",
+        "DEPLOY_URL":    "https://deploy.internal.example.com"
       }
     }
   }

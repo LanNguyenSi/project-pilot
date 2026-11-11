@@ -16,8 +16,11 @@
 # Only a validated file is renamed to its final name, so a failed run never leaves a
 # truncated or empty project-pilot-*.dump behind.
 #
-# Usage:   scripts/backup.sh
+# Usage:   scripts/backup.sh                        (run a backup)
+#          scripts/backup.sh --check-fresh [hours]  (freshness check only, see below)
+#          Any other argument is a usage error (exit 2).
 # Cron:    17 3 * * * cd /path/to/project-pilot && scripts/backup.sh >> "$HOME/project-pilot-backup.log" 2>&1
+#          17 4 * * * cd /path/to/project-pilot && scripts/backup.sh --check-fresh 2 >> "$HOME/project-pilot-backup.log" 2>&1
 #          (the log lives under $HOME: /var/log is not writable for the docker-group
 #          user that runs the job, and a redirect that cannot open its file means the
 #          script never runs at all)
@@ -39,13 +42,29 @@
 #                        session and encrypted credential rows: encrypt it in the hook
 #                        before it leaves the host.
 #
-# Exit codes:
-#   0  dump written and validated (hook, if set, succeeded; rotation done)
-#   1  pg_dump failed or the dump failed validation (nothing published)
+# Freshness: after a fully successful run (published dump; if a hook is set, it must
+# have succeeded too - an exit 3 run does NOT refresh the stamp) the file
+# $BACKUP_DIR/.last-success is replaced atomically (a temp file in BACKUP_DIR, then
+# mv) with one line: the UTC time and the dump's file name. Mode 600, like the dumps.
+# It is never written on a failing run. scripts/backup.sh --check-fresh [hours] reads
+# that stamp and takes no backup: no docker and no compose file are needed, and the
+# BACKUP_DIR default and the inside-the-checkout refusal apply, so the check reads
+# exactly the directory the backup writes. Exit 0 with one ok: line when the stamp
+# exists, is non-empty and its modification time is younger than hours (default 26: a
+# nightly run plus slack, for ad-hoc and monitoring use; a 26-hour threshold checked
+# one hour after the backup cannot flag the first missed night); exit 1 when the stamp
+# is missing, empty or older, or BACKUP_DIR cannot be resolved. hours must be a
+# positive integer without a leading zero and at most 6 digits; anything else, or
+# extra arguments, is a usage error (exit 2).
+#
+# Exit codes (backup run; for --check-fresh see Freshness):
+#   0  dump written and validated (hook, if set, succeeded; rotation done; stamp written)
+#   1  pg_dump failed or the dump failed validation (nothing published, no stamp)
 #   2  refused before dumping: bad configuration, BACKUP_DIR inside the checkout, compose
-#      file missing or the dev stack file, or the db service is not running
+#      file missing or the dev stack file, the db service is not running, or a usage
+#      error (unknown argument, bad --check-fresh hours)
 #   3  dump is published and valid, but the off-host hook failed (rotation is skipped so
-#      a broken off-host copy never pushes older dumps out)
+#      a broken off-host copy never pushes older dumps out; the stamp is not refreshed)
 set -euo pipefail
 umask 077
 
@@ -61,34 +80,47 @@ SKIP_ROTATION="${BACKUP_SKIP_ROTATION:-}"
 
 refuse() { echo "backup: $*" >&2; exit 2; }
 
-# The default needs HOME; an explicit BACKUP_DIR does not.
-if [ -z "${BACKUP_DIR:-}" ]; then
-  [ -n "${HOME:-}" ] || refuse "HOME is not set and BACKUP_DIR is not given"
-  BACKUP_DIR="$HOME/project-pilot-backups"
+# No argument runs a backup; --check-fresh [hours] only reads the freshness stamp.
+# Any other argument is a usage error instead of silently running a backup.
+MODE=backup
+CHECK_HOURS=26
+if [ "$#" -gt 0 ] && [ "$1" = "--check-fresh" ]; then
+  MODE=check
+  shift
+  if [ "$#" -gt 0 ]; then
+    CHECK_HOURS="$1"
+    shift
+  fi
 fi
-
-case "$KEEP_FILES" in ''|*[!0-9]*) refuse "KEEP_FILES must be a positive integer, got '$KEEP_FILES'" ;; esac
-case "$KEEP_DAYS" in ''|*[!0-9]*) refuse "KEEP_DAYS must be a positive integer, got '$KEEP_DAYS'" ;; esac
-[ "$KEEP_FILES" -ge 1 ] || refuse "KEEP_FILES must be at least 1"
-[ "$KEEP_DAYS" -ge 1 ] || refuse "KEEP_DAYS must be at least 1"
-[ -f "$COMPOSE_FILE" ] || refuse "compose file not found: $COMPOSE_FILE"
-if [ -n "$OFFHOST_HOOK" ] && { [ ! -f "$OFFHOST_HOOK" ] || [ ! -x "$OFFHOST_HOOK" ]; }; then
-  refuse "BACKUP_OFFHOST_HOOK is not an executable file: $OFFHOST_HOOK"
+if [ "$#" -gt 0 ]; then
+  refuse "usage: scripts/backup.sh [--check-fresh [hours]]; unexpected argument: '$1'"
+fi
+if [ "$MODE" = check ]; then
+  case "$CHECK_HOURS" in
+    ''|*[!0-9]*) refuse "--check-fresh: hours must be a positive integer without a leading zero and at most 6 digits, got '$CHECK_HOURS'" ;;
+    0|0[0-9]*) refuse "--check-fresh: hours must be at least 1, got '$CHECK_HOURS'" ;;
+    [1-9][0-9][0-9][0-9][0-9][0-9][0-9]*) refuse "--check-fresh: hours must be at most 6 digits, got '$CHECK_HOURS'" ;;
+  esac
 fi
 
 phys_repo="$(cd "$REPO_ROOT" && pwd -P)"
 
-# The dev stack (docker-compose.yml) has its own throwaway database; backing it up
-# (or, in restore.sh, replacing it) from a production script is always a mistake.
-# The -ef test also catches a file symlink or hardlink to it; a copy is not caught.
-phys_compose="$(cd "$(dirname "$COMPOSE_FILE")" && pwd -P)/$(basename "$COMPOSE_FILE")"
-if [ "$phys_compose" = "$phys_repo/docker-compose.yml" ] || [ "$COMPOSE_FILE" -ef "$REPO_ROOT/docker-compose.yml" ]; then
-  refuse "$COMPOSE_FILE is the development stack; this script only handles docker-compose.prod.yml"
+# The default needs HOME; an explicit BACKUP_DIR does not. A --check-fresh run that
+# cannot resolve BACKUP_DIR has no stamp to read: that is the check failing (exit 1),
+# not a refusal.
+if [ -z "${BACKUP_DIR:-}" ]; then
+  if [ "$MODE" = check ] && [ -z "${HOME:-}" ]; then
+    echo "backup: --check-fresh: cannot resolve BACKUP_DIR: HOME is not set and BACKUP_DIR is not given" >&2
+    exit 1
+  fi
+  [ -n "${HOME:-}" ] || refuse "HOME is not set and BACKUP_DIR is not given"
+  BACKUP_DIR="$HOME/project-pilot-backups"
 fi
 
 # A dump inside the checkout would block the next relay deploy (untracked file) and enter
 # every docker build context. Resolve through the nearest existing ancestor so symlinks
-# and a not yet created directory are judged by where they really are.
+# and a not yet created directory are judged by where they really are. The check reads
+# the stamp the backup writes, so the same refusal applies to it.
 case "$BACKUP_DIR" in /*) abs_dir="$BACKUP_DIR" ;; *) abs_dir="$PWD/$BACKUP_DIR" ;; esac
 anc="$abs_dir"
 while [ ! -d "$anc" ]; do anc="$(dirname "$anc")"; done
@@ -100,6 +132,44 @@ phys_dir="$(cd "$anc" && pwd -P)$missing"
 case "$phys_dir/" in
   "$phys_repo/"*) refuse "BACKUP_DIR $BACKUP_DIR is inside the checkout; use a directory outside it (default: \$HOME/project-pilot-backups)" ;;
 esac
+
+# The check reads the stamp a successful run wrote, from exactly the BACKUP_DIR above:
+# no docker, no compose file, no dump, no rotation.
+if [ "$MODE" = check ]; then
+  stamp="$BACKUP_DIR/.last-success"
+  if [ ! -f "$stamp" ]; then
+    echo "backup: --check-fresh: no last-success stamp at $stamp (no successful backup has written one, or BACKUP_DIR points elsewhere)" >&2
+    exit 1
+  fi
+  if [ ! -s "$stamp" ]; then
+    echo "backup: --check-fresh: the stamp $stamp exists but is empty" >&2
+    exit 1
+  fi
+  # -mmin "-N" is true when the file's age is under N minutes (portable BSD and GNU).
+  if find "$stamp" -mmin "-$((CHECK_HOURS * 60))" | grep -q .; then
+    echo "ok: $(cat "$stamp")"
+    exit 0
+  fi
+  echo "backup: --check-fresh: the last success is older than $CHECK_HOURS hour(s): $(cat "$stamp")" >&2
+  exit 1
+fi
+
+case "$KEEP_FILES" in ''|*[!0-9]*) refuse "KEEP_FILES must be a positive integer, got '$KEEP_FILES'" ;; esac
+case "$KEEP_DAYS" in ''|*[!0-9]*) refuse "KEEP_DAYS must be a positive integer, got '$KEEP_DAYS'" ;; esac
+[ "$KEEP_FILES" -ge 1 ] || refuse "KEEP_FILES must be at least 1"
+[ "$KEEP_DAYS" -ge 1 ] || refuse "KEEP_DAYS must be at least 1"
+[ -f "$COMPOSE_FILE" ] || refuse "compose file not found: $COMPOSE_FILE"
+if [ -n "$OFFHOST_HOOK" ] && { [ ! -f "$OFFHOST_HOOK" ] || [ ! -x "$OFFHOST_HOOK" ]; }; then
+  refuse "BACKUP_OFFHOST_HOOK is not an executable file: $OFFHOST_HOOK"
+fi
+
+# The dev stack (docker-compose.yml) has its own throwaway database; backing it up
+# (or, in restore.sh, replacing it) from a production script is always a mistake.
+# The -ef test also catches a file symlink or hardlink to it; a copy is not caught.
+phys_compose="$(cd "$(dirname "$COMPOSE_FILE")" && pwd -P)/$(basename "$COMPOSE_FILE")"
+if [ "$phys_compose" = "$phys_repo/docker-compose.yml" ] || [ "$COMPOSE_FILE" -ef "$REPO_ROOT/docker-compose.yml" ]; then
+  refuse "$COMPOSE_FILE is the development stack; this script only handles docker-compose.prod.yml"
+fi
 
 DC=(docker compose -f "$COMPOSE_FILE")
 
@@ -151,6 +221,16 @@ if [ -n "$OFFHOST_HOOK" ]; then
     exit 3
   fi
 fi
+
+# Freshness stamp: one line (UTC time, dump file name), mode 600 through the umask,
+# replaced atomically (a temp file in BACKUP_DIR, then mv). Only a fully successful
+# run reaches this: a failed dump exited before it, and exit 3 (hook failure) returns
+# above it, so a failed night never refreshes the stamp --check-fresh reads.
+stamp="$BACKUP_DIR/.last-success"
+stamp_tmp="$stamp.$$.tmp"
+printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$(basename "$out")" > "$stamp_tmp"
+mv -f "$stamp_tmp" "$stamp"
+echo "backup: last-success stamp updated ($stamp)"
 
 if [ -n "$SKIP_ROTATION" ]; then
   echo "backup: rotation skipped (BACKUP_SKIP_ROTATION)"
