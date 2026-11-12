@@ -165,7 +165,7 @@ To apply such a change deliberately, run the push once from a one-off container 
 5. Apply the schema once, with the flag: `docker compose -f docker-compose.prod.yml run --rm --no-deps -e HOME=/tmp backend npx prisma db push --schema=prisma/schema.prisma --skip-generate --accept-data-loss` (the schema path is relative to the image's working directory, which holds `prisma/schema.prisma`; `--no-deps` leaves the running database container alone; `--skip-generate` keeps the Prisma client the image built, as in every production schema call).
 6. Redeploy as usual (relay or `make deploy`); the push now finds nothing to change.
 
-Do not add the flag to `.relay.yml`, the Makefile, the compose files or the Dockerfile, and do not add a second schema step (a `prisma` call in the image `CMD` or in the production compose file).
+Do not add `--accept-data-loss` to `.relay.yml`, the Makefile, the compose files or the Dockerfile, and do not add a second schema step (a `prisma` call in the image `CMD` or in the production compose file).
 
 ### Development
 
