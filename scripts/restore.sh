@@ -197,7 +197,7 @@ if [ -n "$SCHEMA_SERVICE" ]; then
   echo "restore: applying the current schema (prisma db push in a one-off $SCHEMA_SERVICE container)"
   # Same command as the deploy's schema step, without a data-loss flag: a schema change
   # that would drop data makes it fail instead of dropping anything.
-  if ! "${DC[@]}" run --rm -T --no-deps -e HOME=/tmp "$SCHEMA_SERVICE" npx prisma db push --schema=prisma/schema.prisma; then
+  if ! "${DC[@]}" run --rm -T --no-deps -e HOME=/tmp "$SCHEMA_SERVICE" npx prisma db push --schema=prisma/schema.prisma --skip-generate; then
     echo "restore: the dump is restored, but the schema step (prisma db push in the $SCHEMA_SERVICE image) failed; see the output above (a dump taken from newer code than the deployed code is one example)." >&2
     [ "$stopped_app" -eq 0 ] || echo "restore: $APP_SERVICE is still stopped; after fixing it run: $start_hint" >&2
     exit 4

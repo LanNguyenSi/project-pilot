@@ -61,6 +61,52 @@ describe("production schema step", () => {
   });
 });
 
+describe("production schema steps skip client generation", () => {
+  // The deploy target's recipe only: its tab-indented block, so the dev
+  // targets' pushes are not part of the parsed text.
+  const makefileDeployTarget = () => {
+    const lines = read("Makefile").split("\n");
+    const start = lines.findIndex((l) => /^deploy:/.test(l));
+    expect(start).toBeGreaterThanOrEqual(0);
+    const recipe: string[] = [];
+    for (const l of lines.slice(start + 1)) {
+      if (/^\t/.test(l)) recipe.push(l);
+      else if (l.trim() === "") continue;
+      else break;
+    }
+    return code(recipe.join("\n"));
+  };
+
+  // Lines that invoke the CLI, not lines that merely mention `prisma db push`
+  // in a comment or an echo: the comments and messages carry no `npx` call.
+  const pushCalls = (text: string) =>
+    code(text)
+      .split("\n")
+      .filter((l) => /npx\s+prisma\s+db\s+push/.test(l));
+
+  const sources: Array<[string, () => string]> = [
+    [".relay.yml", () => read(".relay.yml")],
+    ["Makefile deploy target", makefileDeployTarget],
+    ["scripts/restore.sh", () => read("scripts/restore.sh")],
+  ];
+
+  for (const [name, text] of sources) {
+    it(`${name}: has exactly one prisma db push call and it passes --skip-generate`, () => {
+      const calls = pushCalls(text());
+      expect(calls).toHaveLength(1);
+      expect(calls[0]).toContain("--skip-generate");
+    });
+  }
+
+  it("the Dockerfile copies node_modules/.prisma without --chown", () => {
+    const copies = code(read("backend/Dockerfile"))
+      .split("\n")
+      .filter((l) => /^COPY\b.*\/\.prisma\b/.test(l));
+    expect(copies).toHaveLength(1);
+    expect(copies[0]).not.toContain("--chown");
+  });
+});
+
 describe("dev compose schema step", () => {
   const dev = code(read("docker-compose.yml"));
   const service = (name: string) =>
