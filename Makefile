@@ -53,7 +53,7 @@ deploy:
 	case "$(HEALTH_INTERVAL)" in ''|*[!0-9]*|0*) echo "deploy: HEALTH_INTERVAL must be a positive integer, got '$(HEALTH_INTERVAL)'" >&2; exit 2;; esac
 	git pull
 	docker compose -f docker-compose.prod.yml up --build -d
-	docker compose -f docker-compose.prod.yml exec -T -e HOME=/tmp backend npx prisma db push --schema=prisma/schema.prisma
+	docker compose -f docker-compose.prod.yml exec -T -e HOME=/tmp backend npx prisma db push --schema=prisma/schema.prisma --skip-generate
 	@i=0; \
 	until docker compose -f docker-compose.prod.yml exec -T backend wget -q --spider http://localhost:3001/api/health; do \
 		i=$$((i+1)); \

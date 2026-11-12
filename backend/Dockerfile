@@ -55,18 +55,20 @@ ENV NODE_ENV=production
 COPY --from=prod-deps /app/node_modules /app/node_modules
 COPY --from=builder /app/node_modules/prisma /app/node_modules/prisma
 COPY --from=builder /app/node_modules/@prisma/engines /app/node_modules/@prisma/engines
-# Owned by `node`: `prisma db push` without --skip-generate (the relay step,
-# `make` targets and scripts/restore.sh all call it that way) regenerates the
-# client here, and the unprivileged user could not replace root-owned files.
-COPY --from=builder --chown=node:node /app/node_modules/.prisma /app/node_modules/.prisma
+# Root-owned like the rest: every production schema call (the relay step, the
+# `make deploy` target and scripts/restore.sh) passes --skip-generate, so the
+# client generated in the builder is used as it is and nothing under
+# node_modules needs to be writable by `node`.
+COPY --from=builder /app/node_modules/.prisma /app/node_modules/.prisma
 COPY --from=builder /app/backend/package.json ./
 COPY --from=builder /app/backend/dist ./dist
 COPY --from=builder /app/backend/prisma ./prisma
 
-# Run as the image's unprivileged `node` user (uid 1000), not root. Apart from
-# node_modules/.prisma above, the copied files stay root-owned and read-only for
-# it: the server writes no files, and the schema step (`prisma db push`, run in
-# this image) only needs a writable HOME, which the callers pass as HOME=/tmp.
+# Run as the image's unprivileged `node` user (uid 1000), not root. Every
+# copied file, node_modules/.prisma above included, stays root-owned and
+# read-only for it: the server writes no files, and the schema step
+# (`prisma db push --skip-generate`, run in this image) only needs a writable
+# HOME, which the callers pass as HOME=/tmp.
 USER node
 
 EXPOSE 3001

@@ -9,7 +9,7 @@ post_update:
   # fail and nothing is dropped. Apply such a change deliberately by hand, with
   # a database backup first (`make backup`; see "Backup and restore" in
   # docs/configuration.md).
-  - docker compose -f docker-compose.prod.yml exec -e HOME=/tmp backend npx prisma db push --schema=prisma/schema.prisma
+  - docker compose -f docker-compose.prod.yml exec -e HOME=/tmp backend npx prisma db push --schema=prisma/schema.prisma --skip-generate
 # rollback restores the code only: schema changes and rows already written stay in
 # the database. Restoring data needs a dump (see "Backup and restore" in
 # docs/configuration.md).
