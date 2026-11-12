@@ -45,6 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - Dependency updates: `renovate.json` extends the shared `github>LanNguyenSi/renovate-config` preset (weekly grouped patch/minor pull requests, 7-day minimum release age, no automerge, majors only through the Dependency Dashboard).
 - Removed the `GHSA-vfj7-8cjw-p6xm` (braces) entry from `.github/audit-allowlist.json`: GitHub withdrew the advisory on 2026-10-23, and `npm audit` no longer reports it in this repo's lockfile tree(s), so the gate stays CLEAN with an empty `entries` list. `scripts/audit-gate.mjs` is unchanged.
+- Dev-only: minimatch 11.0.4 for the ESLint toolchain (GHSA-g3hv-75wg-m249) in `package-lock.json`. Root `overrides` pin `minimatch` to `11.0.4` under `eslint`, `@eslint/config-array` and `@typescript-eslint/typescript-estree`, so the hoisted record (used by those two and by the `typescript-estree` under `eslint-config-next`) moves from 10.2.6 to 11.0.4; the minimatch 3.1.5 copies under `eslint-config-next`'s plugins are unchanged. No production dependency changes (`npm audit --omit=dev` is unchanged and clean).
 
 ### Security
 
