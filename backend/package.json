@@ -19,7 +19,7 @@
     "@hono/zod-validator": "^0.9.1",
     "@prisma/client": "^5.22.0",
     "bcryptjs": "^3.0.3",
-    "hono": "^4.12.23",
+    "hono": "^4.13.18",
     "zod": "^4.6.7"
   },
   "devDependencies": {
