@@ -18,12 +18,19 @@ The MCP server is a separate process and reads credentials from environment vari
 | `CORS_ORIGINS` | no | http://localhost:3000 | Allowed origins |
 | `FRONTEND_URL` | no | http://localhost:3000 | Frontend URL |
 | `NODE_ENV` | no | development | development, production, test. The backend image sets `ENV NODE_ENV=production` in its runner stage, so a Docker run is production unless the compose service `environment:` says otherwise (see [Docker deployment](#docker-deployment)) |
+| `ALLOW_FIRST_PASSWORD_ACCOUNT` | no | false | Bootstrap switch for the first password account only, see [Password registration](#password-registration). Only the literal `true` (any case, surrounding space ignored) opens it; unset, empty or any other value keeps `POST /api/auth/register` closed |
 | `PROJECT_FORGE_URL` | yes in production | https://project-forge.opentriologue.ai | Forge API base URL. Required with `NODE_ENV=production` (missing or empty fails startup); outside production it falls back to this default with a warning |
 | `AGENT_TASKS_URL` | yes in production | https://agent-tasks.opentriologue.ai | Tasks API base URL. Required with `NODE_ENV=production` (missing or empty fails startup); outside production it falls back to this default with a warning |
 | `DEPLOY_PANEL_URL` | yes in production | https://deploy-panel.opentriologue.ai | Deploy API base URL. Required with `NODE_ENV=production` (missing or empty fails startup); outside production it falls back to this default with a warning |
 | `BACKEND_URL` | no | http://localhost:3001 | Public backend URL, used to build the OAuth redirect URI |
 | `GITHUB_CLIENT_ID` | no |  | GitHub OAuth app client ID. When unset (along with `GITHUB_CLIENT_SECRET`), the login page hides **Continue with GitHub** and `GET /api/oauth/github/start` redirects to the frontend's `/auth/error?reason=not_configured` page (the callback route answers 503). GitHub sign-in is on only when both values are set; one alone counts as unset. Enabling it forwards users' GitHub tokens to the three service URLs, see [GitHub sign-in](#github-sign-in) |
 | `GITHUB_CLIENT_SECRET` | no |  | GitHub OAuth app client secret. When unset (along with `GITHUB_CLIENT_ID`), GitHub sign-in is off, see `GITHUB_CLIENT_ID`. Enabling it forwards users' GitHub tokens to the three service URLs, see [GitHub sign-in](#github-sign-in) |
+
+## Password registration
+
+Password sign-up is closed. Accounts are not mail-verified, so an open route would let anyone register an address first and then block that person's later GitHub sign-in (the OAuth flow refuses to attach to an existing password account with the same email, and that guard stays). `POST /api/auth/register` therefore answers `403 registration_closed` with one fixed body for every refusal, creates nothing and says nothing about whether the email exists. There is no invite or admin-create path; GitHub sign-in is how users get an account.
+
+The one exception is the bootstrap for a stack without GitHub sign-in: with `ALLOW_FIRST_PASSWORD_ACCOUNT=true` the route accepts a registration while the user table is empty, and is closed again as soon as any user exists. Unset the variable after creating the account. While the table is empty and the variable is `true`, whoever reaches the backend first can create that account, so do not leave it on for an exposed fresh deployment. The dev compose stack sets it (its backend port is loopback only); the production compose file passes it through from the host environment and leaves it empty by default. The login page has no sign-up form; create the bootstrap account with the `curl` call in the [README](../README.md#quick-start) and sign in on the page.
 
 ## GitHub sign-in
 

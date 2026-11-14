@@ -60,7 +60,7 @@ describe("login page GitHub button", () => {
     render(<LoginPage />);
     await settled(f);
     expect(screen.queryByRole("link", { name: /continue with github/i })).toBeNull();
-    expect(screen.getByRole("button", { name: "Sign in", pressed: true })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sign in" })).toBeInTheDocument();
   });
 
   it("hides the button while the request is pending", () => {

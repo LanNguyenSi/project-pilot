@@ -11,7 +11,7 @@ The backend exposes a Hono HTTP API at `:3001/api/*`. All `POST`/`PUT` JSON bodi
 
 ## Auth
 
-- `POST /api/auth/register` create account
+- `POST /api/auth/register` create the first account, bootstrap only: answers `403 registration_closed` (same body in every refusal, no account created, no hint whether the email exists) unless `ALLOW_FIRST_PASSWORD_ACCOUNT=true` and the user table is empty, see [Password registration](configuration.md#password-registration)
 - `POST /api/auth/login` sign in
 - `POST /api/auth/logout` sign out
 - `GET  /api/auth/me` current user

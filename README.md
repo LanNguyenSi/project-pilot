@@ -44,7 +44,7 @@ make dev-full
 
 Then connect your existing service credentials:
 
-1. Register an account at http://localhost:3000/login. If GitHub OAuth is configured (see [GitHub sign-in](docs/configuration.md#github-sign-in)), **Continue with GitHub** registers you with each service and fills `/settings` for every service that accepts the registration.
+1. Sign in at http://localhost:3000/login. Password sign-up is closed (no mail verification, so an open form would let anyone claim your address first); **Continue with GitHub** is the normal way in and registers you with each service and fills `/settings` for every service that accepts the registration (see [GitHub sign-in](docs/configuration.md#github-sign-in)). Without GitHub sign-in, create the first account once through the API with `ALLOW_FIRST_PASSWORD_ACCOUNT=true` set (the dev compose stack sets it; for `make dev-full` uncomment it in `backend/.env`): `curl -X POST http://localhost:3001/api/auth/register -H 'Content-Type: application/json' -H 'X-Requested-With: XMLHttpRequest' -d '{"email":"you@example.com","password":"at-least-8-chars"}'`, then sign in on the login page. See [Password registration](docs/configuration.md#password-registration).
 2. Open `/settings`.
 3. Paste your `pf_...` Forge key, agent-tasks Bearer token, and `dp_...` Deploy key, click **Save**, then click **Test** on each.
 4. Visit `/dashboard`, you should see stats from agent-tasks and deploy-panel and whether a project-forge token is saved.

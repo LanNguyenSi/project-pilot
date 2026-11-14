@@ -15,6 +15,14 @@ const configSchema = z.object({
   // When either is absent, the /api/oauth/github/* routes return 503.
   GITHUB_CLIENT_ID: z.string().optional(),
   GITHUB_CLIENT_SECRET: z.string().optional(),
+  // Bootstrap switch for the very first password account. Default closed:
+  // anything but the literal "true" (any case, surrounding space ignored,
+  // including an empty compose default) leaves POST /api/auth/register
+  // refused. Even when open it only works while the User table is empty.
+  ALLOW_FIRST_PASSWORD_ACCOUNT: z
+    .string()
+    .optional()
+    .transform((value) => value?.trim().toLowerCase() === "true"),
   PROJECT_FORGE_URL: z
     .string()
     .default("https://project-forge.opentriologue.ai"),

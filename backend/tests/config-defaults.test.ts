@@ -19,7 +19,7 @@ const DEFAULTS = {
   DEPLOY_PANEL_URL: "https://deploy-panel.opentriologue.ai",
 } as const;
 
-const MANAGED_KEYS = ["PORT", ...Object.keys(DEFAULTS)];
+const MANAGED_KEYS = ["PORT", "ALLOW_FIRST_PASSWORD_ACCOUNT", ...Object.keys(DEFAULTS)];
 
 async function loadConfig(env: Record<string, string> = {}): Promise<Record<string, unknown>> {
   const saved = { ...process.env };
@@ -80,5 +80,23 @@ describe("config defaults under zod 4 default semantics", () => {
     });
     expect(config.PROJECT_FORGE_URL).toBe("https://HTTP://Example.COM:8443/Path");
     expect(config.FRONTEND_URL).toBe("http://localhost:3001");
+  });
+
+  describe("ALLOW_FIRST_PASSWORD_ACCOUNT fails closed", () => {
+    it("is false when absent", async () => {
+      expect((await loadConfig()).ALLOW_FIRST_PASSWORD_ACCOUNT).toBe(false);
+    });
+
+    it("is false when empty (compose default)", async () => {
+      expect((await loadConfig({ ALLOW_FIRST_PASSWORD_ACCOUNT: "" })).ALLOW_FIRST_PASSWORD_ACCOUNT).toBe(false);
+    });
+
+    it.each(["false", "1", "yes", "on", "truee"])("is false for %j", async (value) => {
+      expect((await loadConfig({ ALLOW_FIRST_PASSWORD_ACCOUNT: value })).ALLOW_FIRST_PASSWORD_ACCOUNT).toBe(false);
+    });
+
+    it.each(["true", "TRUE", " True "])("is true for %j", async (value) => {
+      expect((await loadConfig({ ALLOW_FIRST_PASSWORD_ACCOUNT: value })).ALLOW_FIRST_PASSWORD_ACCOUNT).toBe(true);
+    });
   });
 });

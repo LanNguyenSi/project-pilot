@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import type { Context } from "hono";
+import type { Context, Next } from "hono";
 import { z } from "zod";
 import { setCookie, deleteCookie, getCookie } from "hono/cookie";
 import { registerUser, loginUser, generateSessionToken, hashToken, hashPassword } from "../services/auth.js";
@@ -60,8 +60,28 @@ async function createSession(userId: string): Promise<string> {
   return token;
 }
 
-// POST /auth/register — 5 attempts per minute
-auth.post("/register", rateLimit({ max: 5, windowMs: 60_000 }), zValidate("json", registerSchema), async (c) => {
+// Password sign-up is closed: there is no mail verification, so an open route
+// lets anyone claim an address first and block that person's GitHub sign-in.
+// The only way in is the first-account bootstrap, which needs the explicit
+// ALLOW_FIRST_PASSWORD_ACCOUNT opt-in and an empty User table. Every refusal
+// is the same 403 body, so the answer says nothing about existing accounts.
+const registrationClosed = {
+  error: "registration_closed",
+  message: "Password registration is closed. Sign in with GitHub.",
+} as const;
+
+async function requireRegistrationOpen(c: Context, next: Next) {
+  if (!config.ALLOW_FIRST_PASSWORD_ACCOUNT) {
+    return c.json(registrationClosed, 403);
+  }
+  if ((await prisma.user.count()) > 0) {
+    return c.json(registrationClosed, 403);
+  }
+  await next();
+}
+
+// POST /auth/register: 5 attempts per minute, closed except for the bootstrap
+auth.post("/register", rateLimit({ max: 5, windowMs: 60_000 }), requireRegistrationOpen, zValidate("json", registerSchema), async (c) => {
   const { email, password, name } = c.req.valid("json");
 
   try {

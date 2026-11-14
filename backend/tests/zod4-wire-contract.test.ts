@@ -34,13 +34,15 @@ vi.mock("../src/config/index.js", () => ({
     PROJECT_FORGE_URL: "https://forge.test",
     AGENT_TASKS_URL: "https://agent-tasks.test",
     DEPLOY_PANEL_URL: "https://deploy-panel.test",
+    // The register gate must be open for the 400 wire pins to be reached.
+    ALLOW_FIRST_PASSWORD_ACCOUNT: true,
   },
   hasGitHubOAuthConfigured: false,
 }));
 
 vi.mock("../src/lib/prisma.js", () => ({
   prisma: {
-    user: { findUnique: vi.fn(), create: vi.fn(), update: vi.fn() },
+    user: { findUnique: vi.fn(), create: vi.fn(), update: vi.fn(), count: vi.fn().mockResolvedValue(0) },
     session: { create: vi.fn().mockResolvedValue({}), deleteMany: vi.fn() },
     passwordReset: { findFirst: vi.fn(), create: vi.fn(), updateMany: vi.fn(), update: vi.fn() },
     $transaction: vi.fn(async (ops: unknown[]) => ops),

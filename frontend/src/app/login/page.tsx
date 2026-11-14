@@ -43,10 +43,8 @@ function GitHubDivider() {
 export default function LoginPage() {
   const router = useRouter();
   const githubOAuth = useGitHubOAuthStatus();
-  const [isRegister, setIsRegister] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -56,17 +54,10 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      if (isRegister) {
-        await apiFetch("/api/auth/register", {
-          method: "POST",
-          body: JSON.stringify({ email, password, name: name || undefined }),
-        });
-      } else {
-        await apiFetch("/api/auth/login", {
-          method: "POST",
-          body: JSON.stringify({ email, password }),
-        });
-      }
+      await apiFetch("/api/auth/login", {
+        method: "POST",
+        body: JSON.stringify({ email, password }),
+      });
       router.push("/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
@@ -83,7 +74,7 @@ export default function LoginPage() {
         <Card variant="elevated" className="p-6">
           <div className="text-center mb-5">
             <p className="text-content-secondary text-sm">
-              {isRegister ? "Create your account" : "Sign in to continue"}
+              Sign in to continue
             </p>
           </div>
 
@@ -118,47 +109,7 @@ export default function LoginPage() {
             </>
           )}
 
-          {/* Segmented sign-in / register control */}
-          <div
-            className="flex bg-surface-overlay rounded-button p-0.5 mb-5"
-            role="group"
-            aria-label="Authentication mode"
-          >
-            <button
-              type="button"
-              aria-pressed={!isRegister}
-              onClick={() => { setIsRegister(false); setError(""); }}
-              className={`flex-1 py-1.5 text-xs font-medium rounded-button transition-colors duration-fast ${
-                !isRegister
-                  ? "bg-brand-500/10 text-brand-300 ring-1 ring-brand-500/20"
-                  : "text-content-tertiary hover:text-content-secondary"
-              }`}
-            >
-              Sign in
-            </button>
-            <button
-              type="button"
-              aria-pressed={isRegister}
-              onClick={() => { setIsRegister(true); setError(""); }}
-              className={`flex-1 py-1.5 text-xs font-medium rounded-button transition-colors duration-fast ${
-                isRegister
-                  ? "bg-brand-500/10 text-brand-300 ring-1 ring-brand-500/20"
-                  : "text-content-tertiary hover:text-content-secondary"
-              }`}
-            >
-              Register
-            </button>
-          </div>
-
           <form onSubmit={handleSubmit} className="space-y-4">
-            {isRegister && (
-              <Input
-                label="Name"
-                placeholder="Name (optional)"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-            )}
             <Input
               label="Email"
               type="email"
@@ -170,9 +121,8 @@ export default function LoginPage() {
             <Input
               label="Password"
               type="password"
-              placeholder="Minimum 8 characters"
+              placeholder="Your password"
               required
-              minLength={8}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
@@ -182,16 +132,14 @@ export default function LoginPage() {
             )}
 
             <Button type="submit" loading={loading} className="w-full" size="lg">
-              {isRegister ? "Register" : "Sign in"}
+              Sign in
             </Button>
 
-            {!isRegister && (
-              <div className="text-center">
-                <Link href="/forgot-password" className="text-xs text-content-tertiary hover:text-brand-300 transition-colors">
-                  Forgot password?
-                </Link>
-              </div>
-            )}
+            <div className="text-center">
+              <Link href="/forgot-password" className="text-xs text-content-tertiary hover:text-brand-300 transition-colors">
+                Forgot password?
+              </Link>
+            </div>
           </form>
         </Card>
       </div>
