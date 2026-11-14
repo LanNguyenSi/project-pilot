@@ -60,6 +60,10 @@ services:
       CORS_ORIGINS: http://localhost:3000
       FRONTEND_URL: http://localhost:3000
       NODE_ENV: development
+      # Dev stack only (the port below is loopback only): lets the first
+      # local password account be created. Anything but "true" keeps the
+      # register route closed, and it is closed once any user exists.
+      ALLOW_FIRST_PASSWORD_ACCOUNT: "true"
     ports:
       # Loopback only: the dev backend runs with a placeholder SESSION_SECRET.
       - "127.0.0.1:3001:3001"

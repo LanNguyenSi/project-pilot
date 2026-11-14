@@ -19,6 +19,8 @@ vi.mock("../src/config/index.js", () => ({
     PROJECT_FORGE_URL: "http://localhost:3002",
     AGENT_TASKS_URL: "http://localhost:3003",
     DEPLOY_PANEL_URL: "http://localhost:3004",
+    // The register gate must be open for the rate-limit probes to reach validation.
+    ALLOW_FIRST_PASSWORD_ACCOUNT: true,
   },
   hasGitHubOAuthConfigured: false,
 }));
@@ -27,7 +29,10 @@ vi.mock("../src/lib/prisma.js", () => ({
   prisma: {
     $queryRaw: vi.fn().mockResolvedValue([{ "?column?": 1 }]),
     // The health route also reads the User table to prove the schema is there.
-    user: { findFirst: vi.fn().mockResolvedValue({ id: "user-a" }) },
+    user: {
+      findFirst: vi.fn().mockResolvedValue({ id: "user-a" }),
+      count: vi.fn().mockResolvedValue(0),
+    },
   },
 }));
 

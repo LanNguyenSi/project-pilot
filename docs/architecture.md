@@ -128,7 +128,7 @@ See [configuration.md](configuration.md) for env vars and [api.md](api.md) for t
 | Route | Description |
 |-------|-------------|
 | `/` | Landing page |
-| `/login` | Login / Register |
+| `/login` | Sign in (email and password, GitHub when configured); no sign-up form |
 | `/dashboard` | Aggregated overview |
 | `/settings` | Service credential management |
 | `/forge` | Project list |

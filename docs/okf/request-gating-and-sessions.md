@@ -78,7 +78,7 @@ Each protected router registers it itself:
 `backend/src/routes/tasks.ts:38#"tasks.use("`, and
 `backend/src/routes/deploy.ts:82#"deploy.use("`. In the auth router only
 `GET /api/auth/me` is protected
-(`backend/src/routes/auth.ts:103#"auth.get("`). `GET /api/health` has no
+(`backend/src/routes/auth.ts:123#"auth.get("`). `GET /api/health` has no
 check (`backend/src/routes/health.ts:7#"health.get("`), and neither do the
 two OAuth routes.
 
@@ -95,7 +95,8 @@ creation; `requireAuth` does not extend it.
 
 The two flows differ in the cookie's `SameSite` attribute:
 
-- Register and login set `SameSite=Strict`
+- Login and the bootstrap-only register (closed with 403 unless
+  `ALLOW_FIRST_PASSWORD_ACCOUNT=true` and no user exists) set `SameSite=Strict`
   (`backend/src/routes/auth.ts:41-47#"maxAge: SESSION_MAX_AGE,"`).
 - The GitHub callback sets `SameSite=Lax`, because the browser reaches the
   frontend through a cross-site redirect chain that a Strict cookie would not
@@ -107,9 +108,9 @@ login and Lax for GitHub sign-in
 (`backend/src/middleware/csrf.ts:5-7#"sign-in), this provides double protection."`).
 
 A session ends when it expires, on logout, which deletes the row and clears
-the cookie (`backend/src/routes/auth.ts:92-98#"deleteCookie(c, "`), or on a
+the cookie (`backend/src/routes/auth.ts:112-118#"deleteCookie(c, "`), or on a
 password reset, which deletes every session of that user
-(`backend/src/routes/auth.ts:165-168#"prisma.session.deleteMany({ where: { userId: reset.userId } }),"`).
+(`backend/src/routes/auth.ts:185-188#"prisma.session.deleteMany({ where: { userId: reset.userId } }),"`).
 
 The OAuth `state` cookie is separate: Lax, ten minutes
 (`backend/src/routes/oauth.ts:76-83#"maxAge: STATE_COOKIE_MAX_AGE,"`), always
@@ -130,10 +131,10 @@ frontend's `apiFetch` sends the header on every call, together with
 
 Five routes are limited, each per minute:
 
-- register, 5 (`backend/src/routes/auth.ts:64#"rateLimit({ max: 5, windowMs: 60_000 })"`),
-- login, 10, also per email (`backend/src/routes/auth.ts:78#"keyGenerator: emailKey"`),
-- forgot-password, 3, also per email (`backend/src/routes/auth.ts:115#"max: 3"`),
-- reset-password, 5 (`backend/src/routes/auth.ts:149#"rateLimit({ max: 5, windowMs: 60_000 })"`),
+- register, 5 (`backend/src/routes/auth.ts:84#"rateLimit({ max: 5, windowMs: 60_000 })"`),
+- login, 10, also per email (`backend/src/routes/auth.ts:98#"keyGenerator: emailKey"`),
+- forgot-password, 3, also per email (`backend/src/routes/auth.ts:135#"max: 3"`),
+- reset-password, 5 (`backend/src/routes/auth.ts:169#"rateLimit({ max: 5, windowMs: 60_000 })"`),
 - `PUT /api/credentials`, 10, also per signed-in user id, so an account that
   writes from many addresses is still capped
   (`backend/src/routes/credentials.ts:39#"keyGenerator: userKey"`).

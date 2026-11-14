@@ -8,7 +8,7 @@ vi.mock("../src/middleware/rate-limit.js", () => ({
 
 vi.mock("../src/lib/prisma.js", () => ({
   prisma: {
-    user: { findUnique: vi.fn(), create: vi.fn(), update: vi.fn() },
+    user: { findUnique: vi.fn(), create: vi.fn(), update: vi.fn(), count: vi.fn() },
     session: { create: vi.fn(), deleteMany: vi.fn() },
     passwordReset: {
       findFirst: vi.fn(),
@@ -26,6 +26,7 @@ vi.mock("../src/config/index.js", () => ({
     SESSION_SECRET: "test-session-secret-must-be-32chars!!",
     FRONTEND_URL: "http://localhost:3000",
     BACKEND_URL: "http://localhost:3001",
+    ALLOW_FIRST_PASSWORD_ACCOUNT: false,
   },
   hasGitHubOAuthConfigured: false,
 }));
@@ -62,6 +63,7 @@ import {
   hashPassword,
 } from "../src/services/auth.js";
 import { auth } from "../src/routes/auth.js";
+import { config } from "../src/config/index.js";
 
 // --- Typed mock refs ---
 
@@ -69,6 +71,7 @@ const mockPrismaUser = prisma.user as unknown as {
   findUnique: ReturnType<typeof vi.fn>;
   create: ReturnType<typeof vi.fn>;
   update: ReturnType<typeof vi.fn>;
+  count: ReturnType<typeof vi.fn>;
 };
 const mockPrismaSession = prisma.session as unknown as {
   create: ReturnType<typeof vi.fn>;
@@ -105,12 +108,22 @@ function postJson(path: string, body: unknown, cookieHeader?: string) {
 
 // ---
 
+const mutableConfig = config as unknown as { ALLOW_FIRST_PASSWORD_ACCOUNT: boolean };
+
+const CLOSED_BODY = {
+  error: "registration_closed",
+  message: "Password registration is closed. Sign in with GitHub.",
+};
+
 describe("POST /auth/register", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Bootstrap open and an empty User table unless a test says otherwise.
+    mutableConfig.ALLOW_FIRST_PASSWORD_ACCOUNT = true;
+    mockPrismaUser.count.mockResolvedValue(0);
   });
 
-  it("returns 201 with {user}, sets an HttpOnly session cookie, and creates a session", async () => {
+  it("bootstrap: returns 201 with {user}, sets an HttpOnly session cookie, and creates a session", async () => {
     mockRegisterUser.mockResolvedValue({
       id: "u1",
       email: "test@test.com",
@@ -141,6 +154,64 @@ describe("POST /auth/register", () => {
         data: expect.objectContaining({ tokenHash: FIXED_TOKEN_HASH, userId: "u1" }),
       }),
     );
+  });
+
+  it("refuses with 403 registration_closed when the bootstrap flag is off, without touching the database", async () => {
+    mutableConfig.ALLOW_FIRST_PASSWORD_ACCOUNT = false;
+
+    const res = await postJson("/register", {
+      email: "test@test.com",
+      password: "password123",
+    });
+
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual(CLOSED_BODY);
+    expect(res.headers.get("Set-Cookie")).toBeNull();
+    expect(mockPrismaUser.count).not.toHaveBeenCalled();
+    expect(mockRegisterUser).not.toHaveBeenCalled();
+    expect(mockPrismaSession.create).not.toHaveBeenCalled();
+  });
+
+  it("refuses with 403 registration_closed when the flag is on but a user already exists", async () => {
+    mockPrismaUser.count.mockResolvedValue(1);
+
+    const res = await postJson("/register", {
+      email: "test@test.com",
+      password: "password123",
+    });
+
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual(CLOSED_BODY);
+    expect(res.headers.get("Set-Cookie")).toBeNull();
+    expect(mockRegisterUser).not.toHaveBeenCalled();
+    expect(mockPrismaSession.create).not.toHaveBeenCalled();
+  });
+
+  it("answers the same 403 body whether or not the email already has an account", async () => {
+    mutableConfig.ALLOW_FIRST_PASSWORD_ACCOUNT = false;
+    mockPrismaUser.findUnique.mockResolvedValue({ id: "taken", email: "taken@test.com" });
+    const taken = await postJson("/register", { email: "taken@test.com", password: "password123" });
+    mockPrismaUser.findUnique.mockResolvedValue(null);
+    const free = await postJson("/register", { email: "free@test.com", password: "password123" });
+
+    expect(taken.status).toBe(403);
+    expect(free.status).toBe(403);
+    expect(await taken.json()).toEqual(await free.json());
+    expect(mockPrismaUser.findUnique).not.toHaveBeenCalled();
+  });
+
+  it("refuses before validating the body, so an invalid body gets 403 too", async () => {
+    mutableConfig.ALLOW_FIRST_PASSWORD_ACCOUNT = false;
+    const res = await postJson("/register", { password: "x" });
+    expect(res.status).toBe(403);
+  });
+
+  it("returns 400 registration_failed when the service rejects the bootstrap account", async () => {
+    mockRegisterUser.mockRejectedValue(new Error("boom"));
+    const res = await postJson("/register", { email: "test@test.com", password: "password123" });
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { error: string }).error).toBe("registration_failed");
+    expect(mockPrismaSession.create).not.toHaveBeenCalled();
   });
 
   it("returns 400 when the password is too short (zod min 8)", async () => {

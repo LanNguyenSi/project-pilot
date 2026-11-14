@@ -280,4 +280,43 @@ describe("GET /oauth/github/callback", () => {
     expect(sessionCookie).toBeDefined();
     expect(sessionCookie).toMatch(/SameSite=Lax/i);
   });
+
+  it("still creates the account for a new verified email while password registration is closed", async () => {
+    // No ALLOW_FIRST_PASSWORD_ACCOUNT in the mocked config and no user.count
+    // in the mocked client: sign-in must not depend on the register gate.
+    mockExchange.mockResolvedValue({
+      access_token: "gh-tok",
+      token_type: "bearer",
+      scope: "repo",
+    });
+    mockFetchUser.mockResolvedValue({
+      id: 77,
+      login: "newcomer",
+      name: "Newcomer",
+      avatar_url: "",
+      email: "newcomer@example.com",
+    });
+    mockFetchEmail.mockResolvedValue("newcomer@example.com");
+    // Neither the github id nor the email belongs to an existing row.
+    mockUser.findUnique.mockResolvedValue(null);
+    mockUser.create.mockResolvedValue({
+      id: "newcomer-id",
+      githubId: "77",
+      githubLogin: "newcomer",
+    });
+
+    const res = await callback(
+      "/github/callback?code=abc&state=xyz",
+      "oauth_state=xyz",
+    );
+
+    expect(res.status).toBe(302);
+    expect(res.headers.get("Location")).toBe("http://localhost:3000/dashboard");
+    expect(mockUser.create).toHaveBeenCalledTimes(1);
+    expect(mockUser.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ email: "newcomer@example.com" }),
+      }),
+    );
+  });
 });

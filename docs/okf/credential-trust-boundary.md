@@ -61,7 +61,7 @@ The config schema requires the secret to be at least 16 characters
 (`backend/src/config/index.ts:5#"SESSION_SECRET: z.string().min(16),"`),
 and with `NODE_ENV=production` the backend also refuses to start on the
 placeholder values shipped in the example and compose templates
-(`backend/src/config/index.ts:33#"export const PLACEHOLDER_SESSION_SECRETS = ["`).
+(`backend/src/config/index.ts:41#"export const PLACEHOLDER_SESSION_SECRETS = ["`).
 
 Despite its name, the value plays no part in sessions. A session token is 32
 random bytes (`backend/src/services/auth.ts:44-45#"randomBytes(32).toString("`),
@@ -150,9 +150,9 @@ The three target hosts come from `PROJECT_FORGE_URL`, `AGENT_TASKS_URL` and
 `DEPLOY_PANEL_URL`
 (`backend/src/services/module-registration.ts:17-21#"config.DEPLOY_PANEL_URL,"`),
 which default to the public opentriologue hosts
-(`backend/src/config/index.ts:18-26#"deploy-panel.opentriologue.ai"`). With
+(`backend/src/config/index.ts:26-34#"deploy-panel.opentriologue.ai"`). With
 `NODE_ENV=production` a missing or empty URL stops startup
-(`backend/src/config/index.ts:42#"const SERVICE_URL_KEYS = ["`), so these
+(`backend/src/config/index.ts:50#"const SERVICE_URL_KEYS = ["`), so these
 public defaults never receive tokens in production. These
 variables therefore decide who receives every signing-in user's GitHub token
 with the scopes above. A module error is mapped to a status code only,
