@@ -3,7 +3,7 @@ type: invariant
 title: Request gating and session model
 description: Global CORS and security headers, CSRF registered per route prefix in app.ts, requireAuth registered per router, opaque hashed session tokens with SameSite Strict for password sign-in and Lax for GitHub sign-in, per-process rate limits on four public auth endpoints and the credential write keyed on the last X-Forwarded-For entry, and a CSP that only the frontend sets.
 tags: [auth, sessions, csrf, cors, rate-limit, headers, csp]
-timestamp: 2026-11-10T07:01:02Z
+timestamp: 2026-11-14T08:14:08Z
 sources:
   - backend/src/app.ts
   - backend/src/middleware/auth.ts

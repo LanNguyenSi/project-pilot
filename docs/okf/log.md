@@ -2,6 +2,16 @@
 
 <!-- Add new entries at the top, newest first. -->
 
+- 2026-11-14T08:14:08Z, credential-trust-boundary and request-gating-and-sessions re-verified and
+  re-stamped after `backend/src/routes/auth.ts` (register behind `requireRegistrationOpen`,
+  closed with 403 unless `ALLOW_FIRST_PASSWORD_ACCOUNT=true` and the `User` table is empty) and
+  `backend/src/config/index.ts` (new `ALLOW_FIRST_PASSWORD_ACCOUNT` flag, which shifted the
+  placeholder-secret and service-URL lines) changed, plus `backend/src/routes/credentials.ts`
+  from the earlier rate-limit change: the shifted `auth.ts` and `config/index.ts` citations were
+  already re-pointed in the change itself and were re-read at HEAD, as were the `credentials.ts`
+  ones (router `requireAuth`, `userKey` limiter on `PUT`); the claims (five limited routes,
+  Strict cookie for login and bootstrap register, `SESSION_SECRET` read only by the key
+  derivation) still hold.
 - 2026-11-10T08:19:40Z, credential-trust-boundary re-verified and re-stamped after `backend/src/routes/credentials.ts`
   (per-user rate-limit key without the unreachable branch, three lines shorter),
   `backend/src/services/credentials.ts` and `backend/src/lib/crypto.ts` (squash of the async
