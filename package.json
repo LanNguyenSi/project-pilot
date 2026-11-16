@@ -15,7 +15,7 @@
     "lint": "npm run lint --workspace=backend && npm run lint --workspace=frontend"
   },
   "devDependencies": {
-    "concurrently": "^9.1.0",
+    "concurrently": "^9.2.5",
     "eslint": "^10.14.0"
   },
   "overrides": {
