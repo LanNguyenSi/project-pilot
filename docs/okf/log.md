@@ -2,6 +2,17 @@
 
 <!-- Add new entries at the top, newest first. -->
 
+- 2026-11-16T12:05:00Z, credential-trust-boundary and request-gating-and-sessions re-verified and
+  re-stamped after `backend/src/services/auth.ts` (every login attempt pays one bcrypt compare,
+  against a lazily memoized dummy hash for unknown and OAuth-only accounts) and
+  `backend/src/app.ts` plus the new `backend/src/middleware/body-limit.ts` (global 128 KiB body
+  cap registered after CORS and the security headers, before CSRF and the limiters) changed:
+  the `app.ts` citations (middleware order 39-54, OAuth exemption 45-49, router mounts 56-63,
+  `onError` 20-34 and 25-29) and the `auth.ts` session-token citations (65-66, 69-70) were
+  re-read at HEAD and still point at the code their sentences describe; the middleware-order
+  paragraph already names the body cap, its 413 answer and its place before CSRF, and the
+  credential and session claims do not depend on the login timing change. No claim needed
+  correction.
 - 2026-11-14T08:14:08Z, credential-trust-boundary and request-gating-and-sessions re-verified and
   re-stamped after `backend/src/routes/auth.ts` (register behind `requireRegistrationOpen`,
   closed with 403 unless `ALLOW_FIRST_PASSWORD_ACCOUNT=true` and the `User` table is empty) and
