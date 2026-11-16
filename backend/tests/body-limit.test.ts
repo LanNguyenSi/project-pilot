@@ -12,6 +12,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
  *   the "just over the limit" tests receive a non-413 status.
  * Mutation D, lower MAX_BODY_BYTES below the largest legitimate body:
  *   the "just under the limit" tests receive 413.
+ * Mutation F, register it above corsMiddleware or above securityHeaders:
+ *   the 413 loses the CORS or the security headers and the header test fails.
  * Mutation E, replace bodyLimit's onError with the default (text body):
  *   the JSON error-shape assertion fails.
  */
@@ -207,5 +209,29 @@ describe("global request body limit", () => {
       body: jsonOfSize(MAX_BODY_BYTES + 1),
     });
     expect(tasks.status).toBe(413);
+  });
+
+  it("the 413 still carries CORS and security headers", async () => {
+    const res = await app.request("/api/auth/login", {
+      method: "POST",
+      headers: { ...headers, origin: "http://localhost:3000" },
+      body: jsonOfSize(MAX_BODY_BYTES + 1),
+    });
+    expect(res.status).toBe(413);
+    expect(res.headers.get("access-control-allow-origin")).toBe("http://localhost:3000");
+    expect(res.headers.get("access-control-allow-credentials")).toBe("true");
+    expect(res.headers.get("x-content-type-options")).toBe("nosniff");
+  });
+
+  it("a maximal legitimate task body (10000 four-byte chars) is not rejected with 413", async () => {
+    const body = JSON.stringify({ title: "t".repeat(500), description: "\u{1F600}".repeat(10000) });
+    expect(new TextEncoder().encode(body).length).toBeLessThan(MAX_BODY_BYTES);
+    const res = await app.request("/api/tasks/projects/p1/tasks", {
+      method: "POST",
+      headers,
+      body,
+    });
+    // Passed the limit; the unauthenticated request is then refused by requireAuth.
+    expect(res.status).toBe(401);
   });
 });

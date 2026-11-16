@@ -48,10 +48,11 @@ all of them.
 
 ## Middleware order
 
-`app.ts` registers CORS and the security headers for every path, then a global
-request body cap of 128 KiB (413 `{"error":"Payload too large"}`, counted as
-the body streams in when there is no `Content-Length`), so it runs before CSRF,
-the rate-limit key generators and every route, then the CSRF middleware for six prefixes: `/api/auth`, `/api/credentials`,
+`app.ts` registers CORS and the security headers for every path, then a
+global request body cap of 128 KiB (413 `{"error":"Payload too large"}`,
+counted as the body streams in when there is no `Content-Length`), so it runs
+before CSRF, the rate-limit key generators and every route, then the CSRF
+middleware for six prefixes: `/api/auth`, `/api/credentials`,
 `/api/dashboard`, `/api/forge`, `/api/tasks` and `/api/deploy`
 (`backend/src/app.ts:39-54#"/api/deploy/*"`). `/api/oauth/*` is left out on
 purpose: it is GET-only, and its CSRF defense is the OAuth state cookie
