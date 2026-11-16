@@ -5,6 +5,7 @@ import type { AppEnv } from "./types/hono.js";
 import { corsMiddleware } from "./middleware/cors.js";
 import { securityHeaders } from "./middleware/security.js";
 import { csrfProtection } from "./middleware/csrf.js";
+import { requestBodyLimit } from "./middleware/body-limit.js";
 import { health } from "./routes/health.js";
 import { auth } from "./routes/auth.js";
 import { oauth } from "./routes/oauth.js";
@@ -37,6 +38,9 @@ app.onError((err, c) => {
 
 app.use("*", corsMiddleware);
 app.use("*", securityHeaders);
+// Before every route and before the rate-limit key generators, which read the
+// JSON body. After cors/security headers so a 413 still carries them.
+app.use("*", requestBodyLimit);
 app.use("/api/auth/*", csrfProtection);
 // /api/oauth/* is GET-only (state cookie + redirect dance) so CSRF's
 // X-Requested-With check would reject the browser's direct navigation. The

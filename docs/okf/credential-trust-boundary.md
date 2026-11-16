@@ -64,9 +64,9 @@ placeholder values shipped in the example and compose templates
 (`backend/src/config/index.ts:41#"export const PLACEHOLDER_SESSION_SECRETS = ["`).
 
 Despite its name, the value plays no part in sessions. A session token is 32
-random bytes (`backend/src/services/auth.ts:44-45#"randomBytes(32).toString("`),
+random bytes (`backend/src/services/auth.ts:65-66#"randomBytes(32).toString("`),
 and only its SHA-256 hash is stored and looked up
-(`backend/src/services/auth.ts:48-49#"update(token)"`). See
+(`backend/src/services/auth.ts:69-70#"update(token)"`). See
 [request gating and sessions](request-gating-and-sessions.md) for the session
 model.
 
@@ -112,10 +112,10 @@ and its callers call it before their own `try` blocks:
 
 Every other caller lets the error reach `app.onError`, which answers 409 with
 code `credential_unreadable` and the message "Re-enter it in /settings"
-(`backend/src/app.ts:24-28#"code: err.code"`), after logging one line with the
+(`backend/src/app.ts:25-29#"code: err.code"`), after logging one line with the
 method, path and service name, so a rotation shows up in the logs; any other error without its
 own numeric status becomes a 500 with a generic message
-(`backend/src/app.ts:19-33#"Internal server error"`). Listing and deleting
+(`backend/src/app.ts:20-34#"Internal server error"`). Listing and deleting
 credentials keep working, because neither decrypts the token
 (`backend/src/services/credentials.ts:56-59#"select: { id: true, service: true, label: true, updatedAt: true },"`,
 `backend/src/services/credentials.ts:64-66#"where: { userId_service: { userId, service } },"`).

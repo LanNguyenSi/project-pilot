@@ -108,11 +108,9 @@ describe("auth service", () => {
       expect(result).toEqual({ id: "u1", email: "user@test.com", name: "Alice" });
     });
 
-    it("throws 'Invalid credentials' when the user has no passwordHash (OAuth-only user)", async () => {
-      // Critical security path: GitHub OAuth users have passwordHash=null.
-      // The handler must reject without reaching bcrypt.compare so callers
-      // cannot distinguish OAuth-only accounts from non-existent ones via a
-      // different error message or timing side-channel.
+    const costOf = (h: string) => h.split("$")[2];
+
+    it("OAuth-only user: one compare against a dummy hash, same error as a wrong password", async () => {
       mockUser.findUnique.mockResolvedValue({
         id: "u2",
         email: "oauth@test.com",
@@ -123,19 +121,63 @@ describe("auth service", () => {
         "Invalid credentials",
       );
 
-      // Early-reject BEFORE bcrypt.compare: directly asserts the
-      // no-timing-side-channel property, rather than relying on bcryptjs
-      // throwing on a null hash. Removing the !user.passwordHash guard makes
-      // loginUser call compare(pw, null), tripping this assertion.
-      expect(mockCompare).not.toHaveBeenCalled();
+      // One compare per attempt keeps the bcrypt work equal to a password account.
+      expect(mockCompare).toHaveBeenCalledTimes(1);
+      const [pw, usedHash] = mockCompare.mock.calls[0] as [string, string];
+      expect(pw).toBe("anyPassword");
+      expect(usedHash).toMatch(/^\$2[aby]\$\d\d\$/);
     });
 
-    it("throws 'Invalid credentials' when the user does not exist", async () => {
+    it("unknown email: one compare against a dummy hash, same error as a wrong password", async () => {
       mockUser.findUnique.mockResolvedValue(null);
 
       await expect(loginUser("unknown@test.com", "password123")).rejects.toThrow(
         "Invalid credentials",
       );
+
+      expect(mockCompare).toHaveBeenCalledTimes(1);
+      expect(mockCompare.mock.calls[0][0]).toBe("password123");
+    });
+
+    it("the dummy hash has the same cost factor as a stored password hash", async () => {
+      const stored = await hashPassword("whatever-password");
+      mockCompare.mockClear();
+      mockUser.findUnique.mockResolvedValue(null);
+      await expect(loginUser("unknown@test.com", "x")).rejects.toThrow("Invalid credentials");
+
+      const usedHash = mockCompare.mock.calls[0][1] as string;
+      expect(costOf(usedHash)).toBe(costOf(stored));
+    });
+
+    it("the dummy path never succeeds, even if compare resolves true", async () => {
+      mockCompare.mockResolvedValueOnce(true as never);
+      mockUser.findUnique.mockResolvedValue(null);
+      await expect(loginUser("unknown@test.com", "pw")).rejects.toThrow("Invalid credentials");
+
+      mockCompare.mockResolvedValueOnce(true as never);
+      mockUser.findUnique.mockResolvedValue({
+        id: "u2",
+        email: "oauth@test.com",
+        name: "Bob",
+        passwordHash: null,
+      });
+      await expect(loginUser("oauth@test.com", "pw")).rejects.toThrow("Invalid credentials");
+    });
+
+    it("a password account pays exactly one compare against its own hash", async () => {
+      const realHash = await hashPassword("right-password");
+      mockCompare.mockClear();
+      mockUser.findUnique.mockResolvedValue({
+        id: "u3",
+        email: "user@test.com",
+        name: "Charlie",
+        passwordHash: realHash,
+      });
+      await expect(loginUser("user@test.com", "wrong-password")).rejects.toThrow(
+        "Invalid credentials",
+      );
+      expect(mockCompare).toHaveBeenCalledTimes(1);
+      expect(mockCompare.mock.calls[0][1]).toBe(realHash);
     });
 
     it("throws 'Invalid credentials' on wrong password", async () => {
