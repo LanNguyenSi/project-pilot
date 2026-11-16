@@ -64,9 +64,9 @@ placeholder values shipped in the example and compose templates
 (`backend/src/config/index.ts:41#"export const PLACEHOLDER_SESSION_SECRETS = ["`).
 
 Despite its name, the value plays no part in sessions. A session token is 32
-random bytes (`backend/src/services/auth.ts:59-60#"randomBytes(32).toString("`),
+random bytes (`backend/src/services/auth.ts:65-66#"randomBytes(32).toString("`),
 and only its SHA-256 hash is stored and looked up
-(`backend/src/services/auth.ts:63-64#"update(token)"`). See
+(`backend/src/services/auth.ts:69-70#"update(token)"`). See
 [request gating and sessions](request-gating-and-sessions.md) for the session
 model.
 

@@ -28,11 +28,17 @@ export async function registerUser(email: string, password: string, name?: strin
 // A real bcrypt hash at the same cost as stored hashes, computed lazily on the
 // first login that needs it (not at module load, so importing this module stays
 // cheap). Comparing against it gives unknown and OAuth-only accounts the same
-// bcrypt work as a password account.
+// bcrypt work as a password account. A failed computation is not cached, so a
+// transient error cannot turn every later attempt into a fast rejection.
 let dummyHash: Promise<string> | undefined;
 
 function getDummyHash(): Promise<string> {
-  dummyHash ??= hash(randomBytes(16).toString("hex"), SALT_ROUNDS);
+  dummyHash ??= hash(randomBytes(16).toString("hex"), SALT_ROUNDS).catch(
+    (err: unknown) => {
+      dummyHash = undefined;
+      throw err;
+    },
+  );
   return dummyHash;
 }
 
