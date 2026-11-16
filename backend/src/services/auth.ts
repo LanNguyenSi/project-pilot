@@ -25,15 +25,36 @@ export async function registerUser(email: string, password: string, name?: strin
   });
 }
 
+// A real bcrypt hash at the same cost as stored hashes, computed lazily on the
+// first login that needs it (not at module load, so importing this module stays
+// cheap). Comparing against it gives unknown and OAuth-only accounts the same
+// bcrypt work as a password account. A failed computation is not cached, so a
+// transient error cannot turn every later attempt into a fast rejection.
+let dummyHash: Promise<string> | undefined;
+
+function getDummyHash(): Promise<string> {
+  dummyHash ??= hash(randomBytes(16).toString("hex"), SALT_ROUNDS).catch(
+    (err: unknown) => {
+      dummyHash = undefined;
+      throw err;
+    },
+  );
+  return dummyHash;
+}
+
 export async function loginUser(email: string, password: string) {
   const user = await prisma.user.findUnique({ where: { email } });
-  // Users created via GitHub OAuth have no passwordHash — treat them as
-  // non-local-auth to avoid leaking their existence via a different error.
-  if (!user || !user.passwordHash) {
+  // Users created via GitHub OAuth have no passwordHash. Every attempt pays
+  // exactly one bcrypt compare, so neither the error nor the response time
+  // tells an unknown email, an OAuth-only account and a password account apart.
+  const storedHash = user?.passwordHash;
+  if (!user || !storedHash) {
+    await compare(password, await getDummyHash());
+    // The dummy compare is for timing only; its result is never a success.
     throw new Error("Invalid credentials");
   }
 
-  const valid = await compare(password, user.passwordHash);
+  const valid = await compare(password, storedHash);
   if (!valid) {
     throw new Error("Invalid credentials");
   }

@@ -85,9 +85,9 @@ two OAuth routes.
 ## Session model
 
 A session token is 32 random bytes, hex-encoded
-(`backend/src/services/auth.ts:44-45#"randomBytes(32).toString("`), and the
+(`backend/src/services/auth.ts:65-66#"randomBytes(32).toString("`), and the
 `Session` row stores its SHA-256 hash
-(`backend/src/services/auth.ts:48-49#"update(token)"`). Password sign-in and
+(`backend/src/services/auth.ts:69-70#"update(token)"`). Password sign-in and
 GitHub sign-in create the row the same way, with a 30-day expiry
 (`backend/src/routes/auth.ts:51-57#"data: { tokenHash, userId, expiresAt },"`,
 `backend/src/routes/oauth.ts:50-57#"return token;"`). The expiry is fixed at
