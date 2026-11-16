@@ -54,6 +54,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     // with TopBar and any page below (e.g. Dashboard), instead of each
     // fetching it independently.
     <AuthProvider>
+      {/* Skip link: first focusable element on every page, hidden until it
+          receives focus so keyboard users can jump the seven sidebar stops.
+          focus:fixed (not sr-only alone) so it floats over the content it
+          bypasses instead of pushing the layout down. */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-50 focus:rounded-button focus:bg-surface-overlay focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-content-primary focus:outline-hidden focus:ring-2 focus:ring-brand-500/60"
+      >
+        Skip to main content
+      </a>
       <div
         className="min-h-screen lg:grid transition-[grid-template-columns] duration-normal"
         style={{ gridTemplateColumns: collapsed ? "4rem 1fr" : "15rem 1fr" }}
@@ -70,8 +80,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           {/* key={pathname} remounts the element on each navigation, re-triggering
               animate-fade-in. This gives a subtle page-transition entrance without
               a full animation library. */}
+          {/* id + tabIndex -1 let the skip link move focus here. The aria-label
+              gives this main a name: the /security iframe embeds a same-origin
+              document with its own (unnamed) main, and two same-document
+              landmarks only collide when neither is named (axe
+              landmark-unique). A static label beats aria-labelledby on a page
+              <h1> here: the shell cannot see the page's DOM to reference an id,
+              and the name is present even while a page is loading or erroring. */}
           <main
             key={pathname}
+            id="main-content"
+            tabIndex={-1}
+            aria-label="Content"
             className={`animate-fade-in${fullBleed ? "" : " max-w-6xl mx-auto px-6 py-6"}`}
           >
             {children}

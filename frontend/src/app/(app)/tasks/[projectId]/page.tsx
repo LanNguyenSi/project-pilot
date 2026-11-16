@@ -250,7 +250,7 @@ export default function ProjectTasksPage() {
                         <div className="flex">
                           <div className={`w-1 shrink-0 ${barColor}`} />
                           <div className="p-3 min-w-0 flex-1">
-                            <p className="text-sm font-medium text-content-primary truncate mb-1">{t.title}</p>
+                            <p className="text-sm font-medium text-content-primary truncate mb-1" title={t.title}>{t.title}</p>
                             <div className="flex items-center gap-2 text-xs text-content-tertiary">
                               <span>{priorityMap[t.priority]?.label || t.priority}</span>
                               <span className="truncate">{t.claimedByAgent?.name || t.claimedByUser?.email || "·"}</span>
@@ -286,7 +286,7 @@ export default function ProjectTasksPage() {
                     <div className="flex-1 p-4 flex items-center gap-4 min-w-0">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="text-sm font-medium text-content-primary truncate">{t.title}</span>
+                          <span className="text-sm font-medium text-content-primary truncate" title={t.title}>{t.title}</span>
                         </div>
                         <div className="flex items-center gap-3 text-xs text-content-tertiary">
                           <span>{priorityMap[t.priority]?.label || t.priority}</span>
