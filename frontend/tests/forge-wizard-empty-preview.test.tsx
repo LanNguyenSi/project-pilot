@@ -74,6 +74,24 @@ describe("forge wizard empty generate response", () => {
     expect(screen.getByRole("button", { name: "Generate Preview" })).toBeInTheDocument();
   });
 
+  it("a 200 whose preview has no fileTree array is treated the same way", async () => {
+    mockGenerate({ sessionId: "s1", preview: { ...preview, fileTree: "src/index.ts" } });
+    renderWizard();
+    await fillAndGenerate();
+    expect(await screen.findByRole("alert")).toHaveTextContent("no preview");
+    expect(screen.getByLabelText("Project Name")).toHaveValue("my-project");
+    expect(screen.getByRole("button", { name: "Generate Preview" })).toBeInTheDocument();
+  });
+
+  it("a 200 whose preview is null is treated the same way", async () => {
+    mockGenerate({ sessionId: "s1", preview: null });
+    renderWizard();
+    await fillAndGenerate();
+    expect(await screen.findByRole("alert")).toHaveTextContent("no preview");
+    expect(screen.getByLabelText("Project Name")).toHaveValue("my-project");
+    expect(screen.getByRole("button", { name: "Generate Preview" })).toBeInTheDocument();
+  });
+
   it("a normal response renders the preview step", async () => {
     renderWizard();
     await fillAndGenerate();

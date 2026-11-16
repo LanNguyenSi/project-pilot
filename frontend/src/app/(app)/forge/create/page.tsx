@@ -49,7 +49,8 @@ function stepIndex(phase: Phase): number {
  * non-object, and any object whose `tasks` or `fileTree` is not an array,
  * because the preview step calls `.map` on both and a non-array would crash
  * the page mid-render, which is worse than the empty dead-end this guard
- * avoids. The scalar fields (`projectName`, `architectureOverview`, the two
+ * avoids. Only the top level is checked: a malformed element inside those
+ * arrays still reaches the page's error boundary. The scalar fields (`projectName`, `architectureOverview`, the two
  * counts) render as empty text when absent, so they are not part of the
  * check. A missing `sessionId` is not checked either: Publish would then fail
  * with a server error, which the publish error path already surfaces on top
@@ -397,7 +398,7 @@ export default function CreateProjectPage() {
           <Button
             variant="secondary"
             className="w-full"
-            onClick={() => { setError(""); setPhase("form"); }}
+            onClick={() => { setError(""); setSessionId(""); setPreview(null); setPhase("form"); }}
           >
             Back to form
           </Button>
