@@ -43,6 +43,27 @@ function stepIndex(phase: Phase): number {
   return 2;
 }
 
+/**
+ * A 200 generate response is only usable when `preview` carries the shape the
+ * preview step renders. A missing or null `preview` is unusable; so is any
+ * non-object, and any object whose `tasks` or `fileTree` is not an array,
+ * because the preview step calls `.map` on both and a non-array would crash
+ * the page mid-render, which is worse than the empty dead-end this guard
+ * avoids. The scalar fields (`projectName`, `architectureOverview`, the two
+ * counts) render as empty text when absent, so they are not part of the
+ * check. A missing `sessionId` is not checked either: Publish would then fail
+ * with a server error, which the publish error path already surfaces on top
+ * of a rendered preview page.
+ */
+function isUsablePreview(value: unknown): value is Preview {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    Array.isArray((value as Preview).tasks) &&
+    Array.isArray((value as Preview).fileTree)
+  );
+}
+
 export default function CreateProjectPage() {
   const { toast } = useToast();
   const [phase, setPhase] = useState<Phase>("form");
@@ -109,7 +130,7 @@ export default function CreateProjectPage() {
     setPhase("generating");
 
     try {
-      const data = await apiFetch<{ sessionId: string; preview: Preview }>("/api/forge/generate", {
+      const data = await apiFetch<{ sessionId?: string; preview: Preview | null }>("/api/forge/generate", {
         method: "POST",
         body: JSON.stringify({
           projectName,
@@ -119,7 +140,17 @@ export default function CreateProjectPage() {
           targetUsers: targetUsers ? targetUsers.split("\n").filter(Boolean) : undefined,
         }),
       });
-      setSessionId(data.sessionId);
+      if (!isUsablePreview(data?.preview)) {
+        // A 200 without a usable preview (e.g. {"ok":true}) must not
+        // dead-end on an empty Preview step: stay on the form, keep every
+        // entered value, and name the problem so Generate can be retried.
+        setError("The server returned no preview for this project. Please try again.");
+        setSessionId("");
+        setPreview(null);
+        setPhase("form");
+        return;
+      }
+      setSessionId(data.sessionId ?? "");
       setPreview(data.preview);
       setPhase("preview");
     } catch (err) {
@@ -353,6 +384,23 @@ export default function CreateProjectPage() {
               Publish to GitHub
             </Button>
           </div>
+        </div>
+      )}
+
+      {/* Defence in depth: a preview/publishing phase without preview data
+          (which handleGenerate no longer enters, but any future code path
+          could) must not leave the step indicator pointing at "Preview"
+          above an empty content area with no way back but the breadcrumb. */}
+      {(phase === "preview" || phase === "publishing") && !preview && (
+        <div className="max-w-2xl space-y-4">
+          <ErrorBanner message="There is no preview to show. Go back to the form and generate again." />
+          <Button
+            variant="secondary"
+            className="w-full"
+            onClick={() => { setError(""); setPhase("form"); }}
+          >
+            Back to form
+          </Button>
         </div>
       )}
 
