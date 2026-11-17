@@ -8,6 +8,7 @@ import { Badge, Card, Icon, SkeletonBox } from "@/components/ui";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { useAuth } from "@/lib/auth-context";
 import { serviceState, type ServiceState } from "@/lib/service-state";
+import { serviceHintLists } from "@/lib/service-hints";
 
 interface ServiceStatus {
   configured: boolean;
@@ -87,6 +88,12 @@ export default function DashboardPage() {
   const forgeState = serviceState(forge);
   const tasksState = serviceState(tasks);
   const deployState = serviceState(deploy);
+
+  const hints = serviceHintLists([
+    { label: "Project Forge", state: forgeState },
+    { label: "Agent Tasks", state: tasksState },
+    { label: "Deploy Panel", state: deployState },
+  ]);
 
   const stats: StatItem[] = [
     {
@@ -197,13 +204,26 @@ export default function DashboardPage() {
         </Card>
       )}
 
-      {/* Not configured hint */}
-      {(!forge?.configured || !tasks?.configured || !deploy?.configured) && (
-        <Card className="border-accent-amber/50 p-4">
+      {/* Not configured hint: names the services whose state is not_configured. */}
+      {hints.notConfigured.length > 0 && (
+        <Card className={`border-accent-amber/50 p-4${hints.unreachable.length > 0 ? " mb-4" : ""}`}>
           <p className="text-sm text-accent-amber">
-            Some services are not configured.{" "}
+            Not configured: {hints.notConfigured.join(", ")}.{" "}
             <Link href="/settings" className="underline hover:text-accent-amber/80 transition-colors">
               Add your API tokens in Settings
+            </Link>
+          </p>
+        </Card>
+      )}
+
+      {/* Unreachable hint: services that are configured but answered with an
+          error. The backend's error string is deliberately not shown here. */}
+      {hints.unreachable.length > 0 && (
+        <Card className="border-accent-amber/50 p-4">
+          <p className="text-sm text-accent-amber">
+            Could not reach: {hints.unreachable.join(", ")}.{" "}
+            <Link href="/settings" className="underline hover:text-accent-amber/80 transition-colors">
+              Check the service or its token in Settings
             </Link>
           </p>
         </Card>
@@ -257,7 +277,16 @@ function StatCard({ stat: s, index }: { stat: StatItem; index: number }) {
           )}
         </div>
         <p className="text-2xl font-semibold text-content-primary mt-1">
-          {s.state === "not_configured" ? "·" : s.value ?? "·"}
+          {s.state === "not_configured" ? (
+            "·"
+          ) : s.state === "error" ? (
+            // Error state: the value is unknown because the service could not
+            // be reached, so show the word instead of the dot. The backend's
+            // error string is not rendered.
+            <span className="text-base font-medium text-content-secondary">Unavailable</span>
+          ) : (
+            s.value ?? "·"
+          )}
         </p>
         <p className="text-xs text-content-tertiary mt-1">{s.subtitle}</p>
       </Card>
