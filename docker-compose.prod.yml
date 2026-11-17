@@ -12,6 +12,10 @@ x-logging: &default-logging
     max-size: "10m"
     max-file: "3"
 
+# Each service is capped at one core with `cpus`, same style as `mem_limit`.
+# Docker refuses to start a container whose `cpus` exceeds the host's CPU
+# count, and the production host's core count is not pinned here, so 1.0 is
+# the largest value valid on every host.
 services:
   db:
     image: postgres:16-alpine
@@ -19,6 +23,7 @@ services:
     restart: unless-stopped
     logging: *default-logging
     mem_limit: 1g
+    cpus: "1.0"
     environment:
       POSTGRES_USER: project_pilot
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
@@ -41,6 +46,7 @@ services:
     restart: unless-stopped
     logging: *default-logging
     mem_limit: 768m
+    cpus: "1.0"
     depends_on:
       db:
         condition: service_healthy
@@ -86,6 +92,7 @@ services:
     restart: unless-stopped
     logging: *default-logging
     mem_limit: 512m
+    cpus: "1.0"
     depends_on:
       - backend
     environment:
