@@ -298,7 +298,16 @@ describe("POST /auth/forgot-password", () => {
     vi.clearAllMocks();
   });
 
-  it("returns 200 {ok:true} for unknown email without creating a reset token (enumeration-safe)", async () => {
+  // The handler defers every database call out of the request path, so tests
+  // must flush the scheduled issuance step (a setImmediate plus its await
+  // chain) before asserting on prisma calls. No fake timers here: they would
+  // fake setImmediate too and the flush would never run it.
+  const flushScheduled = async () => {
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+  };
+
+  it("unknown email: the deferred issuance step runs after the response and creates no token (enumeration-safe)", async () => {
     mockPrismaUser.findUnique.mockResolvedValue(null);
 
     const res = await postJson("/forgot-password", { email: "nobody@test.com" });
@@ -306,10 +315,42 @@ describe("POST /auth/forgot-password", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { ok: boolean };
     expect(body.ok).toBe(true);
+    // The lookup is not part of the request path.
+    expect(mockPrismaUser.findUnique).not.toHaveBeenCalled();
+
+    await flushScheduled();
+
+    // The issuance step ran for the unknown email too (same work as known),
+    // found no account, so no token state changed.
+    expect(mockPrismaUser.findUnique).toHaveBeenCalledWith({ where: { email: "nobody@test.com" } });
+    expect(mockPasswordReset.updateMany).not.toHaveBeenCalled();
     expect(mockPasswordReset.create).not.toHaveBeenCalled();
   });
 
-  it("invalidates prior tokens and creates a new reset token with expiresAt ~1 hour out", async () => {
+  it("responds before touching the database: no prisma call has happened when the response resolves", async () => {
+    const userId = "u1";
+    mockPrismaUser.findUnique.mockResolvedValue({ id: userId, email: "known@test.com" });
+    mockPasswordReset.updateMany.mockResolvedValue({ count: 0 });
+    mockPasswordReset.create.mockResolvedValue({});
+
+    const res = await postJson("/forgot-password", { email: "known@test.com" });
+    expect(res.status).toBe(200);
+    await res.json();
+
+    // Response first: the response is fully produced before any DB call, so
+    // known and unknown emails pay the same zero DB calls inside the request.
+    expect(mockPrismaUser.findUnique).not.toHaveBeenCalled();
+    expect(mockPasswordReset.updateMany).not.toHaveBeenCalled();
+    expect(mockPasswordReset.create).not.toHaveBeenCalled();
+
+    await flushScheduled();
+
+    // The scheduled work then runs: lookup, invalidation, creation.
+    expect(mockPrismaUser.findUnique).toHaveBeenCalledOnce();
+    expect(mockPasswordReset.create).toHaveBeenCalledOnce();
+  });
+
+  it("known email: after flushing, invalidates prior tokens and creates a new reset token with expiresAt ~1 hour out", async () => {
     const userId = "u1";
     mockPrismaUser.findUnique.mockResolvedValue({ id: userId, email: "known@test.com" });
     mockPasswordReset.updateMany.mockResolvedValue({ count: 0 });
@@ -317,9 +358,9 @@ describe("POST /auth/forgot-password", () => {
 
     const before = Date.now();
     const res = await postJson("/forgot-password", { email: "known@test.com" });
-    const after = Date.now();
-
     expect(res.status).toBe(200);
+    await flushScheduled();
+    const after = Date.now();
 
     // Prior tokens must be invalidated
     expect(mockPasswordReset.updateMany).toHaveBeenCalledWith({
@@ -339,6 +380,28 @@ describe("POST /auth/forgot-password", () => {
     const { expiresAt } = createArg.data;
     expect(expiresAt.getTime()).toBeGreaterThan(before + 59 * 60 * 1000);
     expect(expiresAt.getTime()).toBeLessThanOrEqual(after + 61 * 60 * 1000);
+  });
+
+  it("an error inside the deferred issuance step is caught and logged, and does not change the response", async () => {
+    mockPrismaUser.findUnique.mockRejectedValue(new Error("db down"));
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    try {
+      const res = await postJson("/forgot-password", { email: "known@test.com" });
+
+      expect(res.status).toBe(200);
+      expect(((await res.json()) as { ok: boolean }).ok).toBe(true);
+
+      await flushScheduled();
+
+      // The failure is logged through the existing logger (console.error) and
+      // never surfaces in the response nor as an unhandled rejection.
+      expect(errorSpy).toHaveBeenCalledTimes(1);
+      expect(String(errorSpy.mock.calls[0][1])).toContain("db down");
+      expect(mockPasswordReset.create).not.toHaveBeenCalled();
+    } finally {
+      errorSpy.mockRestore();
+    }
   });
 });
 
