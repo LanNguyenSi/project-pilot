@@ -161,6 +161,9 @@ async function issuePasswordReset(email: string): Promise<void> {
   });
 
   // TODO: send email via notification-service. No delivery path exists yet: only the token hash is stored, so the token is never delivered or recoverable.
+  // Issuance is best effort: it runs after the response, so it is lost if the
+  // process exits right after answering. It must become a durable queue when
+  // mail delivery lands.
 }
 
 auth.post("/forgot-password", rateLimit({ max: 3, windowMs: 60_000, keyGenerator: emailKey }), zValidate("json", forgotSchema), async (c) => {
@@ -168,9 +171,15 @@ auth.post("/forgot-password", rateLimit({ max: 3, windowMs: 60_000, keyGenerator
 
   // The email is handed to issuePasswordReset after the response; the .catch
   // keeps a database failure from becoming an unhandled rejection, and it is
-  // logged because the answer (always {ok:true}) cannot surface it.
+  // logged because the answer (always {ok:true}) cannot surface it. Only the
+  // error name and a Prisma error code are logged: a Prisma error message can
+  // embed the query arguments (the submitted email, token hash, user id).
   const scheduleIssuance = () => {
-    issuePasswordReset(email).catch((err: unknown) => console.error("[auth] forgot-password issuance failed:", err));
+    issuePasswordReset(email).catch((err: unknown) => {
+      const name = err instanceof Error ? err.name : "UnknownError";
+      const code = typeof (err as { code?: unknown } | null)?.code === "string" ? (err as { code: string }).code : undefined;
+      console.error("[auth] forgot-password issuance failed:", name, ...(code ? [code] : []));
+    });
   };
   setImmediate(scheduleIssuance);
 

@@ -397,8 +397,33 @@ describe("POST /auth/forgot-password", () => {
       // The failure is logged through the existing logger (console.error) and
       // never surfaces in the response nor as an unhandled rejection.
       expect(errorSpy).toHaveBeenCalledTimes(1);
-      expect(String(errorSpy.mock.calls[0][1])).toContain("db down");
+      expect(errorSpy.mock.calls[0][1]).toBe("Error");
       expect(mockPasswordReset.create).not.toHaveBeenCalled();
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
+  it("the logged failure never contains the submitted email, only the error name and a Prisma code", async () => {
+    const email = "secret.person@test.com";
+    const err = Object.assign(new Error(`Invalid invocation: findUnique({ where: { email: "${email}" } })`), {
+      name: "PrismaClientKnownRequestError",
+      code: "P2024",
+    });
+    mockPrismaUser.findUnique.mockRejectedValue(err);
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    try {
+      await postJson("/forgot-password", { email });
+      await flushScheduled();
+
+      expect(errorSpy).toHaveBeenCalledTimes(1);
+      const logged = errorSpy.mock.calls[0];
+      expect(logged).toContain("PrismaClientKnownRequestError");
+      expect(logged).toContain("P2024");
+      for (const arg of logged) {
+        expect(typeof arg === "string" ? arg : JSON.stringify(arg)).not.toContain(email);
+      }
     } finally {
       errorSpy.mockRestore();
     }
