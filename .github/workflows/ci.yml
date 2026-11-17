@@ -219,6 +219,50 @@ jobs:
           (export COMPOSE_PROJECT_NAME=project-pilot; check "COMPOSE_PROJECT_NAME=project-pilot")
           check "-p project-pilot" -p project-pilot
 
+  image-build:
+    # Builds both production images exactly as the production host does
+    # (same compose file, contexts, Dockerfiles and build args), without
+    # starting or pushing anything. Until now the first build of a change to a
+    # Dockerfile, the lockfile or a path the allow-list .dockerignore must name
+    # happened at deploy time. The assertions below catch that class: a path the
+    # build needs but .dockerignore drops makes the build fail, or leaves a
+    # runtime file missing from the final stage (the generated prisma client,
+    # the compiled server, the Next.js standalone server, public assets); the
+    # `id` checks pin the non-root `USER node` the images are meant to run as.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build backend and frontend images
+        env:
+          # Only needed so the compose file interpolates; the build reads none.
+          POSTGRES_PASSWORD: dummy
+          SESSION_SECRET: dummy
+          PROJECT_FORGE_URL: http://forge.invalid
+          AGENT_TASKS_URL: http://tasks.invalid
+          DEPLOY_PANEL_URL: http://deploy.invalid
+        run: docker compose -f docker-compose.prod.yml build backend frontend
+      - name: Backend image runs as node and carries its runtime files
+        run: |
+          img=project-pilot-backend
+          [ "$(docker run --rm --entrypoint id "$img" -u)" = 1000 ]
+          docker run --rm --entrypoint node "$img" -e "
+            require.resolve('@prisma/client');
+            // The prod-deps stage ships a stub client; only the copy from the
+            // builder carries the generated models.
+            if (!require('.prisma/client').Prisma.ModelName.User) throw new Error('prisma client not generated');
+            require.resolve('prisma/package.json');
+            for (const f of ['dist/server.js', 'prisma/schema.prisma', 'package.json']) {
+              require('fs').accessSync(f);
+            }"
+      - name: Frontend image runs as node and carries its runtime files
+        run: |
+          img=project-pilot-frontend
+          [ "$(docker run --rm --entrypoint id "$img" -u)" = 1000 ]
+          docker run --rm --entrypoint node "$img" -e "
+            for (const f of ['frontend/server.js', 'frontend/.next/static', 'frontend/public']) {
+              require('fs').accessSync(f);
+            }"
+
   backup-scripts:
     # shellcheck and the stub-docker tests of the database backup and restore
     # scripts (scripts/backup.sh, scripts/restore.sh). No container is needed.
