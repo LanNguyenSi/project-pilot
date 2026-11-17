@@ -132,13 +132,18 @@ auth.get("/me", requireAuth, async (c) => {
 // POST /auth/forgot-password
 const forgotSchema = z.object({ email: z.email() });
 
-auth.post("/forgot-password", rateLimit({ max: 3, windowMs: 60_000, keyGenerator: emailKey }), zValidate("json", forgotSchema), async (c) => {
-  const { email } = c.req.valid("json");
+// Timing enumeration defense: the user lookup, the invalidation of prior
+// tokens and the token creation all live here, and this runs only after the
+// response has been produced (the route schedules it with setImmediate). The
+// request path therefore does no database work at all, so a known and an
+// unknown email trigger the exact same observable work before the answer.
+async function issuePasswordReset(email: string): Promise<void> {
   const user = await prisma.user.findUnique({ where: { email } });
 
-  // Always return success to prevent account enumeration
+  // Unknown email: nothing to invalidate and no token to create. The caller
+  // already answered {ok:true}, so this stays silent either way.
   if (!user) {
-    return c.json({ ok: true });
+    return;
   }
 
   // Invalidate existing reset tokens
@@ -156,6 +161,27 @@ auth.post("/forgot-password", rateLimit({ max: 3, windowMs: 60_000, keyGenerator
   });
 
   // TODO: send email via notification-service. No delivery path exists yet: only the token hash is stored, so the token is never delivered or recoverable.
+  // Issuance is best effort: it runs after the response, so it is lost if the
+  // process exits right after answering. It must become a durable queue when
+  // mail delivery lands.
+}
+
+auth.post("/forgot-password", rateLimit({ max: 3, windowMs: 60_000, keyGenerator: emailKey }), zValidate("json", forgotSchema), async (c) => {
+  const { email } = c.req.valid("json");
+
+  // The email is handed to issuePasswordReset after the response; the .catch
+  // keeps a database failure from becoming an unhandled rejection, and it is
+  // logged because the answer (always {ok:true}) cannot surface it. Only the
+  // error name and a Prisma error code are logged: a Prisma error message can
+  // embed the query arguments (the submitted email, token hash, user id).
+  const scheduleIssuance = () => {
+    issuePasswordReset(email).catch((err: unknown) => {
+      const name = err instanceof Error ? err.name : "UnknownError";
+      const code = typeof (err as { code?: unknown } | null)?.code === "string" ? (err as { code: string }).code : undefined;
+      console.error("[auth] forgot-password issuance failed:", name, ...(code ? [code] : []));
+    });
+  };
+  setImmediate(scheduleIssuance);
 
   return c.json({ ok: true });
 });

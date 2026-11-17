@@ -16,7 +16,7 @@ The backend exposes a Hono HTTP API at `:3001/api/*`. All `POST`/`PUT` JSON bodi
 - `POST /api/auth/login` sign in
 - `POST /api/auth/logout` sign out
 - `GET  /api/auth/me` current user
-- `POST /api/auth/forgot-password` request password reset
+- `POST /api/auth/forgot-password` request password reset; the lookup and token issuance run after the response is sent, so the request does no database work for either a known or an unknown email.
 - `POST /api/auth/reset-password` reset password with token
 
 ## OAuth
