@@ -160,7 +160,7 @@ describe("production resource limits", () => {
     let current: string[] | null = null;
     for (const l of lines.slice(start + 1)) {
       if (l.trim() !== "" && !/^\s/.test(l)) break;
-      const name = l.match(/^ {2}([a-z][\w-]*):\s*$/)?.[1];
+      const name = l.match(/^ {2}([^\s:#][^:]*):\s*$/)?.[1];
       if (name !== undefined) {
         current = [];
         blocks.push([name, current]);
