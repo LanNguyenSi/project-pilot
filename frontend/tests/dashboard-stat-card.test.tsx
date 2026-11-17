@@ -78,6 +78,13 @@ describe("dashboard error-state stat cards", () => {
     expect(screen.queryByText("Unavailable")).not.toBeInTheDocument();
   });
 
+  it("renders Unavailable smaller and in the secondary colour, not tertiary", async () => {
+    await renderWith(errorSummary);
+    const word = screen.getAllByText("Unavailable")[0];
+    expect(word).toHaveClass("text-content-secondary", "text-base", "font-medium");
+    expect(word).not.toHaveClass("text-content-tertiary");
+  });
+
   it("keeps the dot on a not-configured card", async () => {
     await renderWith(errorSummary);
     expect(cardFor("Apps").textContent).toContain("·");
@@ -93,6 +100,18 @@ describe("dashboard hint cards", () => {
       "href",
       "/settings",
     );
+  });
+
+  it("names Project Forge when its token is missing", async () => {
+    await renderWith({
+      services: {
+        "project-forge": { configured: false },
+        "agent-tasks": { configured: true, projectCount: 3, claimableCount: 7 },
+        "deploy-panel": { configured: false },
+      },
+    });
+    expect(screen.getByText(/Not configured: Project Forge, Deploy Panel\./)).toBeInTheDocument();
+    expect(screen.queryByText(/Could not reach: /)).not.toBeInTheDocument();
   });
 
   it("renders neither hint card when every service is connected", async () => {
