@@ -76,7 +76,7 @@ sequenceDiagram
 
 - `backend/src/routes/`: one Hono router per API area (`auth`, `oauth`, `credentials`, `dashboard`, `forge`, `tasks`, `deploy`, `health`), mounted in `backend/src/app.ts`.
 - `backend/src/services/`: `auth`, `credentials`, `downstream`, `agent-tasks-client`, `github-oauth`, `module-registration`, `forge-task-snapshot`, `forge-task-migration`.
-- `backend/src/middleware/`: `auth` (session check), `csrf`, `cors`, `rate-limit`, `security` (response headers).
+- `backend/src/middleware/`: `auth` (session check), `csrf`, `cors`, `rate-limit`, `body-limit` (global 128 KiB request body cap, `413` before any route), `security` (response headers).
 - `backend/src/lib/`: `crypto` (credential encryption), `prisma` (client), `upstream-timeout`, `validate` (`zValidate`, `urlString`).
 - `backend/src/config/index.ts`: the process environment, validated with Zod at startup: defaults, the placeholder-`SESSION_SECRET` refusal and the required-in-production service URLs; modules read configuration through the parsed `config` object (`middleware/security.ts` still reads `NODE_ENV` directly).
 - `backend/src/server.ts`: the entry point: serves `app.fetch` over HTTP on `config.PORT` (default 3001) and wires the SIGTERM/SIGINT handler built by `shutdown.ts`.

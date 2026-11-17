@@ -1,10 +1,10 @@
 // CSP construction lives here (pure, no side effects) so next.config.ts can
 // call it and unit tests can cover every branch without booting Next.js.
 
-// Modules embedded via iframe under /security, /tasks/embed, etc. Add to
-// this list whenever a new module gets an iframe widget. frame-src allows
-// project-pilot to host these origins; frame-ancestors 'none' continues
-// to forbid anyone else from framing project-pilot.
+// Modules embedded via iframe: /security is the only embedding page so
+// far. Add to this list whenever a new module gets an iframe widget.
+// frame-src allows project-pilot to host these origins; frame-ancestors
+// 'none' continues to forbid anyone else from framing project-pilot.
 const DEFAULT_DEPSIGHT_URL = "https://depsight.opentriologue.ai";
 
 // Same default as frontend/src/lib/api.ts (client-side API base URL), so

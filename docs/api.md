@@ -8,6 +8,7 @@ The backend exposes a Hono HTTP API at `:3001/api/*`. All `POST`/`PUT` JSON bodi
 - CSRF: `POST`, `PUT`, `PATCH` and `DELETE` requests under `/api/auth`, `/api/credentials`, `/api/dashboard`, `/api/forge`, `/api/tasks` and `/api/deploy` must send `X-Requested-With: XMLHttpRequest`, or they get `403` with `csrf_failed`.
 - Rate limits: per minute, per client IP and path: `register` 5, `login` 10, `forgot-password` 3, `reset-password` 5, `PUT /api/credentials` 10. `login` and `forgot-password` are also limited per submitted email, `PUT /api/credentials` per signed-in user. A breach returns `429` with `Retry-After`. The client IP is the last `X-Forwarded-For` entry (the socket address when the header is absent), so deploy behind exactly one reverse proxy. Counters are kept in memory per backend process.
 - CORS: only origins listed in `CORS_ORIGINS`, with credentials.
+- Body size: every request body above 128 KiB (131072 bytes, `MAX_BODY_BYTES` in `backend/src/middleware/body-limit.ts`) gets `413` with the JSON body `{"error":"Payload too large"}`. The limit is registered on `*` before routing, so it is checked before CSRF and before the rate-limit key generators, and it counts the stream when `Content-Length` is absent (chunked bodies), so a missing or lying header does not bypass it.
 
 ## Auth
 
