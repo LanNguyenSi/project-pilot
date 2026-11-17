@@ -2,6 +2,13 @@
 
 <!-- Add new entries at the top, newest first. -->
 
+- 2026-11-17T12:31:00Z, request-gating-and-sessions re-verified and re-stamped after
+  `backend/src/routes/auth.ts` (forgot-password does its lookup and token issuance after the
+  response, 27c5b89, which shifted the lines below it) and `frontend/src/lib/csp.ts` (243f722,
+  comment-only change): the forgot-password and reset-password rate-limit citations (169, 195)
+  and the password-reset session deletion (211-215) were re-pointed, the other `auth.ts` and
+  `csp.ts` citations were re-read at HEAD and still match; the limits, cookie and CSP claims
+  hold. No claim needed correction.
 - 2026-11-16T12:05:00Z, credential-trust-boundary and request-gating-and-sessions re-verified and
   re-stamped after `backend/src/services/auth.ts` (every login attempt pays one bcrypt compare,
   against a lazily memoized dummy hash for unknown and OAuth-only accounts) and

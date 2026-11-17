@@ -3,7 +3,7 @@ type: invariant
 title: Request gating and session model
 description: Global CORS and security headers, CSRF registered per route prefix in app.ts, requireAuth registered per router, opaque hashed session tokens with SameSite Strict for password sign-in and Lax for GitHub sign-in, per-process rate limits on four public auth endpoints and the credential write keyed on the last X-Forwarded-For entry, and a CSP that only the frontend sets.
 tags: [auth, sessions, csrf, cors, rate-limit, headers, csp]
-timestamp: 2026-11-16T12:05:00Z
+timestamp: 2026-11-17T12:31:00Z
 sources:
   - backend/src/app.ts
   - backend/src/middleware/auth.ts
@@ -113,7 +113,7 @@ login and Lax for GitHub sign-in
 A session ends when it expires, on logout, which deletes the row and clears
 the cookie (`backend/src/routes/auth.ts:112-118#"deleteCookie(c, "`), or on a
 password reset, which deletes every session of that user
-(`backend/src/routes/auth.ts:185-188#"prisma.session.deleteMany({ where: { userId: reset.userId } }),"`).
+(`backend/src/routes/auth.ts:211-215#"prisma.session.deleteMany({ where: { userId: reset.userId } }),"`).
 
 The OAuth `state` cookie is separate: Lax, ten minutes
 (`backend/src/routes/oauth.ts:76-83#"maxAge: STATE_COOKIE_MAX_AGE,"`), always
@@ -136,8 +136,8 @@ Five routes are limited, each per minute:
 
 - register, 5 (`backend/src/routes/auth.ts:84#"rateLimit({ max: 5, windowMs: 60_000 })"`),
 - login, 10, also per email (`backend/src/routes/auth.ts:98#"keyGenerator: emailKey"`),
-- forgot-password, 3, also per email (`backend/src/routes/auth.ts:135#"max: 3"`),
-- reset-password, 5 (`backend/src/routes/auth.ts:169#"rateLimit({ max: 5, windowMs: 60_000 })"`),
+- forgot-password, 3, also per email (`backend/src/routes/auth.ts:169#"max: 3"`),
+- reset-password, 5 (`backend/src/routes/auth.ts:195#"rateLimit({ max: 5, windowMs: 60_000 })"`),
 - `PUT /api/credentials`, 10, also per signed-in user id, so an account that
   writes from many addresses is still capped
   (`backend/src/routes/credentials.ts:39#"keyGenerator: userKey"`).
