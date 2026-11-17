@@ -145,3 +145,49 @@ describe("production compose project", () => {
     expect(countMatches(prod, /\$\{POSTGRES_PASSWORD:\?[^}]+\}/g)).toBeGreaterThanOrEqual(2);
   });
 });
+
+describe("production resource limits", () => {
+  const prod = code(read("docker-compose.prod.yml"));
+
+  // Service blocks from the file itself (never a hard-coded list): the keys
+  // indented by exactly two spaces under `services:`, each block running to
+  // the next such key and ending where the file dedents to a top-level key.
+  const serviceBlocks = (): Array<[string, string[]]> => {
+    const lines = prod.split("\n");
+    const start = lines.findIndex((l) => /^services:\s*$/.test(l));
+    expect(start).toBeGreaterThanOrEqual(0);
+    const blocks: Array<[string, string[]]> = [];
+    let current: string[] | null = null;
+    for (const l of lines.slice(start + 1)) {
+      if (l.trim() !== "" && !/^\s/.test(l)) break;
+      const name = l.match(/^ {2}([a-z][\w-]*):\s*$/)?.[1];
+      if (name !== undefined) {
+        current = [];
+        blocks.push([name, current]);
+      } else if (current !== null) {
+        current.push(l);
+      }
+    }
+    return blocks;
+  };
+
+  it("every service with mem_limit also caps CPU, each cpus a number in (0, 1]", () => {
+    const blocks = serviceBlocks();
+    // An empty or broken parse must fail here, not pass vacuously.
+    expect(blocks.length).toBeGreaterThanOrEqual(3);
+    let withMemLimit = 0;
+    for (const [name, body] of blocks) {
+      if (!body.some((l) => /^ {4}mem_limit:/.test(l))) continue;
+      withMemLimit += 1;
+      const cpusLine = body.find((l) => /^ {4}cpus:/.test(l));
+      expect(cpusLine, `${name}: has mem_limit but no cpus`).toBeDefined();
+      const raw = cpusLine!.match(/cpus:\s*"?([^"\s#]+)"?/)?.[1];
+      const value = Number(raw);
+      expect(raw, `${name}: cpus value missing`).toBeDefined();
+      expect(Number.isNaN(value), `${name}: cpus "${raw}" is not a number`).toBe(false);
+      expect(value).toBeGreaterThan(0);
+      expect(value).toBeLessThanOrEqual(1);
+    }
+    expect(withMemLimit).toBeGreaterThanOrEqual(3);
+  });
+});
