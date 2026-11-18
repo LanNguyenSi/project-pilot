@@ -41,7 +41,7 @@ vi.mock("../src/middleware/auth.js", () => ({
 
 import { forge } from "../src/routes/forge.js";
 
-function magicFill(user: string, ip: string) {
+function magicFill(user: string, ip: string, prompt = "Build a todo app") {
   return forge.request("/ai-assist/magic-fill", {
     method: "POST",
     headers: {
@@ -49,7 +49,7 @@ function magicFill(user: string, ip: string) {
       "x-test-user": user,
       "x-forwarded-for": ip,
     },
-    body: JSON.stringify({ prompt: "Build a todo app" }),
+    body: JSON.stringify({ prompt }),
   });
 }
 
@@ -117,6 +117,18 @@ describe("POST /forge/ai-assist/magic-fill rate limit", () => {
     // bucket crosses first wins, and with equal maxima the shared IP
     // bucket does here.
     expect((await magicFill("mf-ip-user-fresh", "203.0.113.30")).status).toBe(429);
+  });
+
+  it("counts invalid bodies against the quota: the limiter runs before validation", async () => {
+    // The limiter-before-validation order is what stops a client from
+    // probing the schema or flooding with invalid bodies for free. Ten
+    // empty-prompt calls from one user across fresh addresses are all
+    // 400, but each one has already passed the limiter, so the 11th
+    // (valid body, fresh address) answers 429, not 400 or 200.
+    for (let i = 0; i < 10; i++) {
+      expect((await magicFill("mf-user-d", `198.51.100.${i}`, "")).status).toBe(400);
+    }
+    expect((await magicFill("mf-user-d", "198.51.100.99")).status).toBe(429);
   });
 
   it("does not rate-limit GET /ai-assist/capabilities", async () => {

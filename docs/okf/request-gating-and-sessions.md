@@ -144,7 +144,7 @@ Six routes are limited, each per minute:
 - `POST /api/forge/ai-assist/magic-fill`, 10, also per signed-in user id, so
   one account cannot spend the operator's LLM key from many addresses; the
   cheap `GET /api/forge/ai-assist/capabilities` probe stays unlimited
-  (`backend/src/routes/forge.ts:241#"keyGenerator: userKey"`).
+  (`backend/src/routes/forge.ts:242#"keyGenerator: userKey"`).
 
 The limiter counts one bucket per client address and path
 (`backend/src/middleware/rate-limit.ts:74#"ip:${ip}:${c.req.path}"`) and,

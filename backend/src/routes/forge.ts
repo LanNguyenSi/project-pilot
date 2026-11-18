@@ -238,6 +238,7 @@ const userKey = (c: Context<AppEnv>) => `user:${c.get("userId")!}`;
 
 // POST /forge/ai-assist/magic-fill — ask the AI to fill project form fields
 // 10 calls per minute per client IP and per signed-in user
+// The limiter runs before validation on purpose, so an invalid body also counts against the quota.
 forge.post("/ai-assist/magic-fill", rateLimit({ max: 10, windowMs: 60_000, keyGenerator: userKey }), zValidate("json", magicFillSchema), async (c) => {
   const body = c.req.valid("json");
   const result = await forgeAiRequest<{
