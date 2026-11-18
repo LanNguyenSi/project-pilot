@@ -2,6 +2,14 @@
 
 <!-- Add new entries at the top, newest first. -->
 
+- 2026-11-18T08:52:00Z, credential-trust-boundary, forge-task-migration and request-gating-and-sessions
+  re-verified and re-stamped after `backend/src/routes/forge.ts` (magic-fill proxy rate limit,
+  10 per minute per address and per user, registered before body validation) changed: the
+  `forge.ts` citations (`forge.use` 19, `getCredential` 25-26, snapshot 95-102 and 99, link
+  144, `migrateForgeTasks` 150-161, limiter 242) were re-read at HEAD and still point at the
+  code their sentences describe. The request-gating invariant "Rate limits exist only on the
+  public auth endpoints" was false (the credential write and the magic-fill proxy are limited
+  too) and now names all six limited routes. No other claim needed correction.
 - 2026-11-17T12:31:00Z, request-gating-and-sessions re-verified and re-stamped after
   `backend/src/routes/auth.ts` (forgot-password does its lookup and token issuance after the
   response, 27c5b89, which shifted the lines below it) and `frontend/src/lib/csp.ts` (243f722,

@@ -3,7 +3,7 @@ type: invariant
 title: Request gating and session model
 description: Global CORS and security headers, CSRF registered per route prefix in app.ts, requireAuth registered per router, opaque hashed session tokens with SameSite Strict for password sign-in and Lax for GitHub sign-in, per-process rate limits on four public auth endpoints, the credential write and the forge magic-fill proxy keyed on the last X-Forwarded-For entry, and a CSP that only the frontend sets.
 tags: [auth, sessions, csrf, cors, rate-limit, headers, csp]
-timestamp: 2026-11-17T12:31:00Z
+timestamp: 2026-11-18T08:52:00Z
 sources:
   - backend/src/app.ts
   - backend/src/middleware/auth.ts
@@ -40,9 +40,9 @@ all of them.
   both registrations, in two different files.
 - A session is an opaque random token. The server stores only its SHA-256
   hash, and nothing about it is signed.
-- Rate limits exist only on the public auth endpoints, and their client
-  address is correct only behind exactly one reverse proxy that appends to
-  `X-Forwarded-For`.
+- Rate limits exist only on the four public auth endpoints, the credential
+  write and the forge magic-fill proxy, and their client address is correct
+  only behind exactly one reverse proxy that appends to `X-Forwarded-For`.
 - The Content-Security-Policy comes from the frontend; the backend sends
   none.
 
