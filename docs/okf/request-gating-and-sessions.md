@@ -1,7 +1,7 @@
 ---
 type: invariant
 title: Request gating and session model
-description: Global CORS and security headers, CSRF registered per route prefix in app.ts, requireAuth registered per router, opaque hashed session tokens with SameSite Strict for password sign-in and Lax for GitHub sign-in, per-process rate limits on four public auth endpoints and the credential write keyed on the last X-Forwarded-For entry, and a CSP that only the frontend sets.
+description: Global CORS and security headers, CSRF registered per route prefix in app.ts, requireAuth registered per router, opaque hashed session tokens with SameSite Strict for password sign-in and Lax for GitHub sign-in, per-process rate limits on four public auth endpoints, the credential write and the forge magic-fill proxy keyed on the last X-Forwarded-For entry, and a CSP that only the frontend sets.
 tags: [auth, sessions, csrf, cors, rate-limit, headers, csp]
 timestamp: 2026-11-17T12:31:00Z
 sources:
@@ -77,7 +77,7 @@ success it sets `userId` on the context
 Each protected router registers it itself:
 `backend/src/routes/credentials.ts:13#"credentials.use("`,
 `backend/src/routes/dashboard.ts:20#"dashboard.use("`,
-`backend/src/routes/forge.ts:18#"forge.use("`,
+`backend/src/routes/forge.ts:19#"forge.use("`,
 `backend/src/routes/tasks.ts:38#"tasks.use("`, and
 `backend/src/routes/deploy.ts:82#"deploy.use("`. In the auth router only
 `GET /api/auth/me` is protected
@@ -132,7 +132,7 @@ frontend's `apiFetch` sends the header on every call, together with
 
 ## Rate limits
 
-Five routes are limited, each per minute:
+Six routes are limited, each per minute:
 
 - register, 5 (`backend/src/routes/auth.ts:84#"rateLimit({ max: 5, windowMs: 60_000 })"`),
 - login, 10, also per email (`backend/src/routes/auth.ts:98#"keyGenerator: emailKey"`),
@@ -140,7 +140,11 @@ Five routes are limited, each per minute:
 - reset-password, 5 (`backend/src/routes/auth.ts:195#"rateLimit({ max: 5, windowMs: 60_000 })"`),
 - `PUT /api/credentials`, 10, also per signed-in user id, so an account that
   writes from many addresses is still capped
-  (`backend/src/routes/credentials.ts:39#"keyGenerator: userKey"`).
+  (`backend/src/routes/credentials.ts:39#"keyGenerator: userKey"`),
+- `POST /api/forge/ai-assist/magic-fill`, 10, also per signed-in user id, so
+  one account cannot spend the operator's LLM key from many addresses; the
+  cheap `GET /api/forge/ai-assist/capabilities` probe stays unlimited
+  (`backend/src/routes/forge.ts:242#"keyGenerator: userKey"`).
 
 The limiter counts one bucket per client address and path
 (`backend/src/middleware/rate-limit.ts:74#"ip:${ip}:${c.req.path}"`) and,
