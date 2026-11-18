@@ -2,6 +2,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // vi.mock calls are hoisted before imports by Vitest.
 
+// The limiter keeps module-level state and every test here runs as user-1
+// from one address, so the magic-fill tests could tip over the 10/min
+// bucket and start seeing 429s. Neutralize it here; the real limiter's
+// magic-fill behaviour is pinned by forge-magic-fill-limits.test.ts.
+vi.mock("../src/middleware/rate-limit.js", () => ({
+  rateLimit: () => (_c: any, next: any) => next(),
+}));
+
 vi.mock("../src/config/index.js", () => ({
   config: {
     NODE_ENV: "test",

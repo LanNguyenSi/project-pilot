@@ -1,7 +1,8 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { z } from "zod";
 import { config } from "../config/index.js";
 import { requireAuth } from "../middleware/auth.js";
+import { rateLimit } from "../middleware/rate-limit.js";
 import { urlString, zValidate } from "../lib/validate.js";
 import { getCredential } from "../services/credentials.js";
 import {
@@ -230,8 +231,14 @@ const magicFillSchema = z.object({
   prompt: z.string().min(1, "Prompt is required").max(2000, "Prompt too long"),
 });
 
+// Per user, in addition to the per-IP bucket the middleware always applies:
+// magic-fill spends the operator's LLM key on every call.
+// requireAuth ran before this, so the user id is in the context.
+const userKey = (c: Context<AppEnv>) => `user:${c.get("userId")!}`;
+
 // POST /forge/ai-assist/magic-fill — ask the AI to fill project form fields
-forge.post("/ai-assist/magic-fill", zValidate("json", magicFillSchema), async (c) => {
+// 10 calls per minute per client IP and per signed-in user
+forge.post("/ai-assist/magic-fill", rateLimit({ max: 10, windowMs: 60_000, keyGenerator: userKey }), zValidate("json", magicFillSchema), async (c) => {
   const body = c.req.valid("json");
   const result = await forgeAiRequest<{
     ok: true;
