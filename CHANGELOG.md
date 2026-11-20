@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Security
 
-- **The npm audit gate allowlists GHSA-fc5q-39xc-vjpf (picomatch) until 2026-12-18.** No picomatch release fixes the advisory yet, and picomatch only reaches the dev tree here (eslint, typescript-eslint, vitest and their globbing helpers), so the gate failed every pull request without a fix to apply. The entry in `.github/audit-allowlist.json` names the reason and stops passing the gate after its `reviewBy` date; remove it once a fixed picomatch lands in the lockfile.
+- Removed the `GHSA-fc5q-39xc-vjpf` (picomatch) entry from `.github/audit-allowlist.json`: GitHub withdrew the advisory on 2026-11-18, and `npm audit` no longer reports it in this repo's lockfile tree(s), so the gate stays CLEAN with an empty `entries` list. `scripts/audit-gate.mjs` is unchanged.
 - **`POST /api/forge/ai-assist/magic-fill` is now rate limited.** The route forwards to project-forge's keyless AI endpoint, so every call spent the operator's LLM quota, and unlike every other expensive route it had no limiter: a signed-in user (or a stolen session) could drain the key without bound. It is now limited to 10 calls per minute per client IP and per signed-in user (the existing `429` `rate_limited` answer with `Retry-After`; counters stay per process like the other limits), while the cheap `GET /api/forge/ai-assist/capabilities` probe stays unlimited. Covered by `backend/tests/forge-magic-fill-limits.test.ts`; `backend/tests/forge-routes.test.ts` now mocks the limiter so its repeated magic-fill calls as one user cannot tip over the bucket. No operator step.
 
 ## [0.8.0] - 2026-11-17
