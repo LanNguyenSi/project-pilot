@@ -66,10 +66,13 @@ export default function SecurityPage() {
         src={DEPSIGHT_URL}
         title="depsight"
         className="flex-1 w-full border-0 min-h-0"
-        // Minimum set of permissions: scripts + same-origin for depsight's
-        // NextAuth session, forms for login submission, popups for any
-        // external links depsight itself renders.
-        sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
+        // Why each flag is here: scripts + same-origin for depsight's
+        // NextAuth session, forms for login submission, popups so external
+        // links depsight renders can open a new tab. No
+        // allow-popups-to-escape-sandbox: a tab opened by such a link
+        // (advisory pages, GitHub PRs) keeps this sandbox, so it cannot
+        // navigate the top-level page, open modals or download files.
+        sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
       />
     </div>
   );
