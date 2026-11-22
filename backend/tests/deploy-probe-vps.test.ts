@@ -1,18 +1,31 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { hashToken } from "../src/services/auth.js";
 
 // vi.mock calls are hoisted before imports by Vitest.
+
+// The route is rate limited (5/min per user AND per client IP). Each test
+// must reach the handler no matter how many ran before it, so every request
+// gets its own session token (mapped to its own user id through this map)
+// and its own X-Forwarded-For address.
+const { sessionUsers } = vi.hoisted(() => ({ sessionUsers: new Map<string, string>() }));
 
 vi.mock("../src/lib/prisma.js", () => ({
   prisma: {
     session: {
-      // requireAuth calls this to validate the session cookie. Always return
-      // a valid, non-expired session so auth passes in every test.
-      findUnique: vi.fn().mockResolvedValue({
+      // requireAuth calls this to validate the session cookie. Tokens
+      // registered in sessionUsers resolve to their own user id; any other
+      // token resolves to the default test user. Every session is valid and
+      // non-expired, so auth passes in every test.
+      findUnique: vi.fn(async (args: { where: { tokenHash: string } }) => ({
         id: "sess-1",
         tokenHash: "any",
         expiresAt: new Date(Date.now() + 3_600_000),
-        user: { id: "user-1", email: "test@example.com", name: "Test" },
-      }),
+        user: {
+          id: sessionUsers.get(args.where.tokenHash) ?? "user-1",
+          email: "test@example.com",
+          name: "Test",
+        },
+      })),
       delete: vi.fn(),
     },
   },
@@ -47,13 +60,22 @@ const mockGetCredential = vi.mocked(getCredential);
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** POST to /probe-vps on the deploy router with a fake authenticated session. */
-async function probeVps(body: unknown, cookie = "session=fake-token"): Promise<Response> {
+/**
+ * POST to /probe-vps on the deploy router with a fake authenticated
+ * session. Each call uses a fresh user id and client address so the route's
+ * rate limiter (5/min per user and per address) never caps a test run.
+ */
+let slot = 0;
+async function probeVps(body: unknown): Promise<Response> {
+  const id = `pv-${slot++}`;
+  const token = `session-token-${id}`;
+  sessionUsers.set(hashToken(token), `user-${id}`);
   return deploy.request("/probe-vps", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Cookie: cookie,
+      Cookie: `session=${token}`,
+      "x-forwarded-for": `203.0.113.${slot}`,
     },
     body: JSON.stringify(body),
   });

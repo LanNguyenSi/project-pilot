@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Hono } from "hono";
 import { rateLimit } from "../src/middleware/rate-limit.js";
+import { userKey } from "../src/middleware/rate-limit-keys.js";
 
 function makeApp(opts: Parameters<typeof rateLimit>[0]) {
   const app = new Hono();
@@ -61,5 +62,13 @@ describe("rateLimit", () => {
     expect(a.status).toBe(200);
     expect(b.status).toBe(200);
     expect(c.status).toBe(429); // account-scoped bucket trips despite IP rotation
+  });
+});
+
+describe("userKey", () => {
+  it("builds the per-user bucket key from the user id requireAuth put in the context", () => {
+    const c = { get: (k: string) => (k === "userId" ? "u-42" : undefined) } as unknown as
+      Parameters<typeof userKey>[0];
+    expect(userKey(c)).toBe("user:u-42");
   });
 });

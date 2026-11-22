@@ -26,12 +26,12 @@ they are in agent-tasks; from then on agent-tasks is the source of truth.
 ## Entry points
 
 - `POST /api/forge/generate` saves the snapshot
-  (`backend/src/routes/forge.ts:95-102#"failed to snapshot preview tasks"`).
+  (`backend/src/routes/forge.ts:105-112#"failed to snapshot preview tasks"`).
 - `POST /api/forge/publish` binds it to the published repo
-  (`backend/src/routes/forge.ts:139-145#"failed to link snapshot"`).
+  (`backend/src/routes/forge.ts:159-165#"failed to link snapshot"`).
 - `POST /api/forge/migrate-tasks` takes `repoUrl` and an optional `teamId`
   and runs `migrateForgeTasks`
-  (`backend/src/routes/forge.ts:150-161#"migrateForgeTasks(userId, repoUrl, teamId)"`).
+  (`backend/src/routes/forge.ts:171-182#"migrateForgeTasks(userId, repoUrl, teamId)"`).
 
 All three sit behind `requireAuth` and the CSRF header check (see
 [request gating and sessions](request-gating-and-sessions.md)), and every
@@ -133,7 +133,7 @@ when no snapshot task carries one
 carries, keeping only string ids and dropping an empty list
 (`backend/src/services/forge-task-snapshot.ts:70-81#".map(normalizeTaskDependsOn);"`),
 and the generate route saves that list as the snapshot
-(`backend/src/routes/forge.ts:99#"extractPreviewTasks(result.data.preview)"`).
+(`backend/src/routes/forge.ts:109#"extractPreviewTasks(result.data.preview)"`).
 
 ### v1: flat batch import
 

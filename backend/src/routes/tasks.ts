@@ -1,6 +1,8 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { requireAuth } from "../middleware/auth.js";
+import { rateLimit } from "../middleware/rate-limit.js";
+import { userKey } from "../middleware/rate-limit-keys.js";
 import { zValidate } from "../lib/validate.js";
 import { agentTasksRequest } from "../services/agent-tasks-client.js";
 import type { AppEnv } from "../types/hono.js";
@@ -77,20 +79,29 @@ tasks.get("/teams", async (c) => {
   return c.json(result.data);
 });
 
+// 3 per minute per client IP and per signed-in user: one sync iterates over
+// every repo the user has on GitHub for up to 120 s on the agent-tasks side.
+// The bucket key carries the full path, so each team id gets its own buckets.
+const TEAM_SYNC_MAX_PER_MINUTE = 3;
+
 // POST /tasks/teams/:teamId/sync — sync projects from user's GitHub account
 // into the given team. agent-tasks returns counts the UI surfaces as a toast.
 // Longer timeout than the default — this iterates over every repo the user
 // has on GitHub plus a create/update round per repo.
-tasks.post("/teams/:teamId/sync", async (c) => {
-  const userId = c.get("userId")!;
-  const teamId = c.req.param("teamId");
-  const result = await tasksRequest<unknown>(userId, `/api/teams/${encodeURIComponent(teamId)}/sync`, {
-    method: "POST",
-    timeoutMs: 120_000,
-  });
-  if (!result.ok) return c.json({ error: result.error }, result.status as any);
-  return c.json(result.data);
-});
+tasks.post(
+  "/teams/:teamId/sync",
+  rateLimit({ max: TEAM_SYNC_MAX_PER_MINUTE, windowMs: 60_000, keyGenerator: userKey }),
+  async (c) => {
+    const userId = c.get("userId")!;
+    const teamId = c.req.param("teamId");
+    const result = await tasksRequest<unknown>(userId, `/api/teams/${encodeURIComponent(teamId)}/sync`, {
+      method: "POST",
+      timeoutMs: 120_000,
+    });
+    if (!result.ok) return c.json({ error: result.error }, result.status as any);
+    return c.json(result.data);
+  },
+);
 
 // POST /tasks/projects — create a project inside a team.
 tasks.post("/projects", zValidate("json", createProjectSchema), async (c) => {
