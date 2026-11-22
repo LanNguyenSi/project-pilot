@@ -46,6 +46,9 @@ vi.mock("../src/services/auth.js", () => ({
       this.code = code;
     }
   },
+  RegistrationClosedError: class RegistrationClosedError extends Error {
+    code = "registration_closed";
+  },
 }));
 
 // Mock requireAuth to a no-op so GET /me does not hit prisma.session
@@ -61,6 +64,7 @@ import {
   registerUser,
   loginUser,
   hashPassword,
+  RegistrationClosedError,
 } from "../src/services/auth.js";
 import { auth } from "../src/routes/auth.js";
 import { config } from "../src/config/index.js";
@@ -185,6 +189,27 @@ describe("POST /auth/register", () => {
     expect(res.headers.get("Set-Cookie")).toBeNull();
     expect(mockRegisterUser).not.toHaveBeenCalled();
     expect(mockPrismaSession.create).not.toHaveBeenCalled();
+  });
+
+  it("maps a registration lost inside the transaction to the identical 403 body, with no cookie and no session", async () => {
+    // The middleware saw an empty table; the service finds a user once it holds the lock.
+    mockRegisterUser.mockRejectedValue(new RegistrationClosedError());
+
+    const res = await postJson("/register", { email: "test@test.com", password: "password123" });
+
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual(CLOSED_BODY);
+    expect(res.headers.get("Set-Cookie")).toBeNull();
+    expect(mockPrismaSession.create).not.toHaveBeenCalled();
+  });
+
+  it("keeps 400 registration_failed for an ordinary failure that is not the closed error", async () => {
+    mockRegisterUser.mockRejectedValue(Object.assign(new Error("dup"), { code: "registration_failed" }));
+
+    const res = await postJson("/register", { email: "test@test.com", password: "password123" });
+
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { error: string }).error).toBe("registration_failed");
   });
 
   it("answers the same 403 body whether or not the email already has an account", async () => {

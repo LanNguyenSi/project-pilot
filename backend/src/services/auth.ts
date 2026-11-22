@@ -10,6 +10,31 @@ export class AuthError extends Error {
   }
 }
 
+// Raised when the first-account bootstrap finds an existing user inside the
+// registration transaction. The route turns it into the same 403 every other
+// refusal gets, so a lost race is indistinguishable from a closed door.
+export const REGISTRATION_CLOSED_CODE = "registration_closed";
+
+export class RegistrationClosedError extends AuthError {
+  constructor() {
+    super("Password registration is closed.", REGISTRATION_CLOSED_CODE);
+  }
+}
+
+// Constant key for the transaction-scoped advisory lock that serialises
+// first-account registrations (the ASCII bytes of "pilt", small enough for a
+// 32-bit integer so the driver's parameter type cannot matter).
+const REGISTRATION_LOCK_KEY = 0x70696c74;
+
+// Password registration exists only as the first-account bootstrap: the User
+// table must be empty. The route's early check keeps the common refusal off the
+// database, but a check-then-create outside one transaction lets two concurrent
+// requests both see an empty table and both create an account. The count and
+// the create therefore run in one transaction behind an advisory lock: the
+// second request waits for the first to commit, then counts one user and is
+// refused. Hashing happens before the transaction, so the lock is held only for
+// the count and the insert. This does not cover the GitHub OAuth callback,
+// which creates users without taking the lock.
 export async function registerUser(email: string, password: string, name?: string) {
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {
@@ -19,9 +44,15 @@ export async function registerUser(email: string, password: string, name?: strin
 
   const passwordHash = await hash(password, SALT_ROUNDS);
 
-  return prisma.user.create({
-    data: { email, passwordHash, name },
-    select: { id: true, email: true, name: true, createdAt: true },
+  return prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(${REGISTRATION_LOCK_KEY})`;
+    if ((await tx.user.count()) > 0) {
+      throw new RegistrationClosedError();
+    }
+    return tx.user.create({
+      data: { email, passwordHash, name },
+      select: { id: true, email: true, name: true, createdAt: true },
+    });
   });
 }
 

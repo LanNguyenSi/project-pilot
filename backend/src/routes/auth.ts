@@ -70,6 +70,12 @@ const registrationClosed = {
   message: "Password registration is closed. Sign in with GitHub.",
 } as const;
 
+// Matches the service's closed error by its code rather than its class, so the
+// route needs no import beyond the ones it already has.
+function isRegistrationClosed(err: unknown): boolean {
+  return typeof err === "object" && err !== null && (err as { code?: unknown }).code === "registration_closed";
+}
+
 async function requireRegistrationOpen(c: Context, next: Next) {
   if (!config.ALLOW_FIRST_PASSWORD_ACCOUNT) {
     return c.json(registrationClosed, 403);
@@ -89,7 +95,11 @@ auth.post("/register", rateLimit({ max: 5, windowMs: 60_000 }), requireRegistrat
     const token = await createSession(user.id);
     setSessionCookie(c, token);
     return c.json({ user }, 201);
-  } catch {
+  } catch (err) {
+    // Another bootstrap registration won the race: same body as every refusal.
+    if (isRegistrationClosed(err)) {
+      return c.json(registrationClosed, 403);
+    }
     return c.json({ error: "registration_failed", message: "Registration failed. Please try again or sign in." }, 400);
   }
 });
