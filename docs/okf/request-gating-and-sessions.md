@@ -84,16 +84,16 @@ Each protected router registers it itself:
 `backend/src/routes/tasks.ts:40#"tasks.use("`, and
 `backend/src/routes/deploy.ts:84#"deploy.use("`. In the auth router only
 `GET /api/auth/me` is protected
-(`backend/src/routes/auth.ts:123#"auth.get("`). `GET /api/health` has no
+(`backend/src/routes/auth.ts:133#"auth.get("`). `GET /api/health` has no
 check (`backend/src/routes/health.ts:7#"health.get("`), and neither do the
 two OAuth routes.
 
 ## Session model
 
 A session token is 32 random bytes, hex-encoded
-(`backend/src/services/auth.ts:65-66#"randomBytes(32).toString("`), and the
+(`backend/src/services/auth.ts:96-97#"randomBytes(32).toString("`), and the
 `Session` row stores its SHA-256 hash
-(`backend/src/services/auth.ts:69-70#"update(token)"`). Password sign-in and
+(`backend/src/services/auth.ts:100-101#"update(token)"`). Password sign-in and
 GitHub sign-in create the row the same way, with a 30-day expiry
 (`backend/src/routes/auth.ts:51-57#"data: { tokenHash, userId, expiresAt },"`,
 `backend/src/routes/oauth.ts:50-57#"return token;"`). The expiry is fixed at
@@ -103,7 +103,12 @@ The two flows differ in the cookie's `SameSite` attribute:
 
 - Login and the bootstrap-only register (closed with 403 unless
   `ALLOW_FIRST_PASSWORD_ACCOUNT=true` and no user exists) set `SameSite=Strict`
-  (`backend/src/routes/auth.ts:41-47#"maxAge: SESSION_MAX_AGE,"`).
+  (`backend/src/routes/auth.ts:41-47#"maxAge: SESSION_MAX_AGE,"`). The route's
+  count is only the early refusal: `registerUser` counts again inside the create
+  transaction behind a transaction-scoped advisory lock, so two concurrent
+  bootstrap requests create at most one user and the loser gets the same 403
+  (`backend/src/services/auth.ts:48#"pg_advisory_xact_lock"`). The GitHub
+  callback creates users without that lock.
 - The GitHub callback sets `SameSite=Lax`, because the browser reaches the
   frontend through a cross-site redirect chain that a Strict cookie would not
   survive (`backend/src/routes/oauth.ts:219-230#"maxAge: SESSION_MAX_AGE,"`).
@@ -114,9 +119,9 @@ login and Lax for GitHub sign-in
 (`backend/src/middleware/csrf.ts:5-7#"sign-in), this provides double protection."`).
 
 A session ends when it expires, on logout, which deletes the row and clears
-the cookie (`backend/src/routes/auth.ts:112-118#"deleteCookie(c, "`), or on a
+the cookie (`backend/src/routes/auth.ts:122-128#"deleteCookie(c, "`), or on a
 password reset, which deletes every session of that user
-(`backend/src/routes/auth.ts:211-215#"prisma.session.deleteMany({ where: { userId: reset.userId } }),"`).
+(`backend/src/routes/auth.ts:221-225#"prisma.session.deleteMany({ where: { userId: reset.userId } }),"`).
 
 The OAuth `state` cookie is separate: Lax, ten minutes
 (`backend/src/routes/oauth.ts:76-83#"maxAge: STATE_COOKIE_MAX_AGE,"`), always
@@ -137,10 +142,10 @@ frontend's `apiFetch` sends the header on every call, together with
 
 Eleven routes are limited, each per minute:
 
-- register, 5 (`backend/src/routes/auth.ts:84#"rateLimit({ max: 5, windowMs: 60_000 })"`),
-- login, 10, also per email (`backend/src/routes/auth.ts:98#"keyGenerator: emailKey"`),
-- forgot-password, 3, also per email (`backend/src/routes/auth.ts:169#"max: 3"`),
-- reset-password, 5 (`backend/src/routes/auth.ts:195#"rateLimit({ max: 5, windowMs: 60_000 })"`),
+- register, 5 (`backend/src/routes/auth.ts:90#"rateLimit({ max: 5, windowMs: 60_000 })"`),
+- login, 10, also per email (`backend/src/routes/auth.ts:108#"keyGenerator: emailKey"`),
+- forgot-password, 3, also per email (`backend/src/routes/auth.ts:179#"max: 3"`),
+- reset-password, 5 (`backend/src/routes/auth.ts:205#"rateLimit({ max: 5, windowMs: 60_000 })"`),
 - `PUT /api/credentials`, 10, also per signed-in user id, so an account that
   writes from many addresses is still capped
   (`backend/src/routes/credentials.ts:38#"keyGenerator: userKey"`),
