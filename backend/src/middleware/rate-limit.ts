@@ -65,20 +65,31 @@ export function rateLimit(opts: {
    * account be protected against distributed brute-force from many IPs.
    */
   keyGenerator?: (c: Context) => string | undefined | Promise<string | undefined>;
+  /**
+   * Optional fixed bucket name that replaces the request path in BOTH bucket
+   * keys. When set, every request sharing the name shares one IP bucket and
+   * one identity bucket whatever path or path spelling it uses (e.g. one
+   * limit per user across all team ids of a parameterised route). When
+   * absent, both keys keep carrying the request path.
+   */
+  bucket?: string;
 }): MiddlewareHandler {
   return async (c, next) => {
     const ip = clientIp(c);
     const now = Date.now();
+    // With a bucket name the keys are pinned to it; without one they stay
+    // per path, exactly as before the option existed.
+    const scope = opts.bucket ?? c.req.path;
 
-    // Always limit by client IP + path.
-    let { limited, resetAt } = hit(`ip:${ip}:${c.req.path}`, opts.max, opts.windowMs);
+    // Always limit by client IP + path (or the route's fixed bucket).
+    let { limited, resetAt } = hit(`ip:${ip}:${scope}`, opts.max, opts.windowMs);
 
     // Defense in depth: also limit by an app-supplied identity (e.g. email) so a
     // single account cannot be brute-forced from a rotating set of source IPs.
     if (!limited && opts.keyGenerator) {
       const extra = await opts.keyGenerator(c);
       if (extra) {
-        const res = hit(`id:${extra}:${c.req.path}`, opts.max, opts.windowMs);
+        const res = hit(`id:${extra}:${scope}`, opts.max, opts.windowMs);
         limited = res.limited;
         if (res.resetAt > resetAt) resetAt = res.resetAt;
       }
