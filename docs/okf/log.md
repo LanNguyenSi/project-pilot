@@ -2,6 +2,15 @@
 
 <!-- Add new entries at the top, newest first. -->
 
+- 2026-11-22T08:02:23Z, credential-trust-boundary, forge-task-migration and request-gating-and-sessions
+  re-verified and re-stamped after the per-user rate limits on the expensive proxy routes
+  (`backend/src/middleware/rate-limit-keys.ts`, `routes/deploy.ts`, `routes/forge.ts`,
+  `routes/tasks.ts`, `routes/credentials.ts`) and the security-page iframe sandbox change
+  (frontend only, no bundle claim). The citations the rate-limit change had already shifted
+  (`getCredential` in `forgeRequest` and `deployRequest`, the `probe-vps` and `install-relay`
+  handlers, the generate snapshot, publish link, `migrate-tasks` route and `extractPreviewTasks`
+  lines) and the eleven-route rate-limit list with its limits, keys and timeouts were re-read at
+  HEAD and match the code. No claim or citation needed further correction.
 - 2026-11-18T08:52:00Z, credential-trust-boundary, forge-task-migration and request-gating-and-sessions
   re-verified and re-stamped after `backend/src/routes/forge.ts` (magic-fill proxy rate limit,
   10 per minute per address and per user, registered before body validation) changed: the
