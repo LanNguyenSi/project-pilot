@@ -81,16 +81,19 @@ interface LimitedRoute {
   label: string;
   max: number;
   call: (user: string, ip: string) => Promise<Response>;
+  // Same route with a body its schema rejects (400); absent when the route
+  // has no body schema.
+  invalidCall?: (user: string, ip: string) => Promise<Response>;
 }
 
 // The maxima mirror the named constants in deploy.ts, tasks.ts and
 // forge.ts: swapping a constant breaks the boundary case of that route.
 const ROUTES: LimitedRoute[] = [
-  { label: "POST /deploy/install-relay", max: 3, call: installRelay },
-  { label: "POST /deploy/probe-vps", max: 5, call: probeVps },
+  { label: "POST /deploy/install-relay", max: 3, call: installRelay, invalidCall: (u, ip) => post(deploy, "/install-relay", u, ip, {}) },
+  { label: "POST /deploy/probe-vps", max: 5, call: probeVps, invalidCall: (u, ip) => post(deploy, "/probe-vps", u, ip, {}) },
   { label: "POST /tasks/teams/:teamId/sync", max: 3, call: (u, ip) => teamSync(u, ip) },
-  { label: "POST /forge/generate", max: 5, call: forgeGenerate },
-  { label: "POST /forge/publish", max: 5, call: forgePublish },
+  { label: "POST /forge/generate", max: 5, call: forgeGenerate, invalidCall: (u, ip) => post(forge, "/generate", u, ip, {}) },
+  { label: "POST /forge/publish", max: 5, call: forgePublish, invalidCall: (u, ip) => post(forge, "/publish", u, ip, {}) },
 ];
 
 // Upstream stub for every test in this file: answer locally so the only
@@ -133,7 +136,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe.each(ROUTES)("$label rate limit", ({ max, call }) => {
+describe.each(ROUTES)("$label rate limit", ({ max, call, invalidCall }) => {
   it("same user and same address: the max number of calls pass, the next is 429 with Retry-After", async () => {
     for (let i = 0; i < max; i++) {
       expect((await call("limit-user", "limit-ip")).status).toBe(200);
@@ -167,6 +170,34 @@ describe.each(ROUTES)("$label rate limit", ({ max, call }) => {
     expect((await call("many-user-fresh", "many-ip")).status).toBe(429);
   });
 
+  it("the 60 s window reopens the quota only after it elapsed", async () => {
+    vi.useFakeTimers();
+    try {
+      for (let i = 0; i < max; i++) {
+        expect((await call("win-user", "win-ip")).status).toBe(200);
+      }
+      expect((await call("win-user", "win-ip")).status).toBe(429);
+      // Still inside the 60 s window that started at the first hit.
+      vi.advanceTimersByTime(59_000);
+      expect((await call("win-user", "win-ip")).status).toBe(429);
+      // Past the window: the next call opens a fresh one.
+      vi.advanceTimersByTime(1_001);
+      expect((await call("win-user", "win-ip")).status).toBe(200);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // Team sync has no body schema, so it has no invalid body to send.
+  it.skipIf(!invalidCall)("the limiter runs before body validation: rejected bodies use up the quota", async () => {
+    for (let i = 0; i < max; i++) {
+      expect((await invalidCall!("val-user", "val-ip")).status).toBe(400);
+    }
+    // A valid body from the same user and address is now refused by the
+    // limiter; with validation first, the 400s would not have counted.
+    expect((await call("val-user", "val-ip")).status).toBe(429);
+  });
+
   it("different users from different addresses: nobody is limited", async () => {
     for (let i = 0; i < max + 2; i++) {
       expect((await call(`free-user-${i}`, `free-ip-${i}`)).status).toBe(200);
@@ -186,26 +217,6 @@ describe("POST /tasks/teams/:teamId/sync path buckets", () => {
     expect((await teamSync("teams-user", "teams-ip", "team-b")).status).toBe(200);
     // team-a is still exhausted.
     expect((await teamSync("teams-user", "teams-ip", "team-a")).status).toBe(429);
-  });
-});
-
-describe("window reset", () => {
-  it("reopens the install-relay quota only after the window elapsed", async () => {
-    vi.useFakeTimers();
-    try {
-      for (let i = 0; i < 3; i++) {
-        expect((await installRelay("win-user", "win-ip")).status).toBe(200);
-      }
-      expect((await installRelay("win-user", "win-ip")).status).toBe(429);
-      // Still inside the 60 s window that started at the first hit.
-      vi.advanceTimersByTime(59_000);
-      expect((await installRelay("win-user", "win-ip")).status).toBe(429);
-      // Past the window: the next call opens a fresh one.
-      vi.advanceTimersByTime(1_001);
-      expect((await installRelay("win-user", "win-ip")).status).toBe(200);
-    } finally {
-      vi.useRealTimers();
-    }
   });
 });
 
