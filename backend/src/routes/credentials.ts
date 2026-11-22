@@ -1,8 +1,9 @@
-import { Hono, type Context } from "hono";
+import { Hono } from "hono";
 import { z } from "zod";
 import { config } from "../config/index.js";
 import { requireAuth } from "../middleware/auth.js";
 import { rateLimit } from "../middleware/rate-limit.js";
+import { userKey } from "../middleware/rate-limit-keys.js";
 import { zValidate } from "../lib/validate.js";
 import { upsertCredential, listCredentials, deleteCredential, getCredential, isValidService, CredentialUnreadableError } from "../services/credentials.js";
 import { isUpstreamTimeout } from "../lib/upstream-timeout.js";
@@ -31,10 +32,8 @@ credentials.get("/", async (c) => {
   return c.json({ credentials: creds });
 });
 
-// Per user, in addition to the per-IP bucket the middleware always applies.
-// requireAuth ran before this, so the user id is in the context.
-const userKey = (c: Context<AppEnv>) => `user:${c.get("userId")!}`;
-
+// Per user (userKey from rate-limit-keys.ts), in addition to the per-IP
+// bucket the middleware always applies.
 // PUT /credentials — upsert a service credential, 10 writes per minute
 credentials.put("/", rateLimit({ max: 10, windowMs: 60_000, keyGenerator: userKey }), zValidate("json", upsertSchema), async (c) => {
   const userId = c.get("userId")!;

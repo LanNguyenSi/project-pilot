@@ -1,7 +1,7 @@
 ---
 type: invariant
 title: Request gating and session model
-description: Global CORS and security headers, CSRF registered per route prefix in app.ts, requireAuth registered per router, opaque hashed session tokens with SameSite Strict for password sign-in and Lax for GitHub sign-in, per-process rate limits on four public auth endpoints, the credential write and the forge magic-fill proxy keyed on the last X-Forwarded-For entry, and a CSP that only the frontend sets.
+description: Global CORS and security headers, CSRF registered per route prefix in app.ts, requireAuth registered per router, opaque hashed session tokens with SameSite Strict for password sign-in and Lax for GitHub sign-in, per-process rate limits on four public auth endpoints, the credential write, the forge magic-fill proxy and five expensive proxy routes keyed on the last X-Forwarded-For entry, and a CSP that only the frontend sets.
 tags: [auth, sessions, csrf, cors, rate-limit, headers, csp]
 timestamp: 2026-11-18T08:52:00Z
 sources:
@@ -10,6 +10,7 @@ sources:
   - backend/src/middleware/csrf.ts
   - backend/src/middleware/cors.ts
   - backend/src/middleware/rate-limit.ts
+  - backend/src/middleware/rate-limit-keys.ts
   - backend/src/middleware/security.ts
   - backend/src/routes/auth.ts
   - backend/src/routes/oauth.ts
@@ -41,8 +42,10 @@ all of them.
 - A session is an opaque random token. The server stores only its SHA-256
   hash, and nothing about it is signed.
 - Rate limits exist only on the four public auth endpoints, the credential
-  write and the forge magic-fill proxy, and their client address is correct
-  only behind exactly one reverse proxy that appends to `X-Forwarded-For`.
+  write, the forge magic-fill proxy and the five expensive proxy routes
+  (deploy probe-vps and install-relay, team sync, forge generate and
+  publish), and their client address is correct only behind exactly one
+  reverse proxy that appends to `X-Forwarded-For`.
 - The Content-Security-Policy comes from the frontend; the backend sends
   none.
 
@@ -75,11 +78,11 @@ success it sets `userId` on the context
 (`backend/src/middleware/auth.ts:28#"session.user.id"`).
 
 Each protected router registers it itself:
-`backend/src/routes/credentials.ts:13#"credentials.use("`,
+`backend/src/routes/credentials.ts:14#"credentials.use("`,
 `backend/src/routes/dashboard.ts:20#"dashboard.use("`,
-`backend/src/routes/forge.ts:19#"forge.use("`,
-`backend/src/routes/tasks.ts:38#"tasks.use("`, and
-`backend/src/routes/deploy.ts:82#"deploy.use("`. In the auth router only
+`backend/src/routes/forge.ts:20#"forge.use("`,
+`backend/src/routes/tasks.ts:40#"tasks.use("`, and
+`backend/src/routes/deploy.ts:84#"deploy.use("`. In the auth router only
 `GET /api/auth/me` is protected
 (`backend/src/routes/auth.ts:123#"auth.get("`). `GET /api/health` has no
 check (`backend/src/routes/health.ts:7#"health.get("`), and neither do the
@@ -132,7 +135,7 @@ frontend's `apiFetch` sends the header on every call, together with
 
 ## Rate limits
 
-Six routes are limited, each per minute:
+Eleven routes are limited, each per minute:
 
 - register, 5 (`backend/src/routes/auth.ts:84#"rateLimit({ max: 5, windowMs: 60_000 })"`),
 - login, 10, also per email (`backend/src/routes/auth.ts:98#"keyGenerator: emailKey"`),
@@ -140,11 +143,29 @@ Six routes are limited, each per minute:
 - reset-password, 5 (`backend/src/routes/auth.ts:195#"rateLimit({ max: 5, windowMs: 60_000 })"`),
 - `PUT /api/credentials`, 10, also per signed-in user id, so an account that
   writes from many addresses is still capped
-  (`backend/src/routes/credentials.ts:39#"keyGenerator: userKey"`),
+  (`backend/src/routes/credentials.ts:38#"keyGenerator: userKey"`),
 - `POST /api/forge/ai-assist/magic-fill`, 10, also per signed-in user id, so
   one account cannot spend the operator's LLM key from many addresses; the
   cheap `GET /api/forge/ai-assist/capabilities` probe stays unlimited
-  (`backend/src/routes/forge.ts:242#"keyGenerator: userKey"`).
+  (`backend/src/routes/forge.ts:259#"keyGenerator: userKey"`),
+- `POST /api/deploy/install-relay`, 3, also per signed-in user id: one call
+  streams a deploy-panel relay install that runs SSH on a third-party VPS for
+  up to about ten minutes
+  (`backend/src/routes/deploy.ts:300#"keyGenerator: userKey"`),
+- `POST /api/deploy/probe-vps`, 5, also per signed-in user id: each call
+  holds a deploy-panel SSH probe open for up to 45 s
+  (`backend/src/routes/deploy.ts:261#"keyGenerator: userKey"`),
+- `POST /api/tasks/teams/:teamId/sync`, 3, also per signed-in user id; the
+  bucket key carries the full path, so each team id gets its own buckets
+  (`backend/src/routes/tasks.ts:93#"keyGenerator: userKey"`),
+- `POST /api/forge/generate`, 5, also per signed-in user id, and
+  `POST /api/forge/publish`, 5, also per signed-in user id: both spend the
+  operator's AI and GitHub quota on project-forge and hold the request for up
+  to 60 s (`backend/src/routes/forge.ts:93#"keyGenerator: userKey"`,
+  `backend/src/routes/forge.ts:146#"keyGenerator: userKey"`).
+
+All per-user limits share one `userKey` generator defined once in
+`backend/src/middleware/rate-limit-keys.ts`.
 
 The limiter counts one bucket per client address and path
 (`backend/src/middleware/rate-limit.ts:74#"ip:${ip}:${c.req.path}"`) and,

@@ -1,8 +1,9 @@
-import { Hono, type Context } from "hono";
+import { Hono } from "hono";
 import { z } from "zod";
 import { config } from "../config/index.js";
 import { requireAuth } from "../middleware/auth.js";
 import { rateLimit } from "../middleware/rate-limit.js";
+import { userKey } from "../middleware/rate-limit-keys.js";
 import { urlString, zValidate } from "../lib/validate.js";
 import { getCredential } from "../services/credentials.js";
 import {
@@ -81,28 +82,38 @@ const generateSchema = z.object({
   targetUsers: z.array(z.string().max(500)).max(20).optional(),
 });
 
+// 5 per minute per client IP and per signed-in user: generate spends the
+// operator's AI quota on project-forge and holds the request for up to 60 s.
+const GENERATE_MAX_PER_MINUTE = 5;
+
 // POST /forge/generate — generate preview
-forge.post("/generate", zValidate("json", generateSchema), async (c) => {
-  const userId = c.get("userId")!;
-  const body = c.req.valid("json");
-  const result = await forgeRequest<{ sessionId: string; preview: unknown }>(userId, "/api/v1/generate", {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
+// The limiter runs before validation on purpose, like magic-fill below.
+forge.post(
+  "/generate",
+  rateLimit({ max: GENERATE_MAX_PER_MINUTE, windowMs: 60_000, keyGenerator: userKey }),
+  zValidate("json", generateSchema),
+  async (c) => {
+    const userId = c.get("userId")!;
+    const body = c.req.valid("json");
+    const result = await forgeRequest<{ sessionId: string; preview: unknown }>(userId, "/api/v1/generate", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
 
-  if (!result.ok) return c.json({ error: result.error }, result.status as any);
+    if (!result.ok) return c.json({ error: result.error }, result.status as any);
 
-  // Snapshot the preview tasks so they survive the (stateless) forge session
-  // and can later be migrated into agent-tasks by repo. Best-effort: a snapshot
-  // failure must not break the generate response the UI depends on.
-  try {
-    await saveForgeTaskSnapshot(userId, result.data.sessionId, extractPreviewTasks(result.data.preview));
-  } catch (err) {
-    console.warn(`[forge] failed to snapshot preview tasks for session ${result.data.sessionId}: ${err instanceof Error ? err.message : err}`);
-  }
+    // Snapshot the preview tasks so they survive the (stateless) forge session
+    // and can later be migrated into agent-tasks by repo. Best-effort: a snapshot
+    // failure must not break the generate response the UI depends on.
+    try {
+      await saveForgeTaskSnapshot(userId, result.data.sessionId, extractPreviewTasks(result.data.preview));
+    } catch (err) {
+      console.warn(`[forge] failed to snapshot preview tasks for session ${result.data.sessionId}: ${err instanceof Error ? err.message : err}`);
+    }
 
-  return c.json(result.data);
-});
+    return c.json(result.data);
+  },
+);
 
 // GET /forge/preview?sessionId= — get preview data
 forge.get("/preview", async (c) => {
@@ -124,28 +135,38 @@ const publishSchema = z.object({
   sessionId: z.string().regex(UUID_RE, "Invalid sessionId"),
 });
 
+// 5 per minute per client IP and per signed-in user: publish runs project-forge's
+// AI publish step and creates a GitHub repo under the operator's quota, up to 60 s.
+const PUBLISH_MAX_PER_MINUTE = 5;
+
 // POST /forge/publish — publish a previewed project
-forge.post("/publish", zValidate("json", publishSchema), async (c) => {
-  const userId = c.get("userId")!;
-  const { sessionId } = c.req.valid("json");
+// The limiter runs before validation on purpose, like magic-fill below.
+forge.post(
+  "/publish",
+  rateLimit({ max: PUBLISH_MAX_PER_MINUTE, windowMs: 60_000, keyGenerator: userKey }),
+  zValidate("json", publishSchema),
+  async (c) => {
+    const userId = c.get("userId")!;
+    const { sessionId } = c.req.valid("json");
 
-  const result = await forgeRequest<{ result: { repoUrl: string; cloneUrl: string; projectName: string } }>(userId, "/api/v1/publish", {
-    method: "POST",
-    body: JSON.stringify({ sessionId }),
-  });
+    const result = await forgeRequest<{ result: { repoUrl: string; cloneUrl: string; projectName: string } }>(userId, "/api/v1/publish", {
+      method: "POST",
+      body: JSON.stringify({ sessionId }),
+    });
 
-  if (!result.ok) return c.json({ error: result.error }, result.status as any);
+    if (!result.ok) return c.json({ error: result.error }, result.status as any);
 
-  // Bind the task snapshot to the repo it was just published to, so the Forge
-  // UI can offer "migrate tasks" keyed by repo. Best-effort.
-  try {
-    await linkForgeSnapshotToRepo(userId, sessionId, result.data.result.repoUrl);
-  } catch (err) {
-    console.warn(`[forge] failed to link snapshot for session ${sessionId}: ${err instanceof Error ? err.message : err}`);
-  }
+    // Bind the task snapshot to the repo it was just published to, so the Forge
+    // UI can offer "migrate tasks" keyed by repo. Best-effort.
+    try {
+      await linkForgeSnapshotToRepo(userId, sessionId, result.data.result.repoUrl);
+    } catch (err) {
+      console.warn(`[forge] failed to link snapshot for session ${sessionId}: ${err instanceof Error ? err.message : err}`);
+    }
 
-  return c.json(result.data);
-});
+    return c.json(result.data);
+  },
+);
 
 const migrateSchema = z.object({
   repoUrl: urlString(),
@@ -231,13 +252,9 @@ const magicFillSchema = z.object({
   prompt: z.string().min(1, "Prompt is required").max(2000, "Prompt too long"),
 });
 
-// Per user, in addition to the per-IP bucket the middleware always applies:
-// magic-fill spends the operator's LLM key on every call.
-// requireAuth ran before this, so the user id is in the context.
-const userKey = (c: Context<AppEnv>) => `user:${c.get("userId")!}`;
-
 // POST /forge/ai-assist/magic-fill — ask the AI to fill project form fields
-// 10 calls per minute per client IP and per signed-in user
+// 10 calls per minute per client IP and per signed-in user: magic-fill spends
+// the operator's LLM key on every call (userKey from rate-limit-keys.ts).
 // The limiter runs before validation on purpose, so an invalid body also counts against the quota.
 forge.post("/ai-assist/magic-fill", rateLimit({ max: 10, windowMs: 60_000, keyGenerator: userKey }), zValidate("json", magicFillSchema), async (c) => {
   const body = c.req.valid("json");

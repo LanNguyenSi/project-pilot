@@ -102,13 +102,13 @@ and its callers call it before their own `try` blocks:
 - `agentTasksRequest`, used by the `/api/tasks` proxy and the forge task
   migration (`backend/src/services/agent-tasks-client.ts:16-21#"getCredential(userId, "`),
 - `forgeRequest` in the forge proxy
-  (`backend/src/routes/forge.ts:25-26#"getCredential(userId, "`),
+  (`backend/src/routes/forge.ts:26-27#"getCredential(userId, "`),
 - `deployRequest` in the deploy proxy
-  (`backend/src/routes/deploy.ts:86-87#"getCredential(userId, "`),
+  (`backend/src/routes/deploy.ts:88-89#"getCredential(userId, "`),
 - the `probe-vps` and `install-relay` handlers of the deploy proxy, which call
   it directly before forwarding
-  (`backend/src/routes/deploy.ts:256#"getCredential(userId, "`,
-  `backend/src/routes/deploy.ts:288#"getCredential(userId, "`).
+  (`backend/src/routes/deploy.ts:267#"getCredential(userId, "`,
+  `backend/src/routes/deploy.ts:306#"getCredential(userId, "`).
 
 Every other caller lets the error reach `app.onError`, which answers 409 with
 code `credential_unreadable` and the message "Re-enter it in /settings"

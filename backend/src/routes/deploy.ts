@@ -2,6 +2,8 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { config } from "../config/index.js";
 import { requireAuth } from "../middleware/auth.js";
+import { rateLimit } from "../middleware/rate-limit.js";
+import { userKey } from "../middleware/rate-limit-keys.js";
 import { urlString, zValidate } from "../lib/validate.js";
 import { getCredential } from "../services/credentials.js";
 import { isUpstreamTimeout } from "../lib/upstream-timeout.js";
@@ -243,43 +245,59 @@ deploy.post("/preflight", zValidate("json", deployTriggerSchema), async (c) => {
   return c.json(result.data);
 });
 
+// 5 per minute per client IP and per signed-in user: each probe holds a
+// deploy-panel SSH probe on a third-party VPS open for up to 45 s.
+const PROBE_VPS_MAX_PER_MINUTE = 5;
+
 // POST /deploy/probe-vps — pre-install probe: test SSH reachability + auth
 // and capture the host-key fingerprint. Proxies to deploy-panel
 // POST /api/servers/probe-vps with a 45-second timeout (SSH probes can be
 // slow on distant or heavily-loaded hosts). SSH credentials live only in
 // the parsed-body variable for the duration of this handler and are NEVER
 // persisted, logged, or echoed in error responses.
-deploy.post("/probe-vps", zValidate("json", probeVpsBodySchema), async (c) => {
-  const userId = c.get("userId")!;
-  const body = c.req.valid("json");
+// The limiter runs before validation on purpose, like magic-fill.
+deploy.post(
+  "/probe-vps",
+  rateLimit({ max: PROBE_VPS_MAX_PER_MINUTE, windowMs: 60_000, keyGenerator: userKey }),
+  zValidate("json", probeVpsBodySchema),
+  async (c) => {
+    const userId = c.get("userId")!;
+    const body = c.req.valid("json");
 
-  const dpToken = await getCredential(userId, "deploy-panel");
-  if (!dpToken) {
-    return c.json(
-      {
-        error: "deploy_panel_not_connected",
-        message: "Connect deploy-panel first in Settings.",
-      },
-      409,
-    );
-  }
+    const dpToken = await getCredential(userId, "deploy-panel");
+    if (!dpToken) {
+      return c.json(
+        {
+          error: "deploy_panel_not_connected",
+          message: "Connect deploy-panel first in Settings.",
+        },
+        409,
+      );
+    }
 
-  const result = await deployRequest<unknown>(userId, "/api/servers/probe-vps", {
-    method: "POST",
-    body: JSON.stringify(body),
-    timeoutMs: 45_000,
-  });
-  if (!result.ok) return c.json({ error: result.error }, result.status as any);
-  return c.json(result.data);
-});
+    const result = await deployRequest<unknown>(userId, "/api/servers/probe-vps", {
+      method: "POST",
+      body: JSON.stringify(body),
+      timeoutMs: 45_000,
+    });
+    if (!result.ok) return c.json({ error: result.error }, result.status as any);
+    return c.json(result.data);
+  },
+);
+
+// 3 per minute per client IP and per signed-in user: one call streams a
+// deploy-panel relay install that runs SSH on a third-party VPS for up to ~10 min.
+const INSTALL_RELAY_MAX_PER_MINUTE = 3;
 
 // POST /deploy/install-relay — stream SSE relay-install progress from
 // deploy-panel. SSH credentials (sshPassword / sshPrivateKey / sshPassphrase)
 // are forwarded in the proxied request body and are NEVER written to the DB,
 // written to any log, or included in error responses. They exist only in the
 // `body` variable for the lifetime of this handler.
+// The limiter runs before validation on purpose, like magic-fill.
 deploy.post(
   "/install-relay",
+  rateLimit({ max: INSTALL_RELAY_MAX_PER_MINUTE, windowMs: 60_000, keyGenerator: userKey }),
   zValidate("json", installRelayBodySchema),
   async (c) => {
     const userId = c.get("userId")!;
