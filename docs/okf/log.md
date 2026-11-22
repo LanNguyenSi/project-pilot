@@ -2,6 +2,16 @@
 
 <!-- Add new entries at the top, newest first. -->
 
+- 2026-11-22T10:54:23Z, credential-trust-boundary and request-gating-and-sessions re-verified and
+  re-stamped after the bootstrap registration change (`backend/src/routes/auth.ts`,
+  `backend/src/services/auth.ts`: the user count and the create run in one transaction behind
+  a transaction-scoped advisory lock, the route's count is only the early refusal) and the
+  rate-limit change (`backend/src/middleware/rate-limit.ts`, `backend/src/routes/tasks.ts`: an
+  optional fixed `bucket` option, team sync pinned to `tasks:team-sync`). The registration,
+  lock, `bucket` and team-sync sentences, the eleven-route rate-limit list and the shifted
+  `auth.ts`, `rate-limit.ts` and `tasks.ts` citations were re-read at HEAD and match the code;
+  the session-token citations in credential-trust-boundary still point at the same code. No
+  claim or citation needed further correction.
 - 2026-11-22T08:02:23Z, credential-trust-boundary, forge-task-migration and request-gating-and-sessions
   re-verified and re-stamped after the per-user rate limits on the expensive proxy routes
   (`backend/src/middleware/rate-limit-keys.ts`, `routes/deploy.ts`, `routes/forge.ts`,
