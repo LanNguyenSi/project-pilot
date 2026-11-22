@@ -9,8 +9,22 @@ function makeApp(opts: Parameters<typeof rateLimit>[0]) {
   return app;
 }
 
-async function post(app: Hono, headers: Record<string, string>, body: unknown = {}) {
-  return app.request("/login", {
+// One limiter instance registered on several paths, so a test can tell
+// whether the bucket keys are per path or shared across paths.
+function makeMultiPathApp(opts: Parameters<typeof rateLimit>[0], paths: string[]) {
+  const app = new Hono();
+  const mw = rateLimit(opts);
+  for (const path of paths) app.post(path, mw, (c) => c.json({ ok: true }));
+  return app;
+}
+
+async function post(
+  app: Hono,
+  headers: Record<string, string>,
+  body: unknown = {},
+  path = "/login",
+) {
+  return app.request(path, {
     method: "POST",
     headers: { "content-type": "application/json", ...headers },
     body: JSON.stringify(body),
@@ -62,6 +76,66 @@ describe("rateLimit", () => {
     expect(a.status).toBe(200);
     expect(b.status).toBe(200);
     expect(c.status).toBe(429); // account-scoped bucket trips despite IP rotation
+  });
+
+  it("with bucket set, one client-IP bucket is shared across paths", async () => {
+    // No keyGenerator: only the IP bucket can produce the 429, so a 429 on
+    // the third path proves the bucket name replaced the path in the IP key.
+    const app = makeMultiPathApp({ max: 2, windowMs: 60_000, bucket: "fixed-bucket" }, ["/a", "/b", "/c"]);
+    const ip = { "x-forwarded-for": "192.0.2.11" };
+
+    expect((await post(app, ip, {}, "/a")).status).toBe(200);
+    expect((await post(app, ip, {}, "/b")).status).toBe(200);
+    expect((await post(app, ip, {}, "/c")).status).toBe(429);
+  });
+
+  it("with bucket set, one identity bucket is shared across paths", async () => {
+    // A fresh address per call: no IP bucket can fill up, so only the
+    // identity bucket can produce the 429 across three different paths.
+    const app = makeMultiPathApp(
+      { max: 2, windowMs: 60_000, keyGenerator: () => "user:bucketed", bucket: "fixed-bucket" },
+      ["/a", "/b", "/c"],
+    );
+
+    expect((await post(app, { "x-forwarded-for": "192.0.2.21" }, {}, "/a")).status).toBe(200);
+    expect((await post(app, { "x-forwarded-for": "192.0.2.22" }, {}, "/b")).status).toBe(200);
+    expect((await post(app, { "x-forwarded-for": "192.0.2.23" }, {}, "/c")).status).toBe(429);
+  });
+
+  it("with bucket set, two different identities keep separate buckets", async () => {
+    const app = makeMultiPathApp(
+      { max: 2, windowMs: 60_000, keyGenerator: (c) => (c.req.header("x-identity") ?? undefined), bucket: "fixed-bucket" },
+      ["/a"],
+    );
+    const who = (n: number, name: string) => ({
+      "x-forwarded-for": `192.0.2.${100 + n}`,
+      "x-identity": name,
+    });
+
+    expect((await post(app, who(1, "user:one"), {}, "/a")).status).toBe(200);
+    expect((await post(app, who(2, "user:one"), {}, "/a")).status).toBe(200);
+    expect((await post(app, who(3, "user:one"), {}, "/a")).status).toBe(429);
+    // A different identity on the same path and bucket: untouched quota.
+    expect((await post(app, who(4, "user:other"), {}, "/a")).status).toBe(200);
+  });
+
+  it("without bucket, the keys stay per path: one identity on three paths is not shared", async () => {
+    // Same identity, three different paths, fresh addresses: with the bucket
+    // option wrongly applied by default the third call would be 429 here.
+    const app = makeMultiPathApp(
+      { max: 2, windowMs: 60_000, keyGenerator: () => "user:perpath" },
+      ["/a", "/b", "/c"],
+    );
+
+    expect((await post(app, { "x-forwarded-for": "192.0.2.31" }, {}, "/a")).status).toBe(200);
+    expect((await post(app, { "x-forwarded-for": "192.0.2.32" }, {}, "/b")).status).toBe(200);
+    expect((await post(app, { "x-forwarded-for": "192.0.2.33" }, {}, "/c")).status).toBe(200);
+
+    // And repeating one and the same path still trips: the path really is
+    // present in both default keys, which stay byte-identical to before.
+    const ip = { "x-forwarded-for": "192.0.2.34" };
+    expect((await post(app, ip, {}, "/a")).status).toBe(200); // id bucket for /a now at 2
+    expect((await post(app, ip, {}, "/a")).status).toBe(429); // 3rd hit: id bucket for /a breached
   });
 });
 

@@ -160,9 +160,11 @@ Eleven routes are limited, each per minute:
 - `POST /api/deploy/probe-vps`, 5, also per signed-in user id: each call
   holds a deploy-panel SSH probe open for up to 45 s
   (`backend/src/routes/deploy.ts:261#"keyGenerator: userKey"`),
-- `POST /api/tasks/teams/:teamId/sync`, 3, also per signed-in user id; the
-  bucket key carries the full path, so each team id gets its own buckets
-  (`backend/src/routes/tasks.ts:93#"keyGenerator: userKey"`),
+- `POST /api/tasks/teams/:teamId/sync`, 3, also per signed-in user id, per
+  user across teams: the route pins both keys to the fixed bucket
+  `tasks:team-sync`, so the 3 per minute are shared by every team id and path
+  variant instead of restarting per team id
+  (`backend/src/routes/tasks.ts:93#"tasks:team-sync"`),
 - `POST /api/forge/generate`, 5, also per signed-in user id, and
   `POST /api/forge/publish`, 5, also per signed-in user id: both spend the
   operator's AI and GitHub quota on project-forge and hold the request for up
@@ -173,13 +175,17 @@ All per-user limits share one `userKey` generator defined once in
 `backend/src/middleware/rate-limit-keys.ts`.
 
 The limiter counts one bucket per client address and path
-(`backend/src/middleware/rate-limit.ts:74#"ip:${ip}:${c.req.path}"`) and,
+(`backend/src/middleware/rate-limit.ts:85#"ip:${ip}:${scope}"`) and,
 when a key generator is set, a second bucket per identity and path
-(`backend/src/middleware/rate-limit.ts:81#"id:${extra}:${c.req.path}"`). The
+(`backend/src/middleware/rate-limit.ts:92#"id:${extra}:${scope}"`). A route
+can pin both keys to one fixed bucket name with the `bucket` option
+(`backend/src/middleware/rate-limit.ts:75#"bucket?: string;"`), which
+replaces the path so all its variants share one quota; every route that
+does not set it keeps the path in both keys. The
 email key is read from the cached request body and normalized to lower case
 (`backend/src/routes/auth.ts:21-24#"body.email.toLowerCase().trim()"`). A
 breach answers 429 with `Retry-After`
-(`backend/src/middleware/rate-limit.ts:87-92#"429,"`).
+(`backend/src/middleware/rate-limit.ts:99-104#"429,"`).
 
 The client address is the last `X-Forwarded-For` entry
 (`backend/src/middleware/rate-limit.ts:31-39#"if (last) return last;"`), with

@@ -79,9 +79,9 @@ tasks.get("/teams", async (c) => {
   return c.json(result.data);
 });
 
-// 3 per minute per client IP and per signed-in user: one sync iterates over
-// every repo the user has on GitHub for up to 120 s on the agent-tasks side.
-// The bucket key carries the full path, so each team id gets its own buckets.
+// 3 per minute per client IP and per signed-in user, across all team ids:
+// one sync iterates over every repo the user has on GitHub for up to 120 s on
+// the agent-tasks side. The fixed bucket pins both keys to one shared name.
 const TEAM_SYNC_MAX_PER_MINUTE = 3;
 
 // POST /tasks/teams/:teamId/sync — sync projects from user's GitHub account
@@ -90,7 +90,7 @@ const TEAM_SYNC_MAX_PER_MINUTE = 3;
 // has on GitHub plus a create/update round per repo.
 tasks.post(
   "/teams/:teamId/sync",
-  rateLimit({ max: TEAM_SYNC_MAX_PER_MINUTE, windowMs: 60_000, keyGenerator: userKey }),
+  rateLimit({ max: TEAM_SYNC_MAX_PER_MINUTE, windowMs: 60_000, keyGenerator: userKey, bucket: "tasks:team-sync" }),
   async (c) => {
     const userId = c.get("userId")!;
     const teamId = c.req.param("teamId");

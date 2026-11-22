@@ -1,10 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // The real rate limiter is used here (forge-routes.test.ts and
-// tasks-routes.test.ts mock it away). Every upstream call is stubbed, so a
-// 429 can only come from the limiter. Every bucket key carries the request
-// path, so the five routes never share a bucket, and each case below uses
-// its own user ids and addresses so cases cannot tip each other over.
+// tasks-routes.test.ts mock it away, except for bucket-pinned routes). Every
+// upstream call is stubbed, so a 429 can only come from the limiter. Bucket
+// keys carry the request path, except team sync which pins the fixed name
+// "tasks:team-sync", so the five routes never share a bucket, and each case
+// below uses its own user ids and addresses so cases cannot tip each other
+// over.
 
 vi.mock("../src/config/index.js", () => ({
   config: {
@@ -205,18 +207,16 @@ describe.each(ROUTES)("$label rate limit", ({ max, call, invalidCall }) => {
   });
 });
 
-describe("POST /tasks/teams/:teamId/sync path buckets", () => {
-  it("keys the buckets on the full path: same user and address, two team ids are separate buckets", async () => {
-    // Fill team-a's user bucket to its max with one shared address.
+describe("POST /tasks/teams/:teamId/sync shared bucket", () => {
+  it("pins both keys to one fixed bucket: team ids share the quota", async () => {
+    // Fill the user's quota to its max with one shared address and team-a.
     for (let i = 0; i < 3; i++) {
       expect((await teamSync("teams-user", "teams-ip", "team-a")).status).toBe(200);
     }
-    // The first team-b call is the 4th for this user and address overall, so
-    // a path-independent bucket would answer 429 here; it does not: team ids
-    // get separate buckets.
-    expect((await teamSync("teams-user", "teams-ip", "team-b")).status).toBe(200);
-    // team-a is still exhausted.
-    expect((await teamSync("teams-user", "teams-ip", "team-a")).status).toBe(429);
+    // The first team-b call is the 4th for this user and address overall.
+    // A path-scoped bucket would restart the quota for the new team id;
+    // the fixed bucket name replaces the path, so it is refused instead.
+    expect((await teamSync("teams-user", "teams-ip", "team-b")).status).toBe(429);
   });
 });
 

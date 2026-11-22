@@ -16,9 +16,17 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
  *     Killed by: exact path/options assertion on each handler's agentTasksRequest call.
  */
 
-vi.mock("../src/middleware/rate-limit.js", () => ({
-  rateLimit: () => (_c: any, next: any) => next(),
-}));
+// Pass the limiter through everywhere except routes that pin a fixed bucket
+// (POST /teams/:teamId/sync pins "tasks:team-sync"): those run the REAL
+// limiter so the cross-team bucket behaviour is tested end to end.
+vi.mock("../src/middleware/rate-limit.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../src/middleware/rate-limit.js")>();
+  return {
+    ...actual,
+    rateLimit: (opts: Parameters<typeof actual.rateLimit>[0]) =>
+      opts.bucket ? actual.rateLimit(opts) : (_c: any, next: any) => next(),
+  };
+});
 
 // Mock requireAuth as a spy so individual tests can override it.
 vi.mock("../src/middleware/auth.js", () => ({
@@ -350,11 +358,27 @@ describe("POST /:taskId/comments — add comment", () => {
 
 // ─── POST /teams/:teamId/sync — GitHub sync ──────────────────────────────────
 
+// This route runs the REAL limiter with the fixed bucket "tasks:team-sync":
+// requests that must not share quota need a distinct user id AND a distinct
+// address; requests that must share quota reuse the user, the address, or
+// both. Counter keeps user ids and addresses unique across the whole file.
+let syncSeq = 0;
+const freshSyncIp = () => `192.0.2.${(syncSeq += 1)}`;
+const freshSyncUser = () => `sync-user-${(syncSeq += 1)}`;
+
 describe("POST /teams/:teamId/sync — sync GitHub repos into team", () => {
+  let current: { user: string; ip: string };
+  // The userId the mocked requireAuth injects, set per request by syncPost.
+  // (No per-request mockImplementationOnce here: unconsumed queued
+  // implementations would leak into the next test.)
+  let authUser: string;
+
   beforeEach(() => {
     vi.clearAllMocks();
+    current = { user: freshSyncUser(), ip: freshSyncIp() };
+    authUser = current.user;
     mockRequireAuth.mockImplementation(async (c: any, next: any) => {
-      c.set?.("userId", "user-a");
+      c.set?.("userId", authUser);
       await next();
     });
     mockTasksRequest.mockResolvedValue({
@@ -363,23 +387,34 @@ describe("POST /teams/:teamId/sync — sync GitHub repos into team", () => {
     });
   });
 
+  // One sync request; identity defaults to this test's fresh user and
+  // address.
+  function syncPost(teamId: string, opts: { user?: string; ip?: string } = {}) {
+    authUser = opts.user ?? current.user;
+    const ip = opts.ip ?? current.ip;
+    return tasks.request(`/teams/${teamId}/sync`, {
+      method: "POST",
+      headers: { "x-forwarded-for": ip },
+    });
+  }
+
   it("calls agentTasksRequest with POST and correct team path (Guards G + H)", async () => {
-    await makeRequest("/teams/team-xyz/sync", "POST");
+    await syncPost("team-xyz");
 
     expect(mockTasksRequest).toHaveBeenCalledWith(
-      "user-a",
+      current.user,
       "/api/teams/team-xyz/sync",
       expect.objectContaining({ method: "POST" }),
     );
   });
 
   it("passes caller userId (Guard G)", async () => {
-    await makeRequest("/teams/team-xyz/sync", "POST");
-    expect(mockTasksRequest.mock.calls[0]![0]).toBe("user-a");
+    await syncPost("team-xyz");
+    expect(mockTasksRequest.mock.calls[0]![0]).toBe(current.user);
   });
 
   it("uses extended timeout for sync operations (timeoutMs present in options)", async () => {
-    await makeRequest("/teams/team-xyz/sync", "POST");
+    await syncPost("team-xyz");
 
     const options = mockTasksRequest.mock.calls[0]![2] as { timeoutMs?: number };
     // Sync is slow (iterates all repos) — must use a generous timeout
@@ -387,7 +422,7 @@ describe("POST /teams/:teamId/sync — sync GitHub repos into team", () => {
   });
 
   it("proxies sync result to caller → 200", async () => {
-    const res = await makeRequest("/teams/team-xyz/sync", "POST");
+    const res = await syncPost("team-xyz");
     expect(res.status).toBe(200);
     const body = (await res.json()) as { synced: number; created: number };
     expect(body.synced).toBe(5);
@@ -398,8 +433,58 @@ describe("POST /teams/:teamId/sync — sync GitHub repos into team", () => {
       c.json({ error: "unauthorized" }, 401),
     );
 
-    const res = await makeRequest("/teams/team-xyz/sync", "POST");
+    const res = await syncPost("team-xyz");
     expect(res.status).toBe(401);
     expect(mockTasksRequest).not.toHaveBeenCalled();
+  });
+
+  it("fixed bucket: the 4th sync on ANOTHER team id is 429 with Retry-After", async () => {
+    // Fresh address per call: no IP bucket can fill up, so only the shared
+    // per-user bucket can answer 429 — which requires the bucket name to
+    // have replaced the path in the identity key across team ids.
+    for (let i = 0; i < 3; i++) {
+      expect((await syncPost("team-a", { ip: freshSyncIp() })).status).toBe(200);
+    }
+    const res = await syncPost("team-b", { ip: freshSyncIp() });
+    expect(res.status).toBe(429);
+    expect(Number(res.headers.get("retry-after"))).toBeGreaterThan(0);
+    expect(await res.json()).toEqual({
+      error: "rate_limited",
+      message: "Too many requests. Please try again later.",
+    });
+    // The refused team-b call never reached the handler.
+    expect(mockTasksRequest).toHaveBeenCalledTimes(3);
+  });
+
+  it("fixed bucket: a path variant of an exhausted team id is 429 too", async () => {
+    // %2D decodes to "-": same route and team id, different raw request
+    // path. A path-scoped key would treat it as a fresh bucket.
+    for (let i = 0; i < 3; i++) {
+      expect((await syncPost("t-1", { ip: freshSyncIp() })).status).toBe(200);
+    }
+    const res = await syncPost("t%2D1", { ip: freshSyncIp() });
+    expect(res.status).toBe(429);
+  });
+
+  it("fixed bucket: a second user is not limited by the first user's quota", async () => {
+    // First user exhausts the per-user quota on team-a.
+    for (let i = 0; i < 3; i++) {
+      expect((await syncPost("team-a", { ip: freshSyncIp() })).status).toBe(200);
+    }
+    expect((await syncPost("team-a", { ip: freshSyncIp() })).status).toBe(429);
+
+    // Different user, fresh address: full quota available.
+    expect((await syncPost("team-a", { user: freshSyncUser(), ip: freshSyncIp() })).status).toBe(200);
+  });
+
+  it("fixed bucket: one IP is capped across teams even for a fresh user", async () => {
+    // The IP bucket carries the same fixed name (accepted trade-off: users
+    // behind one NAT share 3 per minute). One shared address, three
+    // distinct users on distinct team ids: the 4th caller is refused.
+    const ip = freshSyncIp();
+    for (const team of ["team-a", "team-b", "team-c"]) {
+      expect((await syncPost(team, { user: freshSyncUser(), ip })).status).toBe(200);
+    }
+    expect((await syncPost("team-d", { user: freshSyncUser(), ip })).status).toBe(429);
   });
 });
