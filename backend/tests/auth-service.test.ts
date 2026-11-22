@@ -1,10 +1,36 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createHash } from "node:crypto";
 
+// Every database step of the registration transaction appends its name here,
+// so a test can pin the order in which the service takes the lock, counts and
+// creates, and whether bcrypt hashing happens before the transaction opens.
+const { callOrder, txMock } = vi.hoisted(() => {
+  const callOrder: string[] = [];
+  const txMock = {
+    $executeRaw: vi.fn(),
+    user: { count: vi.fn(), create: vi.fn() },
+  };
+  return { callOrder, txMock };
+});
+
 vi.mock("../src/lib/prisma.js", () => ({
   prisma: {
-    user: { findUnique: vi.fn(), create: vi.fn() },
+    // The create mock is shared with the transaction client, so registerUser's
+    // insert is observable on `prisma.user.create` as before.
+    user: {
+      findUnique: vi.fn(),
+      create: txMock.user.create,
+      // Present so that a count on the outer client is recorded, not a TypeError.
+      count: vi.fn(async () => {
+        callOrder.push("count-outer");
+        return 0;
+      }),
+    },
     session: { create: vi.fn() },
+    $transaction: vi.fn(async (fn: (tx: typeof txMock) => unknown) => {
+      callOrder.push("transaction");
+      return fn(txMock);
+    }),
   },
 }));
 
@@ -24,7 +50,14 @@ vi.mock("../src/config/index.js", () => ({
 // named export, so the module is partially mocked instead.
 vi.mock("bcryptjs", async (importOriginal) => {
   const actual = await importOriginal<typeof import("bcryptjs")>();
-  return { ...actual, compare: vi.fn(actual.compare) };
+  return {
+    ...actual,
+    compare: vi.fn(actual.compare),
+    hash: vi.fn(async (...args: Parameters<typeof actual.hash>) => {
+      callOrder.push("hash");
+      return actual.hash(...args);
+    }),
+  };
 });
 
 import { prisma } from "../src/lib/prisma.js";
@@ -36,6 +69,7 @@ import {
   hashToken,
   hashPassword,
   AuthError,
+  RegistrationClosedError,
 } from "../src/services/auth.js";
 
 const mockCompare = vi.mocked(compare);
@@ -44,10 +78,25 @@ const mockUser = prisma.user as unknown as {
   findUnique: ReturnType<typeof vi.fn>;
   create: ReturnType<typeof vi.fn>;
 };
+const mockTx = txMock;
 
 describe("auth service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    callOrder.length = 0;
+    // Empty User table and a lock that records itself, unless a test says otherwise.
+    mockTx.$executeRaw.mockImplementation(async () => {
+      callOrder.push("lock");
+      return 0;
+    });
+    mockTx.user.count.mockImplementation(async () => {
+      callOrder.push("count");
+      return 0;
+    });
+    mockTx.user.create.mockImplementation(async () => {
+      callOrder.push("create");
+      return { id: "u1", email: "new@test.com", name: null, createdAt: new Date() };
+    });
   });
 
   describe("registerUser", () => {
@@ -90,6 +139,56 @@ describe("auth service", () => {
       expect((caughtError as AuthError).code).toBe("registration_failed");
       // create must not be called when the user already exists
       expect(mockUser.create).not.toHaveBeenCalled();
+    });
+
+    it("runs hash, then the transaction, then lock, count and create, in that order", async () => {
+      mockUser.findUnique.mockResolvedValue(null);
+
+      await registerUser("new@test.com", "password123");
+
+      expect(callOrder).toEqual(["hash", "transaction", "lock", "count", "create"]);
+    });
+
+    it("takes a transaction-scoped advisory lock on the transaction client, not the outer client", async () => {
+      mockUser.findUnique.mockResolvedValue(null);
+
+      await registerUser("new@test.com", "password123");
+
+      expect(mockTx.$executeRaw).toHaveBeenCalledOnce();
+      // A tagged template call: the first argument is the strings array.
+      const [strings, key] = mockTx.$executeRaw.mock.calls[0] as [string[], number];
+      expect(strings.join("?")).toBe("SELECT pg_advisory_xact_lock(?)");
+      expect(Number.isInteger(key)).toBe(true);
+    });
+
+    it("throws RegistrationClosedError and creates nothing when a user exists inside the transaction", async () => {
+      mockUser.findUnique.mockResolvedValue(null);
+      // The earlier request committed between this one's email check and its lock.
+      mockTx.user.count.mockImplementation(async () => {
+        callOrder.push("count");
+        return 1;
+      });
+
+      let caughtError: unknown;
+      try {
+        await registerUser("new@test.com", "password123");
+      } catch (e) {
+        caughtError = e;
+      }
+
+      expect(caughtError).toBeInstanceOf(RegistrationClosedError);
+      expect(caughtError).toBeInstanceOf(AuthError);
+      expect((caughtError as AuthError).code).toBe("registration_closed");
+      expect(mockTx.user.create).not.toHaveBeenCalled();
+      expect(callOrder).toEqual(["hash", "transaction", "lock", "count"]);
+    });
+
+    it("does not open a transaction or hash when the email is already taken", async () => {
+      mockUser.findUnique.mockResolvedValue({ id: "existing", email: "taken@test.com" });
+
+      await expect(registerUser("taken@test.com", "password123")).rejects.toBeInstanceOf(AuthError);
+
+      expect(callOrder).toEqual([]);
     });
   });
 
