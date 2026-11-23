@@ -14,12 +14,14 @@ interface BadgeProps {
   dot?: boolean;
   children: React.ReactNode;
   className?: string;
+  /** Allow the text to wrap onto several lines (default: a single line). */
+  wrap?: boolean;
 }
 
-export function Badge({ variant = "neutral", dot = false, children, className = "" }: BadgeProps) {
+export function Badge({ variant = "neutral", dot = false, children, className = "", wrap = false }: BadgeProps) {
   return (
     <span
-      className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-badge text-xs font-medium ${variantStyles[variant]} ${className}`}
+      className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-badge text-xs font-medium ${wrap ? "" : "whitespace-nowrap"} ${variantStyles[variant]} ${className}`}
     >
       {dot && (
         <span className="h-1.5 w-1.5 rounded-full bg-current" />

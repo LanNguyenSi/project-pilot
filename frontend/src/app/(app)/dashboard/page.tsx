@@ -261,7 +261,7 @@ function StatCard({ stat: s, index }: { stat: StatItem; index: number }) {
       style={{ "--delay": `${index * 40}ms` } as React.CSSProperties}
     >
       <Card noPadding variant="elevated" className={`p-5 h-full ${tint.bg}`}>
-        <div className="flex items-center justify-between mb-2">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
           <span className="text-label text-content-tertiary flex items-center gap-1.5">
             <span className={`inline-block h-1.5 w-1.5 rounded-full ${tint.dot} bg-current`} />
             {s.label}
@@ -278,7 +278,9 @@ function StatCard({ stat: s, index }: { stat: StatItem; index: number }) {
         </div>
         <p className="text-2xl font-semibold text-content-primary mt-1">
           {s.state === "not_configured" ? (
-            "·"
+            // Not configured: the value does not exist, so show a word like the
+            // error branch instead of the dot.
+            <span className="text-base font-medium text-content-secondary">Not set</span>
           ) : s.state === "error" ? (
             // Error state: the value is unknown because the service could not
             // be reached, so show the word instead of the dot. The backend's
