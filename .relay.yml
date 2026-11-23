@@ -29,7 +29,7 @@ post_update:
   # that stays down fails the step, which fails the deploy and rolls back.
   - >-
     i=0;
-    until docker compose -f docker-compose.prod.yml exec -T frontend node -e "fetch('http://localhost:3000').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))";
+    until docker compose -f docker-compose.prod.yml exec -T frontend node -e "fetch('http://localhost:3000', { signal: AbortSignal.timeout(3000) }).then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))";
     do
     i=$((i+1));
     if [ $i -ge 30 ]; then echo "deploy failed, frontend :3000 still failing after 30 attempts, 2s apart" >&2; exit 1; fi;

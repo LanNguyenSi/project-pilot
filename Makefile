@@ -47,8 +47,9 @@ db-push:
 # `build --pull`, build/up, `prisma db push` without a data-loss flag,
 # then bounded waits on the backend `/api/health` and on the frontend's
 # port 3000). A destructive schema change makes the push fail and the
-# deploy exit non-zero. A pull failure fails the deploy before anything
-# has changed, so retrying is safe.
+# deploy exit non-zero. `git pull` has already run at that point, and a
+# pull failure fails before any image is built or any container is
+# restarted, so a retry is safe.
 HEALTH_TRIES ?= 30
 HEALTH_INTERVAL ?= 2
 
@@ -69,7 +70,7 @@ deploy:
 		sleep $(HEALTH_INTERVAL); \
 	done; \
 	i=0; \
-	until docker compose -f docker-compose.prod.yml exec -T frontend node -e "fetch('http://localhost:3000').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"; do \
+	until docker compose -f docker-compose.prod.yml exec -T frontend node -e "fetch('http://localhost:3000', { signal: AbortSignal.timeout(3000) }).then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"; do \
 		i=$$((i+1)); \
 		if [ $$i -ge $(HEALTH_TRIES) ]; then \
 			echo "deploy failed: frontend :3000 still failing after $(HEALTH_TRIES) attempts, $(HEALTH_INTERVAL)s apart" >&2; exit 1; \

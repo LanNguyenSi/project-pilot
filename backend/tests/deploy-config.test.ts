@@ -289,13 +289,23 @@ describe("frontend health gate in both deploy paths", () => {
   const deployRecipe = makefileDeployTarget();
 
   // The same check as the frontend image's HEALTHCHECK: the standalone
-  // server must answer on port 3000 before the deploy counts as done.
+  // server must answer on port 3000 before the deploy counts as done. Each
+  // attempt carries a 3 s AbortSignal timeout, the same budget as the image
+  // HEALTHCHECK, so a frontend that accepts the connection but never answers
+  // fails one attempt in 3 s instead of waiting for fetch's own timeout.
   const waitCmd =
-    /docker compose -f docker-compose\.prod\.yml exec -T frontend node -e "fetch\('http:\/\/localhost:3000'\)/;
+    /docker compose -f docker-compose\.prod\.yml exec -T frontend node -e "fetch\('http:\/\/localhost:3000', \{ signal: AbortSignal\.timeout\(3000\) \}\)/;
 
   it("make deploy waits a bounded number of tries for the frontend", () => {
     expect(deployRecipe).toMatch(waitCmd);
     expect(deployRecipe).toMatch(/frontend .*HEALTH_TRIES.*attempts/s);
+  });
+
+  // Without the signal a hung attempt (TCP accepted, no response) costs the
+  // full fetch timeout per try instead of 3 s.
+  it("both gates abort a hung attempt after 3 s", () => {
+    expect(countMatches(deployRecipe, /AbortSignal\.timeout\(3000\)/g)).toBe(1);
+    expect(countMatches(relay, /AbortSignal\.timeout\(3000\)/g)).toBe(1);
   });
 
   it(".relay.yml post_update waits a bounded number of tries for the frontend, after the schema push", () => {
