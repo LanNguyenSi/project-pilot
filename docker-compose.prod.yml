@@ -21,6 +21,13 @@ services:
     image: postgres:16-alpine
     container_name: project-pilot-db
     restart: unless-stopped
+    # Every service blocks privilege gain at exec with no-new-privileges.
+    # db deliberately gets no cap_drop: [ALL] (unlike backend and frontend):
+    # the postgres entrypoint starts as root, chowns the data directory and
+    # drops to the `postgres` user with gosu, which needs the CHOWN, SETUID,
+    # SETGID, DAC_OVERRIDE and FOWNER capabilities; dropping them would break
+    # the container at start.
+    security_opt: ["no-new-privileges:true"]
     logging: *default-logging
     mem_limit: 1g
     cpus: "1.0"
@@ -44,6 +51,11 @@ services:
       dockerfile: backend/Dockerfile
     container_name: project-pilot-backend
     restart: unless-stopped
+    # The node services run as the image's own `node` user and need no
+    # capability, so they drop all of them and block setuid/exec privilege
+    # gain (see the db service for why it keeps its capabilities).
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
     logging: *default-logging
     mem_limit: 768m
     cpus: "1.0"
@@ -90,6 +102,8 @@ services:
         NEXT_PUBLIC_DEPSIGHT_URL: https://depsight.opentriologue.ai
     container_name: project-pilot-frontend
     restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
     logging: *default-logging
     mem_limit: 512m
     cpus: "1.0"

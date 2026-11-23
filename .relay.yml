@@ -2,6 +2,19 @@ name: project-pilot
 health: /api/health
 health_port: 3001
 compose_file: docker-compose.prod.yml
+# agent-relay runs `pre_update` before `git pull`, with the `.relay.yml` that
+# is on the host before the deploy, so the deploy that introduces these lines
+# still runs the previous (empty) pre_update: the first automatic refresh
+# happens one deploy later. A pull failure fails the deploy before anything
+# has changed (nothing is pulled, built or started yet), so the operator can
+# simply retry.
+pre_update:
+  # agent-relay builds and runs without `--pull` and never pulls the postgres
+  # image itself, so without this a deploy rebuilds on stale base layers and
+  # keeps a stale database image forever. `node:22-alpine` is the base both
+  # Dockerfiles name (a structural test pins the pairing).
+  - docker compose -f docker-compose.prod.yml pull db
+  - docker pull node:22-alpine
 post_update:
   # `prisma db push` runs without a data-loss override flag. A change that would lose
   # data (dropping a non-empty column or table, adding a UNIQUE constraint over
@@ -10,6 +23,18 @@ post_update:
   # a database backup first (`make backup`; see "Backup and restore" in
   # docs/configuration.md).
   - docker compose -f docker-compose.prod.yml exec -e HOME=/tmp backend npx prisma db push --schema=prisma/schema.prisma --skip-generate
+  # The frontend gate, after the schema push: the deploy is only done when the
+  # frontend container answers on port 3000 (the same check as the frontend
+  # image's HEALTHCHECK). Bounded retries like the backend wait; a frontend
+  # that stays down fails the step, which fails the deploy and rolls back.
+  - >-
+    i=0;
+    until docker compose -f docker-compose.prod.yml exec -T frontend node -e "fetch('http://localhost:3000').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))";
+    do
+    i=$((i+1));
+    if [ $i -ge 30 ]; then echo "deploy failed, frontend :3000 still failing after 30 attempts, 2s apart" >&2; exit 1; fi;
+    sleep 2;
+    done
 # rollback restores the code only: schema changes and rows already written stay in
 # the database. Restoring data needs a dump (see "Backup and restore" in
 # docs/configuration.md).
