@@ -29,13 +29,13 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("Settings service card", () => {
-  it("wraps the header row and keeps the action group from shrinking", async () => {
+  it("wraps the header row and lets the action group shrink", async () => {
     render(<SettingsPage />);
     const badge = await screen.findByText("Connected");
     const actions = badge.parentElement as HTMLElement;
     const header = actions.parentElement as HTMLElement;
     expect(header).toHaveClass("flex-wrap", "gap-2");
-    expect(actions).toHaveClass("shrink-0");
+    expect(actions).not.toHaveClass("shrink-0");
   });
 
   it("lets a long test-result error wrap inside its badge", async () => {

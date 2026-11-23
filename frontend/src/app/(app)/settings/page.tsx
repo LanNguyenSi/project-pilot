@@ -130,7 +130,7 @@ export default function SettingsPage() {
                   <p className="text-xs text-content-tertiary">{hint}</p>
                 </div>
                 {existing && (
-                  <div className="flex items-center gap-3 shrink-0">
+                  <div className="flex items-center gap-3">
                     {testResults[key] ? (
                       <Badge variant={testResults[key].valid ? "success" : "error"} dot wrap>
                         {testResults[key].valid ? "Valid" : testResults[key].error || "Invalid"}
