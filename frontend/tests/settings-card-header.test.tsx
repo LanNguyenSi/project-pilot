@@ -36,6 +36,7 @@ describe("Settings service card", () => {
     const header = actions.parentElement as HTMLElement;
     expect(header).toHaveClass("flex-wrap", "gap-2");
     expect(actions).not.toHaveClass("shrink-0");
+    expect(actions).not.toHaveClass("flex-none");
   });
 
   it("lets a long test-result error wrap inside its badge", async () => {
