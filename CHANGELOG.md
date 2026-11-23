@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Five small UI fixes.** The "Delete server" confirm on `/deploys` now uses the danger button style like the other delete confirms. `Badge` keeps its text on one line by default (`whitespace-nowrap`) so status pills such as "Not configured" no longer break into two lines at 390 px; a new `wrap` prop allows wrapping, and the settings test-result badge uses it so a long error string still wraps. Dashboard stat cards with a service that is not configured show "Not set" instead of the middle dot (a connected card without a value keeps the dot), and their header row wraps. The `/settings` service card header wraps so the action group moves below the title at 390 px. The `/forge` project card description carries its full text as `title`. Pinned by `frontend/tests/badge.test.tsx`, `deploys-delete-server-danger.test.tsx`, `dashboard-stat-card.test.tsx`, `settings-card-header.test.tsx` and `forge-description-title.test.tsx`. No operator step.
+
 ### Security
 
 - **The `POST /api/tasks/teams/:teamId/sync` rate limit is per user across teams, not per team id.** Both bucket keys used to carry the full request path, so its 3 per minute applied separately to every team id (and to every path spelling of one team id): a signed-in user could hold any number of the long team-sync upstream operations (up to 120 s each) open at once by rotating team ids. The limiter gained an optional `bucket` name that replaces the path in both the client-IP and the per-user key, and the route pins it to `tasks:team-sync`, so one signed-in user gets 3 syncs per minute across all team ids and variants (the IP bucket shares the name too, so several users behind one address share 3 per minute per IP, as on every other limited route). Every other limited route passes no bucket and its keys stay byte-identical. Pinned by `backend/tests/rate-limit.test.ts` and `backend/tests/tasks-routes.test.ts`. No operator step.

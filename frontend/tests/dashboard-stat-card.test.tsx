@@ -85,9 +85,21 @@ describe("dashboard error-state stat cards", () => {
     expect(word).not.toHaveClass("text-content-tertiary");
   });
 
-  it("keeps the dot on a not-configured card", async () => {
+  it("shows the word Not set, not the dot, on a not-configured card", async () => {
     await renderWith(errorSummary);
-    expect(cardFor("Apps").textContent).toContain("·");
+    for (const label of ["Servers", "Apps"]) {
+      const card = cardFor(label);
+      expect(card.textContent).toContain("Not set");
+      expect(card.textContent).not.toContain("·");
+    }
+    const word = screen.getAllByText("Not set")[0];
+    expect(word).toHaveClass("text-content-secondary", "text-base", "font-medium");
+  });
+
+  it("lets the card header row wrap so a long label and the badge never overflow", async () => {
+    await renderWith(errorSummary);
+    const row = screen.getByText("Servers").parentElement as HTMLElement;
+    expect(row).toHaveClass("flex-wrap", "gap-2");
   });
 });
 

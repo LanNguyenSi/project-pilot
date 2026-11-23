@@ -199,7 +199,7 @@ export default function ForgePage() {
               >
                 <h2 className="font-medium text-sm text-content-primary">{p.projectName}</h2>
                 {p.description && (
-                  <p className="text-xs text-content-secondary mt-1 line-clamp-2">{p.description}</p>
+                  <p className="text-xs text-content-secondary mt-1 line-clamp-2" title={p.description}>{p.description}</p>
                 )}
                 <p className="text-xs text-content-tertiary mt-1">
                   {new Date(p.createdAt).toLocaleDateString()}

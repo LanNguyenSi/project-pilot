@@ -124,15 +124,15 @@ export default function SettingsPage() {
           const existing = credentials.find((c) => c.service === key);
           return (
             <Card key={key}>
-              <div className="flex items-center justify-between mb-3">
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                 <div>
                   <h2 className="font-medium text-sm text-content-primary">{label}</h2>
                   <p className="text-xs text-content-tertiary">{hint}</p>
                 </div>
                 {existing && (
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 shrink-0">
                     {testResults[key] ? (
-                      <Badge variant={testResults[key].valid ? "success" : "error"} dot>
+                      <Badge variant={testResults[key].valid ? "success" : "error"} dot wrap>
                         {testResults[key].valid ? "Valid" : testResults[key].error || "Invalid"}
                       </Badge>
                     ) : (

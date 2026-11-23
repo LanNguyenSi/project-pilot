@@ -645,6 +645,7 @@ export default function DeploysPage() {
             : ""
         }
         confirmLabel="Delete"
+        variant="danger"
         loading={deleteServerSubmitting}
       />
 
