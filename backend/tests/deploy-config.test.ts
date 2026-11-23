@@ -22,6 +22,43 @@ const code = (text: string) =>
 const countMatches = (text: string, re: RegExp) =>
   (text.match(re) ?? []).length;
 
+// Service blocks from the production compose file: the keys indented by
+// exactly two spaces under `services:`, each block running to the next such
+// key and ending where the file dedents to a top-level key.
+const serviceBlocks = (prod: string): Array<[string, string[]]> => {
+  const lines = prod.split("\n");
+  const start = lines.findIndex((l) => /^services:\s*$/.test(l));
+  expect(start).toBeGreaterThanOrEqual(0);
+  const blocks: Array<[string, string[]]> = [];
+  let current: string[] | null = null;
+  for (const l of lines.slice(start + 1)) {
+    if (l.trim() !== "" && !/^\s/.test(l)) break;
+    const name = l.match(/^ {2}([^\s:#][^:]*):\s*$/)?.[1];
+    if (name !== undefined) {
+      current = [];
+      blocks.push([name, current]);
+    } else if (current !== null) {
+      current.push(l);
+    }
+  }
+  return blocks;
+};
+
+// The deploy target's recipe only: its tab-indented block, so the dev
+// targets' pushes are not part of the parsed text.
+const makefileDeployTarget = () => {
+  const lines = read("Makefile").split("\n");
+  const start = lines.findIndex((l) => /^deploy:/.test(l));
+  expect(start).toBeGreaterThanOrEqual(0);
+  const recipe: string[] = [];
+  for (const l of lines.slice(start + 1)) {
+    if (/^\t/.test(l)) recipe.push(l);
+    else if (l.trim() === "") continue;
+    else break;
+  }
+  return code(recipe.join("\n"));
+};
+
 describe("backend image start command", () => {
   const dockerfile = code(read("backend/Dockerfile"));
   const cmdLines = dockerfile.split("\n").filter((l) => /^(CMD|ENTRYPOINT)\b/.test(l));
@@ -62,21 +99,6 @@ describe("production schema step", () => {
 });
 
 describe("production schema steps skip client generation", () => {
-  // The deploy target's recipe only: its tab-indented block, so the dev
-  // targets' pushes are not part of the parsed text.
-  const makefileDeployTarget = () => {
-    const lines = read("Makefile").split("\n");
-    const start = lines.findIndex((l) => /^deploy:/.test(l));
-    expect(start).toBeGreaterThanOrEqual(0);
-    const recipe: string[] = [];
-    for (const l of lines.slice(start + 1)) {
-      if (/^\t/.test(l)) recipe.push(l);
-      else if (l.trim() === "") continue;
-      else break;
-    }
-    return code(recipe.join("\n"));
-  };
-
   // Lines that invoke the CLI, not lines that merely mention `prisma db push`
   // in a comment or an echo: the comments and messages carry no `npx` call.
   const pushCalls = (text: string) =>
@@ -149,30 +171,8 @@ describe("production compose project", () => {
 describe("production resource limits", () => {
   const prod = code(read("docker-compose.prod.yml"));
 
-  // Service blocks from the file itself (never a hard-coded list): the keys
-  // indented by exactly two spaces under `services:`, each block running to
-  // the next such key and ending where the file dedents to a top-level key.
-  const serviceBlocks = (): Array<[string, string[]]> => {
-    const lines = prod.split("\n");
-    const start = lines.findIndex((l) => /^services:\s*$/.test(l));
-    expect(start).toBeGreaterThanOrEqual(0);
-    const blocks: Array<[string, string[]]> = [];
-    let current: string[] | null = null;
-    for (const l of lines.slice(start + 1)) {
-      if (l.trim() !== "" && !/^\s/.test(l)) break;
-      const name = l.match(/^ {2}([^\s:#][^:]*):\s*$/)?.[1];
-      if (name !== undefined) {
-        current = [];
-        blocks.push([name, current]);
-      } else if (current !== null) {
-        current.push(l);
-      }
-    }
-    return blocks;
-  };
-
   it("every service with mem_limit also caps CPU, each cpus a number in (0, 1]", () => {
-    const blocks = serviceBlocks();
+    const blocks = serviceBlocks(prod);
     // An empty or broken parse must fail here, not pass vacuously.
     expect(blocks.length).toBeGreaterThanOrEqual(3);
     let withMemLimit = 0;
@@ -189,5 +189,131 @@ describe("production resource limits", () => {
       expect(value).toBeLessThanOrEqual(1);
     }
     expect(withMemLimit).toBeGreaterThanOrEqual(3);
+  });
+});
+
+describe("production container hardening", () => {
+  const prod = code(read("docker-compose.prod.yml"));
+  const bodyOf = (name: string) => {
+    const found = serviceBlocks(prod).find(([n]) => n === name);
+    expect(found, `service ${name} not found`).toBeDefined();
+    return found![1].join("\n");
+  };
+
+  // Every container blocks exec-time privilege gain (setuid/setgid binaries,
+  // file capabilities).
+  it("every service sets security_opt with no-new-privileges", () => {
+    const blocks = serviceBlocks(prod);
+    // An empty or broken parse must fail here, not pass vacuously.
+    expect(blocks.length).toBeGreaterThanOrEqual(3);
+    for (const [name, lines] of blocks) {
+      const text = lines.join("\n");
+      expect(text, `${name}: no security_opt`).toMatch(/security_opt:/);
+      expect(text, `${name}: security_opt without no-new-privileges`).toMatch(
+        /no-new-privileges:true/,
+      );
+    }
+  });
+
+  it("backend and frontend drop every capability", () => {
+    for (const name of ["backend", "frontend"]) {
+      const text = bodyOf(name);
+      expect(text, `${name}: no cap_drop`).toMatch(
+        /cap_drop:\s*\[\s*ALL\s*\]|cap_drop:\s*\n\s*-\s*ALL\b/,
+      );
+    }
+  });
+
+  // The postgres entrypoint starts as root and uses gosu to drop to the
+  // `postgres` user and chown the data directory, which needs CHOWN, SETUID,
+  // SETGID, DAC_OVERRIDE and FOWNER (commented in the compose file), so db
+  // keeps its capabilities and only gets security_opt.
+  it("db keeps its capabilities: no cap_drop on the db service", () => {
+    const text = bodyOf("db");
+    expect(text).not.toMatch(/cap_drop/);
+    expect(text).toMatch(/no-new-privileges:true/);
+  });
+});
+
+describe("deploy refreshes the images it builds on", () => {
+  const relay = code(read(".relay.yml"));
+  const deployRecipe = makefileDeployTarget();
+
+  it("make deploy pulls the db image and builds with --pull", () => {
+    expect(deployRecipe).toMatch(
+      /docker compose -f docker-compose\.prod\.yml pull db(?=\s|$)/,
+    );
+    expect(deployRecipe).toMatch(
+      /docker compose -f docker-compose\.prod\.yml build --pull(?=\s|$)/,
+    );
+  });
+
+  const preUpdate = () => {
+    const start = relay.indexOf("pre_update:");
+    expect(start).toBeGreaterThanOrEqual(0);
+    return relay.slice(start, relay.indexOf("post_update:"));
+  };
+
+  it(".relay.yml pre_update pulls the compose db service's image", () => {
+    expect(preUpdate()).toMatch(
+      /docker compose -f docker-compose\.prod\.yml pull db(?=\s|$)/,
+    );
+    // `pull db` refreshes a base image only because db pins an `image:`.
+    const db = serviceBlocks(code(read("docker-compose.prod.yml"))).find(
+      ([n]) => n === "db",
+    );
+    expect(db?.[1].join("\n")).toMatch(/^ {4}image:\s*\S+/m);
+  });
+
+  // A pulled name drifting from a Dockerfile FROM (either direction) means a
+  // deploy path builds on a base image it never refreshes.
+  it("the node base image pre_update pulls is exactly the one both Dockerfiles build FROM", () => {
+    const pulled = new Set(
+      [...preUpdate().matchAll(/^ *- docker pull (\S+)$/gm)].map((m) => m[1]),
+    );
+    expect(pulled.size).toBeGreaterThan(0);
+    const bases = new Set<string>();
+    for (const file of ["backend/Dockerfile", "frontend/Dockerfile"]) {
+      for (const l of code(read(file)).split("\n")) {
+        const m = l.match(/^FROM\s+(\S+)/);
+        if (m) bases.add(m[1]);
+      }
+    }
+    expect(bases.size).toBeGreaterThan(0);
+    expect(pulled).toEqual(bases);
+  });
+});
+
+describe("frontend health gate in both deploy paths", () => {
+  const relay = code(read(".relay.yml"));
+  const deployRecipe = makefileDeployTarget();
+
+  // The same check as the frontend image's HEALTHCHECK: the standalone
+  // server must answer on port 3000 before the deploy counts as done. Each
+  // attempt carries a 3 s AbortSignal timeout, the same budget as the image
+  // HEALTHCHECK, so a frontend that accepts the connection but never answers
+  // fails one attempt in 3 s instead of waiting for fetch's own timeout.
+  const waitCmd =
+    /docker compose -f docker-compose\.prod\.yml exec -T frontend node -e "fetch\('http:\/\/localhost:3000', \{ signal: AbortSignal\.timeout\(3000\) \}\)/;
+
+  it("make deploy waits a bounded number of tries for the frontend", () => {
+    expect(deployRecipe).toMatch(waitCmd);
+    expect(deployRecipe).toMatch(/frontend .*HEALTH_TRIES.*attempts/s);
+  });
+
+  // Without the signal a hung attempt (TCP accepted, no response) costs the
+  // full fetch timeout per try instead of 3 s.
+  it("both gates abort a hung attempt after 3 s", () => {
+    expect(countMatches(deployRecipe, /AbortSignal\.timeout\(3000\)/g)).toBe(1);
+    expect(countMatches(relay, /AbortSignal\.timeout\(3000\)/g)).toBe(1);
+  });
+
+  it(".relay.yml post_update waits a bounded number of tries for the frontend, after the schema push", () => {
+    const waitAt = relay.search(waitCmd);
+    expect(waitAt).toBeGreaterThanOrEqual(0);
+    expect(relay.indexOf("post_update:")).toBeLessThan(waitAt);
+    expect(relay.indexOf("prisma db push")).toBeLessThan(waitAt);
+    // Bounded: a frontend that stays down fails the step, it never loops on.
+    expect(relay.slice(waitAt)).toMatch(/\$i -ge \d+.*exit 1/s);
   });
 });
