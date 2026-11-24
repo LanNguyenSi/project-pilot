@@ -9,7 +9,7 @@ vi.mock("../src/middleware/rate-limit.js", () => ({
 vi.mock("../src/lib/prisma.js", () => ({
   prisma: {
     user: { findUnique: vi.fn(), create: vi.fn(), update: vi.fn(), count: vi.fn() },
-    session: { create: vi.fn(), deleteMany: vi.fn() },
+    session: { create: vi.fn(), deleteMany: vi.fn(), count: vi.fn() },
     passwordReset: {
       findFirst: vi.fn(),
       create: vi.fn(),
@@ -67,6 +67,7 @@ import {
   RegistrationClosedError,
 } from "../src/services/auth.js";
 import { auth } from "../src/routes/auth.js";
+import { requireAuth } from "../src/middleware/auth.js";
 import { config } from "../src/config/index.js";
 
 // --- Typed mock refs ---
@@ -80,6 +81,7 @@ const mockPrismaUser = prisma.user as unknown as {
 const mockPrismaSession = prisma.session as unknown as {
   create: ReturnType<typeof vi.fn>;
   deleteMany: ReturnType<typeof vi.fn>;
+  count: ReturnType<typeof vi.fn>;
 };
 const mockPasswordReset = (prisma as any).passwordReset as {
   findFirst: ReturnType<typeof vi.fn>;
@@ -315,6 +317,66 @@ describe("POST /auth/logout", () => {
 
     expect(res.status).toBe(200);
     expect(mockPrismaSession.deleteMany).not.toHaveBeenCalled();
+  });
+});
+
+const mockRequireAuth = vi.mocked(requireAuth);
+const deny = async (c: any) => c.json({ error: "unauthorized", message: "Not authenticated" }, 401);
+
+describe("GET /auth/sessions", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("returns 401 and counts nothing without a valid session", async () => {
+    mockRequireAuth.mockImplementationOnce(deny as any);
+    const res = await auth.request("/sessions");
+    expect(res.status).toBe(401);
+    expect(mockPrismaSession.count).not.toHaveBeenCalled();
+  });
+
+  it("counts only unexpired sessions of the signed-in user", async () => {
+    mockPrismaSession.count.mockResolvedValue(3);
+    const before = Date.now();
+    const res = await auth.request("/sessions", { headers: { Cookie: `session=${FIXED_TOKEN}` } });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ active: 3, current: true });
+    const where = mockPrismaSession.count.mock.calls[0][0].where;
+    expect(where.userId).toBe("mock-user-id");
+    expect(where.expiresAt.gt).toBeInstanceOf(Date);
+    expect(where.expiresAt.gt.getTime()).toBeGreaterThanOrEqual(before);
+    expect(where.expiresAt.gt.getTime()).toBeLessThanOrEqual(Date.now());
+  });
+});
+
+describe("POST /auth/sessions/revoke-others", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("returns 401 and deletes nothing without a valid session", async () => {
+    mockRequireAuth.mockImplementationOnce(deny as any);
+    const res = await postJson("/sessions/revoke-others", {}, `session=${FIXED_TOKEN}`);
+    expect(res.status).toBe(401);
+    expect(mockPrismaSession.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it("deletes only other sessions of the same user and reports the number", async () => {
+    mockPrismaSession.deleteMany.mockResolvedValue({ count: 2 });
+    const res = await postJson("/sessions/revoke-others", {}, `session=${FIXED_TOKEN}`);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true, revoked: 2 });
+    expect(mockPrismaSession.deleteMany).toHaveBeenCalledTimes(1);
+    expect(mockPrismaSession.deleteMany).toHaveBeenCalledWith({
+      where: { userId: "mock-user-id", tokenHash: { not: FIXED_TOKEN_HASH } },
+    });
+  });
+
+  it("keeps the session cookie (no Set-Cookie)", async () => {
+    mockPrismaSession.deleteMany.mockResolvedValue({ count: 0 });
+    const res = await postJson("/sessions/revoke-others", {}, `session=${FIXED_TOKEN}`);
+    expect(await res.json()).toEqual({ ok: true, revoked: 0 });
+    expect(res.headers.get("Set-Cookie")).toBeNull();
   });
 });
 

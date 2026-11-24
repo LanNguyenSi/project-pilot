@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import { Badge, Button, Card, ConfirmModal, Input, SkeletonBox, useToast } from "@/components/ui";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { SessionsCard } from "@/components/settings/SessionsCard";
 
 interface Credential {
   id: string;
@@ -180,6 +181,7 @@ export default function SettingsPage() {
             </Card>
           );
         })}
+        <SessionsCard />
       </div>
 
       <ConfirmModal

@@ -78,7 +78,7 @@ describe("heading hierarchy", () => {
     );
     await screen.findByRole("heading", { level: 1, name: "Settings" });
     const levels = headingLevels();
-    expect(levels).toEqual([1, 2, 2, 2]);
+    expect(levels).toEqual([1, 2, 2, 2, 2]);
     expect(levels).not.toContain(3);
     assertConsecutiveFromH1(levels);
   });

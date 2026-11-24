@@ -121,7 +121,9 @@ login and Lax for GitHub sign-in
 A session ends when it expires, on logout, which deletes the row and clears
 the cookie (`backend/src/routes/auth.ts:122-128#"deleteCookie(c, "`), or on a
 password reset, which deletes every session of that user
-(`backend/src/routes/auth.ts:221-225#"prisma.session.deleteMany({ where: { userId: reset.userId } }),"`).
+(`backend/src/routes/auth.ts:221-225#"prisma.session.deleteMany({ where: { userId: reset.userId } }),"`). A signed-in user can also end every session except
+the current one with `POST /auth/sessions/revoke-others`; `GET /auth/sessions`
+counts the unexpired ones.
 
 The OAuth `state` cookie is separate: Lax, ten minutes
 (`backend/src/routes/oauth.ts:76-83#"maxAge: STATE_COOKIE_MAX_AGE,"`), always
