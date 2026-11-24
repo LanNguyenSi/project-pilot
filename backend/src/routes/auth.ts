@@ -227,4 +227,30 @@ auth.post("/reset-password", rateLimit({ max: 5, windowMs: 60_000 }), zValidate(
   return c.json({ ok: true });
 });
 
+// GET /auth/sessions: how many unexpired sessions the account has.
+auth.get("/sessions", requireAuth, async (c) => {
+  const userId = c.get("userId")!;
+  const active = await prisma.session.count({
+    where: { userId, expiresAt: { gt: new Date() } },
+  });
+  return c.json({ active, current: true });
+});
+
+// POST /auth/sessions/revoke-others: end every session of the account except
+// the one that sent this request.
+auth.post("/sessions/revoke-others", requireAuth, async (c) => {
+  const userId = c.get("userId")!;
+  const tokenHash = hashToken(getCookie(c, "session") ?? "");
+  // Expired rows are removed too (harmless cleanup), but only live sessions are
+  // reported, so the number matches the count GET /auth/sessions shows.
+  const now = new Date();
+  await prisma.session.deleteMany({
+    where: { userId, tokenHash: { not: tokenHash }, expiresAt: { lte: now } },
+  });
+  const { count } = await prisma.session.deleteMany({
+    where: { userId, tokenHash: { not: tokenHash }, expiresAt: { gt: now } },
+  });
+  return c.json({ ok: true, revoked: count });
+});
+
 export { auth };

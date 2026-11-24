@@ -16,6 +16,8 @@ The backend exposes a Hono HTTP API at `:3001/api/*`. All `POST`/`PUT` JSON bodi
 - `POST /api/auth/login` sign in
 - `POST /api/auth/logout` sign out
 - `GET  /api/auth/me` current user
+- `GET  /api/auth/sessions` signed-in users only: `{"active": n, "current": true}`, the number of unexpired sessions of the account (password and GitHub sign-ins both create a session row)
+- `POST /api/auth/sessions/revoke-others` signed-in users only: deletes every other session of the account and keeps the one that sent the request, answers `{"ok": true, "revoked": n}` where `n` is the number of unexpired sessions ended (expired rows of the account are removed too but not counted). Downstream service tokens (Credentials) are not touched.
 - `POST /api/auth/forgot-password` request password reset; the lookup and token issuance run after the response is sent, so the request does no database work for either a known or an unknown email.
 - `POST /api/auth/reset-password` reset password with token
 
