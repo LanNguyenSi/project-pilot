@@ -37,7 +37,7 @@ cd project-pilot
 make dev-full
 ```
 
-`make dev-full` installs deps, starts the `db` container, generates the Prisma client, copies `.env.example` files if missing, pushes the schema, and starts both servers.
+`make dev-full` installs deps, generates the Prisma client, starts the `db` container, copies `.env.example` files if missing, pushes the schema, and starts both servers.
 
 - Frontend: http://localhost:3000
 - Backend:  http://localhost:3001
