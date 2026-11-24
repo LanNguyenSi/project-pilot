@@ -87,6 +87,7 @@ export function SessionsCard() {
         open={confirmOpen}
         onClose={() => setConfirmOpen(false)}
         onConfirm={revokeOthers}
+        loading={revoking}
         title="Sign out other sessions"
         description="Every other session of this account will be signed out. This session stays signed in."
         confirmLabel="Sign out"

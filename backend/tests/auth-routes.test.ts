@@ -361,15 +361,20 @@ describe("POST /auth/sessions/revoke-others", () => {
     expect(mockPrismaSession.deleteMany).not.toHaveBeenCalled();
   });
 
-  it("deletes only other sessions of the same user and reports the number", async () => {
-    mockPrismaSession.deleteMany.mockResolvedValue({ count: 2 });
+  it("deletes only other sessions of the same user; reports only the unexpired ones removed", async () => {
+    mockPrismaSession.deleteMany.mockResolvedValueOnce({ count: 5 }).mockResolvedValueOnce({ count: 2 });
     const res = await postJson("/sessions/revoke-others", {}, `session=${FIXED_TOKEN}`);
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ok: true, revoked: 2 });
-    expect(mockPrismaSession.deleteMany).toHaveBeenCalledTimes(1);
-    expect(mockPrismaSession.deleteMany).toHaveBeenCalledWith({
-      where: { userId: "mock-user-id", tokenHash: { not: FIXED_TOKEN_HASH } },
-    });
+    expect(mockPrismaSession.deleteMany).toHaveBeenCalledTimes(2);
+    const [expiredCall, liveCall] = mockPrismaSession.deleteMany.mock.calls.map((c) => c[0].where);
+    expect(expiredCall.userId).toBe("mock-user-id");
+    expect(expiredCall.tokenHash).toEqual({ not: FIXED_TOKEN_HASH });
+    expect(expiredCall.expiresAt.lte).toBeInstanceOf(Date);
+    expect(liveCall.userId).toBe("mock-user-id");
+    expect(liveCall.tokenHash).toEqual({ not: FIXED_TOKEN_HASH });
+    expect(liveCall.expiresAt.gt).toBeInstanceOf(Date);
+    expect(liveCall.expiresAt.gt).toBe(expiredCall.expiresAt.lte);
   });
 
   it("keeps the session cookie (no Set-Cookie)", async () => {

@@ -241,8 +241,14 @@ auth.get("/sessions", requireAuth, async (c) => {
 auth.post("/sessions/revoke-others", requireAuth, async (c) => {
   const userId = c.get("userId")!;
   const tokenHash = hashToken(getCookie(c, "session") ?? "");
+  // Expired rows are removed too (harmless cleanup), but only live sessions are
+  // reported, so the number matches the count GET /auth/sessions shows.
+  const now = new Date();
+  await prisma.session.deleteMany({
+    where: { userId, tokenHash: { not: tokenHash }, expiresAt: { lte: now } },
+  });
   const { count } = await prisma.session.deleteMany({
-    where: { userId, tokenHash: { not: tokenHash } },
+    where: { userId, tokenHash: { not: tokenHash }, expiresAt: { gt: now } },
   });
   return c.json({ ok: true, revoked: count });
 });
