@@ -2,6 +2,15 @@
 
 <!-- Add new entries at the top, newest first. -->
 
+- 2026-11-24T10:37:03Z, request-gating-and-sessions re-verified and
+  re-stamped after the sign-out-other-sessions change (`backend/src/routes/auth.ts`
+  gains `GET /auth/sessions` and `POST /auth/sessions/revoke-others` below
+  reset-password, so no line above them moved). The sentence added with that change was
+  re-read against the routes (the count covers unexpired sessions only, revoke-others
+  keeps the request's own session) and now carries a citation to them; the existing
+  `auth.ts` citations, the eleven-route rate-limit list (the new routes are not rate
+  limited) and the CSRF claim (`/api/auth/*` is covered) still match. Check:
+  `npx -y okf-kit@0.22.0 check --require-anchors docs/okf`.
 - 2026-11-22T10:54:23Z, credential-trust-boundary and request-gating-and-sessions re-verified and
   re-stamped after the bootstrap registration change (`backend/src/routes/auth.ts`,
   `backend/src/services/auth.ts`: the user count and the create run in one transaction behind

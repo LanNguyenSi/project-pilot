@@ -3,7 +3,7 @@ type: invariant
 title: Request gating and session model
 description: Global CORS and security headers, CSRF registered per route prefix in app.ts, requireAuth registered per router, opaque hashed session tokens with SameSite Strict for password sign-in and Lax for GitHub sign-in, per-process rate limits on four public auth endpoints, the credential write, the forge magic-fill proxy and five expensive proxy routes keyed on the last X-Forwarded-For entry, and a CSP that only the frontend sets.
 tags: [auth, sessions, csrf, cors, rate-limit, headers, csp]
-timestamp: 2026-11-22T10:54:23Z
+timestamp: 2026-11-24T10:37:03Z
 sources:
   - backend/src/app.ts
   - backend/src/middleware/auth.ts
@@ -123,7 +123,8 @@ the cookie (`backend/src/routes/auth.ts:122-128#"deleteCookie(c, "`), or on a
 password reset, which deletes every session of that user
 (`backend/src/routes/auth.ts:221-225#"prisma.session.deleteMany({ where: { userId: reset.userId } }),"`). A signed-in user can also end every session except
 the current one with `POST /auth/sessions/revoke-others`; `GET /auth/sessions`
-counts the unexpired ones.
+counts the unexpired ones
+(`backend/src/routes/auth.ts:231-253#"return c.json({ ok: true, revoked: count });"`).
 
 The OAuth `state` cookie is separate: Lax, ten minutes
 (`backend/src/routes/oauth.ts:76-83#"maxAge: STATE_COOKIE_MAX_AGE,"`), always
