@@ -2,6 +2,19 @@
 
 <!-- Add new entries at the top, newest first. -->
 
+- 2026-11-25T13:21:01Z, request-gating-and-sessions re-verified and re-stamped after the
+  API client rate-limit handling (`frontend/src/lib/api.ts`: a 429 answer is turned into
+  an `ApiError` carrying the limiter's `message` and, when the `Retry-After` header is
+  readable, `retryAfterSeconds`, with `parseRetryAfter` and two constants added above
+  `apiFetch`; the dashboard page shows an error state for a failed summary). The PR had
+  already re-pointed the `X-Requested-With` citation to `frontend/src/lib/api.ts:57-64`;
+  re-read at HEAD, that range is the `fetch` call with `credentials: "include"` and the
+  default headers including `X-Requested-With: XMLHttpRequest`, so the CSRF header claim
+  holds. `API_URL` (line 1, `NEXT_PUBLIC_API_URL` with the `http://localhost:3001`
+  default) is untouched, so the CSP `connect-src` sentence that cites it by name still
+  matches. The doc's 429 claim concerns the backend limiter answering with `Retry-After`
+  and is unchanged. No claim or citation needed correcting. Check: `npx -y okf-kit@0.22.0
+  check --require-anchors docs/okf`.
 - 2026-11-24T10:37:03Z, request-gating-and-sessions re-verified and
   re-stamped after the sign-out-other-sessions change (`backend/src/routes/auth.ts`
   gains `GET /auth/sessions` and `POST /auth/sessions/revoke-others` below
