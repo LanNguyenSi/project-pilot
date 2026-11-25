@@ -40,7 +40,6 @@ function parseRetryAfter(value: string | null | undefined): number | undefined {
     if (Number.isNaN(at)) return undefined;
     seconds = (at - Date.now()) / 1000;
   }
-  if (!Number.isFinite(seconds)) return undefined;
   const rounded = Math.ceil(seconds);
   if (rounded <= 0) return undefined;
   return Math.min(rounded, MAX_RETRY_DISPLAY_SECONDS);
@@ -77,7 +76,7 @@ export async function apiFetch<T>(
         typeof body.message === "string" && body.message.trim() !== ""
           ? body.message
           : RATE_LIMIT_FALLBACK_MESSAGE;
-      const retryAfter = parseRetryAfter(res.headers?.get?.("Retry-After"));
+      const retryAfter = parseRetryAfter(res.headers?.get("Retry-After"));
       throw new ApiError(
         retryAfter === undefined ? text : `${text} Try again in ${retryAfter} s.`,
         res.status,

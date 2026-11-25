@@ -207,6 +207,14 @@ describe("apiFetch rate limiting (429)", () => {
     }
   });
 
+  it("shows the message without a wait when the response carries no headers object", async () => {
+    fetchMock.mockResolvedValueOnce({ ok: false, status: 429, json: async () => limiterBody });
+    await expect(apiFetch("/x")).rejects.toMatchObject({
+      message: "Too many requests. Please try again later.",
+      status: 429,
+    });
+  });
+
   it("keeps body.error first for other statuses", async () => {
     fetchMock.mockResolvedValueOnce({
       ok: false,
