@@ -139,7 +139,7 @@ For any method other than GET, HEAD and OPTIONS, `csrfProtection` requires
 look at cookies, so it applies the same way to Strict and Lax sessions. The
 frontend's `apiFetch` sends the header on every call, together with
 `credentials: "include"`
-(`frontend/src/lib/api.ts:53-60#"X-Requested-With"`).
+(`frontend/src/lib/api.ts:57-64#"X-Requested-With"`).
 
 ## Rate limits
 
