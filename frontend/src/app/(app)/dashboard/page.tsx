@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { apiFetch } from "@/lib/api";
-import { Badge, Card, Icon, SkeletonBox } from "@/components/ui";
+import { Badge, Button, Card, Icon, SkeletonBox } from "@/components/ui";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { useAuth } from "@/lib/auth-context";
 import { serviceState, type ServiceState } from "@/lib/service-state";
@@ -38,6 +38,10 @@ export default function DashboardPage() {
   const { user, loading: authLoading } = useAuth();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  // True while the latest summary load failed (non-401). Cleared by the next success.
+  const [loadFailed, setLoadFailed] = useState(false);
+  // Bumped by the retry button to restart the load and the 30 s poll.
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -47,10 +51,14 @@ export default function DashboardPage() {
         const dashData = await apiFetch<DashboardData>("/api/dashboard/summary");
         if (!cancelled) {
           setData(dashData);
+          setLoadFailed(false);
         }
       } catch (err) {
         if (err instanceof Error && (err.message.includes("401") || err.message.includes("Not authenticated"))) {
           router.push("/login");
+        } else if (!cancelled) {
+          // Keep any earlier data; the render below decides what to show.
+          setLoadFailed(true);
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -60,7 +68,7 @@ export default function DashboardPage() {
     void fetchDashboard();
     const interval = setInterval(() => void fetchDashboard(), 30_000);
     return () => { cancelled = true; clearInterval(interval); };
-  }, [router]);
+  }, [router, reloadKey]);
 
   if (loading || authLoading) {
     return (
@@ -78,6 +86,45 @@ export default function DashboardPage() {
         </div>
         <span className="sr-only">Loading</span>
       </div>
+    );
+  }
+
+  const quickActions = [
+    { label: "Create Project", href: "/forge/create", icon: <Icon name="plus" size={20} /> },
+    { label: "View Tasks",     href: "/tasks",        icon: <Icon name="tasks" size={20} /> },
+    { label: "Deployments",    href: "/deploys",      icon: <Icon name="rocket" size={20} /> },
+  ];
+
+  // No data and the load failed: say so instead of reading the missing
+  // summary as "not configured" for every service.
+  if (!data && loadFailed) {
+    return (
+      <>
+        <PageHeader
+          title="Dashboard"
+          description={user ? `Welcome, ${user.name || user.email}` : "Welcome"}
+        />
+        <Card className="border-accent-red/50 p-4 mb-8" role="alert">
+          <p className="text-sm font-medium text-accent-red">Could not load the service summary</p>
+          <p className="text-sm text-content-secondary mt-1">
+            The dashboard retries every 30 seconds, or you can try again now.
+          </p>
+          <Button variant="secondary" className="mt-3" onClick={() => setReloadKey((k) => k + 1)}>
+            Try again
+          </Button>
+        </Card>
+        <h2 className="text-section-title text-content-primary mb-4">Quick Actions</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {quickActions.map((a) => (
+            <Link key={a.href} href={a.href}>
+              <Card variant="interactive" className="flex items-center gap-3 p-4">
+                <span className="text-content-tertiary">{a.icon}</span>
+                <span className="text-sm font-medium text-content-primary">{a.label}</span>
+              </Card>
+            </Link>
+          ))}
+        </div>
+      </>
     );
   }
 
@@ -128,12 +175,6 @@ export default function DashboardPage() {
     },
   ];
 
-  const quickActions = [
-    { label: "Create Project", href: "/forge/create", icon: <Icon name="plus" size={20} /> },
-    { label: "View Tasks",     href: "/tasks",        icon: <Icon name="tasks" size={20} /> },
-    { label: "Deployments",    href: "/deploys",      icon: <Icon name="rocket" size={20} /> },
-  ];
-
   return (
     <>
       {/* PageHeader replaces the ad-hoc welcome <p>. */}
@@ -141,6 +182,17 @@ export default function DashboardPage() {
         title="Dashboard"
         description={user ? `Welcome, ${user.name || user.email}` : "Welcome"}
       />
+
+      {/* A refresh failed after an earlier success: the cards below are the
+          last good data, so say that they may be out of date. */}
+      {loadFailed && (
+        <Card className="border-accent-amber/50 p-4 mb-4" role="status">
+          <p className="text-sm text-accent-amber">
+            The latest refresh failed. The figures below are from the last successful load; the
+            dashboard retries every 30 seconds.
+          </p>
+        </Card>
+      )}
 
       {/* Stat cards with card-stagger entrance.
           Card stagger pattern: each wrapper div carries --delay via inline style;
