@@ -195,6 +195,19 @@ describe("apiFetch rate limiting (429)", () => {
     expect(err.message).toBe("Too many requests. Please try again later. Try again in 30 s.");
   });
 
+  it("rounds an HTTP date up when the clock has a sub-second part", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-01-01T00:00:00.400Z"));
+    const err = await rejection(limiterBody, "Thu, 01 Jan 2026 00:00:30 GMT");
+    expect(err.retryAfterSeconds).toBe(30);
+  });
+
+  it("accepts a fractional delay-seconds value and rounds it up", async () => {
+    const err = await rejection(limiterBody, "1.2");
+    expect(err.retryAfterSeconds).toBe(2);
+    expect(err.message).toBe("Too many requests. Please try again later. Try again in 2 s.");
+  });
+
   it("caps a very long wait in the display", async () => {
     expect((await rejection(limiterBody, "999999")).retryAfterSeconds).toBe(3600);
   });

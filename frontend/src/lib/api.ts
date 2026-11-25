@@ -9,7 +9,11 @@ export const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001
 export class ApiError extends Error {
   status: number;
   body: Record<string, unknown>;
-  /** Seconds until a retry is allowed, from a readable `Retry-After` header (429 only). */
+  /**
+   * Seconds until a retry is allowed, from a readable `Retry-After` header
+   * (429 only). Rounded up and display-capped at 3600 s: a longer wait is
+   * reported as 3600.
+   */
   retryAfterSeconds?: number;
   constructor(message: string, status: number, body: Record<string, unknown>, retryAfterSeconds?: number) {
     super(message);
