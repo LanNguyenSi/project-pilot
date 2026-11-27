@@ -181,6 +181,7 @@ export default function ForgePage() {
 
       {projects.length === 0 && !error ? (
         <EmptyState
+          headingLevel={2}
           icon={<Icon name="hammer" size={48} />}
           title="No projects yet"
           description="Create your first project to scaffold a new repository."

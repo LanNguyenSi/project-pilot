@@ -238,6 +238,7 @@ export default function TaskProjectsPage() {
 
           {projects.length === 0 ? (
             <EmptyState
+              headingLevel={2}
               icon={<Icon name="folder" size={48} />}
               title="No projects found"
               description={
