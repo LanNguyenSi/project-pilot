@@ -467,6 +467,7 @@ export default function DeploysPage() {
             {servers.length === 0 && (
               <div className="col-span-full">
                 <EmptyState
+                  headingLevel={2}
                   icon={<Icon name="rocket" size={40} />}
                   title="No servers configured"
                   description='Click "Add Server" to connect your first server.'
@@ -550,6 +551,7 @@ export default function DeploysPage() {
 
           {deploys.length === 0 ? (
             <EmptyState
+              headingLevel={2}
               icon={<Icon name="rocket" size={40} />}
               title={serverFilter || appFilter || statusFilter ? "No matching deploys" : "No deploys yet"}
               description={

@@ -8,9 +8,14 @@
 // (axe `page-has-heading-one`); the wordmark is now the page's single <h1>.
 import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn() }),
+  usePathname: () => "/tasks",
+  useParams: () => ({ projectId: "p1" }),
+}));
+vi.mock("@/lib/auth-context", () => ({ useAuth: () => ({ user: null }) }));
 
 const apiFetch = vi.fn();
 vi.mock("@/lib/api", () => ({
@@ -24,6 +29,9 @@ import ForgePage from "@/app/(app)/forge/page";
 import SettingsPage from "@/app/(app)/settings/page";
 import DeploysPage from "@/app/(app)/deploys/page";
 import LoginPage from "@/app/login/page";
+import TasksPage from "@/app/(app)/tasks/page";
+import ProjectTasksPage from "@/app/(app)/tasks/[projectId]/page";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 beforeEach(() => {
   apiFetch.mockReset();
@@ -103,5 +111,103 @@ describe("heading hierarchy", () => {
     expect(h1s[0]).toHaveTextContent("project-pilot");
     // The wordmark is the only heading, so there is nothing to jump over.
     expect(headingLevels()).toEqual([1]);
+  });
+
+  describe("empty states sit directly under the page h1 as h2", () => {
+    it("Forge without projects", async () => {
+      apiFetch.mockImplementation(async (url?: string) =>
+        url?.startsWith("/api/forge/projects") ? { projects: [] } : {},
+      );
+      render(
+        <ToastProvider>
+          <ForgePage />
+        </ToastProvider>,
+      );
+      await screen.findByRole("heading", { level: 2, name: "No projects yet" });
+      const levels = headingLevels();
+      expect(levels).toEqual([1, 2]);
+      assertConsecutiveFromH1(levels);
+    });
+
+    it("Deploys Servers tab without servers", async () => {
+      apiFetch.mockImplementation(async (url?: string) => {
+        if (url?.startsWith("/api/deploy/servers")) return { servers: [] };
+        if (url?.startsWith("/api/deploy/apps")) return { apps: [] };
+        if (url?.startsWith("/api/deploy/history")) return { deploys: [], total: 0 };
+        return {};
+      });
+      render(
+        <ToastProvider>
+          <DeploysPage />
+        </ToastProvider>,
+      );
+      await screen.findByRole("heading", { level: 2, name: "No servers configured" });
+      const levels = headingLevels();
+      expect(levels).toEqual([1, 2]);
+      assertConsecutiveFromH1(levels);
+    });
+
+    it("Deploys History tab without deploys", async () => {
+      render(
+        <ToastProvider>
+          <DeploysPage />
+        </ToastProvider>,
+      );
+      await screen.findByRole("heading", { level: 1, name: "Deploys" });
+      fireEvent.click(screen.getByRole("tab", { name: /History/ }));
+      await screen.findByRole("heading", { level: 2, name: "No deploys yet" });
+      const levels = headingLevels();
+      expect(levels).toEqual([1, 2]);
+      assertConsecutiveFromH1(levels);
+    });
+
+    it("Tasks without projects", async () => {
+      apiFetch.mockImplementation(async (url?: string) =>
+        url?.startsWith("/api/tasks/projects") ? { projects: [] } : { teams: [] },
+      );
+      render(
+        <ToastProvider>
+          <TasksPage />
+        </ToastProvider>,
+      );
+      await screen.findByRole("heading", { level: 2, name: "No projects found" });
+      const levels = headingLevels();
+      expect(levels[0]).toBe(1);
+      expect(levels).not.toContain(3);
+      assertConsecutiveFromH1(levels);
+    });
+
+    it("Project tasks without tasks", async () => {
+      apiFetch.mockImplementation(async (url?: string) =>
+        url === "/api/tasks/projects"
+          ? { projects: [{ id: "p1", name: "P", slug: "p", description: "" }] }
+          : { tasks: [] },
+      );
+      render(
+        <ToastProvider>
+          <ProjectTasksPage />
+        </ToastProvider>,
+      );
+      await screen.findByRole("heading", { level: 2, name: "No tasks yet" });
+      const levels = headingLevels();
+      expect(levels[0]).toBe(1);
+      expect(levels).not.toContain(3);
+      assertConsecutiveFromH1(levels);
+    });
+  });
+
+  describe("EmptyState headingLevel", () => {
+    it("an unnamed caller keeps h3", () => {
+      render(<EmptyState icon={null} title="Nothing" />);
+      expect(screen.getByRole("heading", { name: "Nothing" }).tagName).toBe("H3");
+    });
+    it("headingLevel 3 is h3", () => {
+      render(<EmptyState icon={null} title="Nothing" headingLevel={3} />);
+      expect(screen.getByRole("heading", { name: "Nothing" }).tagName).toBe("H3");
+    });
+    it("headingLevel 2 is h2", () => {
+      render(<EmptyState icon={null} title="Nothing" headingLevel={2} />);
+      expect(screen.getByRole("heading", { name: "Nothing" }).tagName).toBe("H2");
+    });
   });
 });

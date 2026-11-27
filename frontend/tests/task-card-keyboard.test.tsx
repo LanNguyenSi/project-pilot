@@ -62,13 +62,30 @@ describe.each(["list", "board"])("task cards (%s view)", (view) => {
     expect(screen.getByRole("dialog", { name: "Task k1" })).toBeInTheDocument();
   });
 
-  it("Space opens the panel and does not scroll the page", async () => {
+  it("Space keydown alone does not open the panel and does not scroll the page", async () => {
     render(<ProjectTasksPage />);
     const [first] = await cards();
     first.focus();
     const notPrevented = fireEvent.keyDown(first, { key: " " });
     expect(notPrevented).toBe(false);
-    expect(screen.getByRole("dialog", { name: "Task k1" })).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("Space keydown then keyup opens the panel once", async () => {
+    render(<ProjectTasksPage />);
+    const [first] = await cards();
+    first.focus();
+    fireEvent.keyDown(first, { key: " " });
+    fireEvent.keyUp(first, { key: " " });
+    expect(screen.getAllByRole("dialog", { name: "Task k1" })).toHaveLength(1);
+  });
+
+  it("Space keyup without a keydown on the card does not open the panel", async () => {
+    render(<ProjectTasksPage />);
+    const [first] = await cards();
+    first.focus();
+    fireEvent.keyUp(first, { key: " " });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("Tab reaches the cards in order", async () => {
@@ -130,6 +147,57 @@ describe("Card", () => {
     fireEvent.keyDown(inner, { key: " " });
     expect(onInner).toHaveBeenCalledTimes(2);
     expect(onCard).not.toHaveBeenCalled();
+  });
+
+  it("Enter activates on keydown, not on keyup", () => {
+    const onCard = vi.fn();
+    render(<Card data-testid="c" onClick={onCard}>x</Card>);
+    const el = screen.getByTestId("c");
+    fireEvent.keyDown(el, { key: "Enter" });
+    expect(onCard).toHaveBeenCalledTimes(1);
+    fireEvent.keyUp(el, { key: "Enter" });
+    expect(onCard).toHaveBeenCalledTimes(1);
+  });
+
+  it("a keydown on one card does not arm another card's Space keyup", () => {
+    const onA = vi.fn();
+    const onB = vi.fn();
+    render(
+      <>
+        <Card data-testid="a" onClick={onA}>a</Card>
+        <Card data-testid="b" onClick={onB}>b</Card>
+      </>,
+    );
+    fireEvent.keyDown(screen.getByTestId("a"), { key: " " });
+    fireEvent.keyUp(screen.getByTestId("b"), { key: " " });
+    expect(onB).not.toHaveBeenCalled();
+    expect(onA).not.toHaveBeenCalled();
+  });
+
+  it("Space keyup on a nested control does not activate the card, even after a card keydown", () => {
+    const onCard = vi.fn();
+    render(
+      <Card data-testid="c" onClick={onCard}>
+        <button type="button">inner</button>
+      </Card>,
+    );
+    fireEvent.keyDown(screen.getByTestId("c"), { key: " " });
+    fireEvent.keyUp(screen.getByText("inner"), { key: " " });
+    expect(onCard).not.toHaveBeenCalled();
+  });
+
+  it("a caller onKeyUp is passed through", () => {
+    const onUp = vi.fn();
+    render(<Card data-testid="c" onClick={() => {}} onKeyUp={onUp}>x</Card>);
+    fireEvent.keyUp(screen.getByTestId("c"), { key: "a" });
+    expect(onUp).toHaveBeenCalledTimes(1);
+  });
+
+  it("without onClick a caller onKeyUp is passed through", () => {
+    const onUp = vi.fn();
+    render(<Card data-testid="c" onKeyUp={onUp}>x</Card>);
+    fireEvent.keyUp(screen.getByTestId("c"), { key: "a" });
+    expect(onUp).toHaveBeenCalledTimes(1);
   });
 
   it("an onKeyDown that prevents the default suppresses activation", () => {

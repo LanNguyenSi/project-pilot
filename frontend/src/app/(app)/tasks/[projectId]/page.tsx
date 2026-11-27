@@ -219,6 +219,7 @@ export default function ProjectTasksPage() {
         </div>
       ) : tasks.length === 0 ? (
         <EmptyState
+          headingLevel={2}
           icon={<Icon name="check-circle" size={48} />}
           title="No tasks yet"
           description="Create your first task to start tracking work for this project."
