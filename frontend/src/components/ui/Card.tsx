@@ -1,4 +1,4 @@
-import type { HTMLAttributes, KeyboardEvent } from "react";
+import type { FocusEvent, HTMLAttributes, KeyboardEvent } from "react";
 
 // Cards whose Space keydown started on the card itself. Module scope instead of
 // a hook: Card is also rendered from server components, where hooks are not allowed.
@@ -27,6 +27,7 @@ export function Card({
   onClick,
   onKeyDown,
   onKeyUp,
+  onBlur,
   ...rest
 }: CardProps) {
   // Space activates on keyup like a native button, and only when its keydown
@@ -57,8 +58,13 @@ export function Card({
           const started = spaceStarted.delete(e.currentTarget);
           if (started && !e.defaultPrevented) e.currentTarget.click();
         },
+        // A press that started here does not survive focus leaving the card.
+        onBlur: (e: FocusEvent<HTMLDivElement>) => {
+          onBlur?.(e);
+          spaceStarted.delete(e.currentTarget);
+        },
       }
-    : { onKeyDown, onKeyUp };
+    : { onKeyDown, onKeyUp, onBlur };
   const focusRing = onClick
     ? " focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-brand-500/60"
     : "";

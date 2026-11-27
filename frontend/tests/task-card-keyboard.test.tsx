@@ -200,6 +200,68 @@ describe("Card", () => {
     expect(onUp).toHaveBeenCalledTimes(1);
   });
 
+  it("a completed Space press does not leave the card armed for a later bare keyup", () => {
+    const onCard = vi.fn();
+    render(<Card data-testid="c" onClick={onCard}>x</Card>);
+    const el = screen.getByTestId("c");
+    fireEvent.keyDown(el, { key: " " });
+    fireEvent.keyUp(el, { key: " " });
+    expect(onCard).toHaveBeenCalledTimes(1);
+    fireEvent.keyUp(el, { key: " " });
+    expect(onCard).toHaveBeenCalledTimes(1);
+  });
+
+  it("an onKeyUp that prevents the default suppresses Space activation", () => {
+    const onCard = vi.fn();
+    render(
+      <Card data-testid="c" onClick={onCard} onKeyUp={(e) => e.preventDefault()}>
+        x
+      </Card>,
+    );
+    const el = screen.getByTestId("c");
+    fireEvent.keyDown(el, { key: " " });
+    fireEvent.keyUp(el, { key: " " });
+    expect(onCard).not.toHaveBeenCalled();
+  });
+
+  it("a non-Space keyup while Space is armed does not activate; the Space keyup does, once", () => {
+    const onCard = vi.fn();
+    render(<Card data-testid="c" onClick={onCard}>x</Card>);
+    const el = screen.getByTestId("c");
+    fireEvent.keyDown(el, { key: " " });
+    fireEvent.keyUp(el, { key: "Shift" });
+    fireEvent.keyUp(el, { key: "a" });
+    expect(onCard).not.toHaveBeenCalled();
+    fireEvent.keyUp(el, { key: " " });
+    expect(onCard).toHaveBeenCalledTimes(1);
+  });
+
+  it("blur clears the Space arm: keydown, blur, keyup does not activate", () => {
+    const onCard = vi.fn();
+    render(<Card data-testid="c" onClick={onCard}>x</Card>);
+    const el = screen.getByTestId("c");
+    el.focus();
+    fireEvent.keyDown(el, { key: " " });
+    fireEvent.blur(el);
+    fireEvent.keyUp(el, { key: " " });
+    expect(onCard).not.toHaveBeenCalled();
+  });
+
+  it("a caller onBlur is passed through, with and without onClick", () => {
+    const withClick = vi.fn();
+    const without = vi.fn();
+    render(
+      <>
+        <Card data-testid="a" onClick={() => {}} onBlur={withClick}>a</Card>
+        <Card data-testid="b" onBlur={without}>b</Card>
+      </>,
+    );
+    fireEvent.blur(screen.getByTestId("a"));
+    fireEvent.blur(screen.getByTestId("b"));
+    expect(withClick).toHaveBeenCalledTimes(1);
+    expect(without).toHaveBeenCalledTimes(1);
+  });
+
   it("an onKeyDown that prevents the default suppresses activation", () => {
     const onCard = vi.fn();
     render(
